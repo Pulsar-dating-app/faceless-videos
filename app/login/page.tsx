@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 import { Mail, Lock, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { Navbar } from "@/components/Navbar";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
+
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,26 +39,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* Navbar / Header */}
-      <header className="w-full p-6 flex justify-between items-center max-w-6xl mx-auto">
-        <Link href="/" className="flex items-center gap-2 font-bold text-xl">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white text-lg">V</span>
-          </div>
-          <span>ViralGen</span>
-        </Link>
-        <nav className="hidden md:flex gap-6 text-sm font-medium text-zinc-600 dark:text-zinc-400">
-          <Link href="#" className="hover:text-blue-600 transition-colors">
-            Features
-          </Link>
-          <Link href="/pricing" className="hover:text-blue-600 transition-colors">
-            Pricing
-          </Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">
-            About
-          </Link>
-        </nav>
-      </header>
+      <Navbar />
 
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center px-4 py-12">

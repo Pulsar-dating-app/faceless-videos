@@ -15,6 +15,27 @@ export async function POST(request: Request) {
     const durationNum = parseInt(duration) || 30;
     const wordCount = Math.round((durationNum / 60) * 150);
 
+    let specificInstructions = "";
+    
+    if (category === "reddit") {
+      specificInstructions = `
+      You are narrating a viral Reddit story (like r/AskReddit, r/TIFU, or r/confession).
+      Start immediately with a hook like "I accidentally..." or "My boss fired me because..." or "TIFU by...".
+      Do not say "Here is a story" or "Welcome to Reddit". Just jump straight into the first-person narration.
+      The tone should be conversational, slightly dramatic, and engaging, like someone telling a crazy story to a friend.
+      Keep it strictly first-person ("I did this", "She told me").
+      `;
+    } else if (category === "reddit-relationship") {
+      specificInstructions = `
+      You are narrating a viral Reddit Relationship story (like r/relationships, r/AITAH, or r/marriage).
+      START IMMEDIATELY with the format: "Me [Age][Gender] and my [Relation] [Age][Gender]..." (e.g., "Me 23M and my girlfriend 24F were having...").
+      Focus on relationship drama, confessions, or wholesome moments.
+      The tone should be personal, confessional, and engaging.
+      Keep it strictly first-person.
+      Do NOT include title or intro like "Here is a relationship story". Start directly with the "Me [Age][Gender]..." hook.
+      `;
+    }
+
     const systemPrompt = `You are a narrator speaking in a continuous, single-voice monologue designed for text-to-speech. 
     You never include dialogue between multiple characters. You never switch perspectives or include more than one speaking voice. 
     Everything you say must sound like a narrated story, explanation, reflection, or spoken thought. 
@@ -24,6 +45,7 @@ export async function POST(request: Request) {
     You may create vivid imagery and emotion, but always through narration alone.
 
     The content must be highly engaging and viral-worthy for TikTok/Reels/Shorts.
+    ${specificInstructions}
     
     Target Duration: ${durationNum} seconds (approx ${wordCount} words).
     Category: ${category}

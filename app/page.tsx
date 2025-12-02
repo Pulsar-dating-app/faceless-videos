@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { ArrowRight, Sparkles, Loader2, Video, FileText, Wand2, Play, Pause, User } from "lucide-react";
 import { useState, useRef } from "react";
+import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/lib/auth-context";
 
 export default function Home() {
-  const { user, isLoading, signOut } = useAuth();
+  const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
@@ -136,42 +137,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* Navbar / Header */}
-      <header className="w-full p-6 flex justify-between items-center max-w-6xl mx-auto">
-        <div className="flex items-center gap-2 font-bold text-xl cursor-pointer" onClick={() => { setShowForm(false); setVideoUrl(null); }}>
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white text-lg">V</span>
-          </div>
-          <span>ViralGen</span>
-        </div>
-        {/* Placeholder for future auth/menu */}
-        <nav className="hidden md:flex gap-6 text-sm font-medium text-zinc-600 dark:text-zinc-400 items-center">
-          <a href="#" className="hover:text-blue-600 transition-colors">Features</a>
-          <Link href="/pricing" className="hover:text-blue-600 transition-colors">Pricing</Link>
-          <a href="#" className="hover:text-blue-600 transition-colors">About</a>
-          
-          {isLoading ? (
-            <div className="w-20 h-8 bg-zinc-100 dark:bg-zinc-800 animate-pulse rounded-md" />
-          ) : user ? (
-            <div className="flex items-center gap-4">
-              <span className="text-sm font-medium">{user.email}</span>
-              <button 
-                onClick={() => signOut()}
-                className="text-red-600 hover:text-red-700 transition-colors"
-              >
-                Sign Out
-              </button>
-            </div>
-          ) : (
-            <>
-              <Link href="/login" className="hover:text-blue-600 transition-colors">Login</Link>
-              <Link href="/signup" className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
-                Sign Up
-              </Link>
-            </>
-          )}
-        </nav>
-      </header>
+      <Navbar />
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center text-center px-4 py-12 sm:py-20">
@@ -240,6 +206,8 @@ export default function Home() {
                       <option value="tech">Tech Facts</option>
                       <option value="scary">Scary Story</option>
                       <option value="history">History Facts</option>
+                      <option value="reddit">Reddit Story</option>
+                      <option value="reddit-relationship">Reddit Relationship</option>
                     </select>
                   </div>
 

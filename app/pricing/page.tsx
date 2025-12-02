@@ -47,35 +47,12 @@ const pricingPlans = [
   },
 ];
 
+import { Navbar } from "@/components/Navbar";
+
 export default function PricingPage() {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* Navbar / Header */}
-      <header className="w-full p-6 flex justify-between items-center max-w-6xl mx-auto">
-        <Link href="/" className="flex items-center gap-2 font-bold text-xl">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white text-lg">V</span>
-          </div>
-          <span>ViralGen</span>
-        </Link>
-        <nav className="hidden md:flex gap-6 text-sm font-medium text-zinc-600 dark:text-zinc-400 items-center">
-          <Link href="#" className="hover:text-blue-600 transition-colors">
-            Features
-          </Link>
-          <Link href="/pricing" className="hover:text-blue-600 transition-colors">
-            Pricing
-          </Link>
-          <Link href="#" className="hover:text-blue-600 transition-colors">
-            About
-          </Link>
-          <Link href="/login" className="hover:text-blue-600 transition-colors">
-            Login
-          </Link>
-          <Link href="/signup" className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
-            Sign Up
-          </Link>
-        </nav>
-      </header>
+      <Navbar />
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-12 sm:py-20">
