@@ -7,15 +7,10 @@ import ffmpegStatic from "ffmpeg-static";
 
 // Tell fluent-ffmpeg where to find the ffmpeg binary
 if (ffmpegStatic) {
-  // On Windows, ffmpeg-static might return a path with backslashes, which could cause issues if not handled.
-  // But generally it works. If "spawn ... ENOENT" happens, it usually means the file isn't at that path or permission denied.
-  // However, the error message showed the path to node_modules/ffmpeg-static/ffmpeg.exe 
-  // If the path has spaces or special chars (like "Área de Trabalho"), it might be an issue with how spawn handles it.
-  
-  // Let's try to use the path directly. 
+  console.log("ffmpeg-static path:", ffmpegStatic);
   ffmpeg.setFfmpegPath(ffmpegStatic);
 } else {
-    console.warn("ffmpeg-static not found, relying on system ffmpeg");
+  console.warn("ffmpeg-static not found, relying on system ffmpeg");
 }
 
 export async function POST(request: Request) {
@@ -55,29 +50,44 @@ export async function POST(request: Request) {
     fs.writeFileSync(audioPath, audioBuffer);
 
     // 2. Get audio duration to cut video accordingly
-    // We need to use ffmpeg.ffprobe to get duration, or just trust fluent-ffmpeg to cut
-    // But to cut the video to match audio, we can set output duration to match audio input
+    let audioDuration = 0;
+    await new Promise<void>((resolve) => {
+      ffmpeg.ffprobe(audioPath, (err, metadata) => {
+        if (!err) {
+          audioDuration = metadata.format.duration || 0;
+          console.log(`Audio duration: ${audioDuration}s`);
+        }
+        resolve();
+      });
+    });
 
     // We'll use a promise wrapper for the ffmpeg process
     await new Promise((resolve, reject) => {
-      ffmpeg()
+      // Use complex filter to ensure audio drives the duration
+      // "apad" adds silence to the end of the audio stream if needed (though we want the opposite, we want video to stop)
+      // The most reliable way is to use -t explicitly with the audio duration
+      
+      let command = ffmpeg()
         .input(videoPath)
-        .input(audioPath)
-        // Cut video to length of audio
-        // -shortest in some contexts works, but better to explicitly set duration if we knew it
-        // or use complex filter. 
-        // Simple approach: Loop video if short, or just take video stream and map audio
-        // We want the video to be cut to the audio duration.
-        // The 'shortest' input option tells ffmpeg to finish encoding when the shortest input stream ends.
+        .input(audioPath);
+
+      // If we successfully got the duration, use it to limit the video
+      if (audioDuration > 0) {
+        // Add a small buffer (0.1s) to avoid cutting off the very last millisecond of audio
+        const durationWithBuffer = audioDuration + 0.1;
+        command = command.outputOptions([`-t ${durationWithBuffer}`]);
+      } else {
+        // Fallback to shortest if probe failed
+        command = command.outputOptions(['-shortest']);
+      }
+
+      command
         .outputOptions([
-          '-map 0:v',   // Map video from input 0 (minecraft)
-          '-map 1:a',   // Map audio from input 1 (our tts)
-          '-c:v copy',  // Copy video codec (fast, no re-encoding if possible, but might fail if container differs significantly or needs cutting exact frames)
-          // If copying video fails or we need exact cut, use '-c:v libx264'
-          // But to cut exactly at audio end, we generally need to re-encode or use -shortest with re-encoding
-          '-c:v libx264', 
-          '-c:a aac',
-          '-shortest',   // Finish when the shortest input (audio) ends
+          '-map 0:v',   // Map video from input 0
+          '-map 1:a',   // Map audio from input 1
+          '-c:v libx264', // Re-encode video
+          '-c:a aac',     // Re-encode audio
+          '-pix_fmt yuv420p' // Ensure compatibility
         ])
         .save(outputPath)
         .on('end', resolve)

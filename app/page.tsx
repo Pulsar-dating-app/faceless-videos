@@ -71,8 +71,8 @@ export default function Home() {
   };
 
   const handleGenerate = async () => {
-    if (!audioUrl) {
-      alert("Please generate audio first!");
+    if (!script) {
+      alert("Please generate or write a script first!");
       return;
     }
     
@@ -80,13 +80,29 @@ export default function Home() {
     setVideoUrl(null);
 
     try {
+      // 1. Generate Audio
+      const audioResponse = await fetch("/api/audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: script, voice: "alloy" }),
+      });
+      
+      const audioData = await audioResponse.json();
+      if (!audioData.audioUrl) {
+         throw new Error("Failed to generate audio");
+      }
+      
+      const currentAudioUrl = audioData.audioUrl;
+      setAudioUrl(currentAudioUrl);
+
+      // 2. Generate Video using Audio
       const response = await fetch("/api/merge", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          audioUrl,
+          audioUrl: currentAudioUrl,
         }),
       });
 
@@ -229,36 +245,6 @@ export default function Home() {
                     placeholder="Enter your script here or generate one..."
                     className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[120px] resize-none font-mono text-sm"
                   />
-                  
-                  {/* Audio Preview Section */}
-                  <div className="flex items-center justify-between pt-2">
-                     <button
-                      onClick={handleGenerateAudio}
-                      disabled={isGeneratingAudio || !script}
-                      className="text-sm flex items-center gap-2 px-3 py-1.5 rounded-md bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 font-medium disabled:opacity-50 transition-colors"
-                    >
-                      {isGeneratingAudio ? <Loader2 className="w-3 h-3 animate-spin" /> : <Video className="w-3 h-3" />}
-                      Generate Audio
-                    </button>
-
-                    {audioUrl && (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={toggleAudio}
-                          className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
-                        >
-                          {isPlayingAudio ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                        </button>
-                        <audio 
-                          ref={audioRef} 
-                          src={audioUrl} 
-                          onEnded={() => setIsPlayingAudio(false)} 
-                          className="hidden" 
-                        />
-                        <span className="text-xs text-zinc-500">Audio Ready</span>
-                      </div>
-                    )}
-                  </div>
                 </div>
 
                 <button 
