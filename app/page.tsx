@@ -11,7 +11,6 @@ export default function Home() {
   const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
-  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [category, setCategory] = useState("joke");
   const [duration, setDuration] = useState("30");
@@ -44,27 +43,6 @@ export default function Home() {
     }
   };
 
-  const handleGenerateAudio = async () => {
-    if (!script) return;
-    setIsGeneratingAudio(true);
-    try {
-      const response = await fetch("/api/audio", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: script, voice: "alloy" }),
-      });
-      
-      const data = await response.json();
-      if (data.audioUrl) {
-        setAudioUrl(data.audioUrl);
-      }
-    } catch (error) {
-      console.error("Error generating audio:", error);
-    } finally {
-      setIsGeneratingAudio(false);
-    }
-  };
-
   const toggleAudio = () => {
     if (audioRef.current) {
       if (isPlayingAudio) {
@@ -92,22 +70,21 @@ export default function Home() {
     setVideoUrl(null);
 
     try {
-      // 1. Generate Audio
-      const audioResponse = await fetch("/api/audio", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: script, voice: "alloy" }),
+      // 1. Generate Audio + Subtitles via Supabase Edge Function
+      const { data: audioData, error: audioError } = await supabase.functions.invoke("generate-video", {
+        body: { text: script, voice: "alloy" },
       });
-      
-      const audioData = await audioResponse.json();
-      if (!audioData.audioUrl) {
-         throw new Error("Failed to generate audio");
+
+      if (audioError) throw audioError;
+      if (!audioData?.audioUrl) {
+        throw new Error("Failed to generate audio");
       }
       
       const currentAudioUrl = audioData.audioUrl;
+      const subtitles = audioData.subtitles || "";
       setAudioUrl(currentAudioUrl);
 
-      // 2. Generate Video using Audio
+      // 2. Merge Video using local API (FFmpeg requires server)
       const response = await fetch("/api/merge", {
         method: "POST",
         headers: {
@@ -115,6 +92,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           audioUrl: currentAudioUrl,
+          subtitles: subtitles,
         }),
       });
 
