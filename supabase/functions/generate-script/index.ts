@@ -1,18 +1,36 @@
-import { NextResponse } from "next/server";
-import OpenAI from "openai";
+// Setup type definitions for built-in Supabase Runtime APIs
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const OPENAI_API_KEY = "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" // process.env.OPENAI_API_KEY || "sk-mock-api-key";
+// Access OpenAI API Key from environment variables (you need to set this in Supabase)
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
-const openai = new OpenAI({
-  apiKey: OPENAI_API_KEY,
-});
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
-export async function POST(request: Request) {
+interface RequestBody {
+  category: string;
+  prompt?: string;
+  duration?: string | number;
+}
+
+Deno.serve(async (req: Request) => {
+  // Handle CORS preflight request
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   try {
-    const { category, prompt, duration } = await request.json();
+    // Get request body
+    const { category, prompt, duration }: RequestBody = await req.json();
+
+    if (!OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY is not set");
+    }
 
     // Estimate word count based on duration (approx. 150 words per minute for normal speech)
-    const durationNum = parseInt(duration) || 30;
+    const durationNum = typeof duration === 'string' ? parseInt(duration) : (duration || 30);
     const wordCount = Math.round((durationNum / 60) * 150);
 
     let specificInstructions = "";
@@ -53,21 +71,38 @@ export async function POST(request: Request) {
     
     Output ONLY the raw spoken text. Do not include any scene directions, sound effects, or intro/outro labels.`;
 
-    const completion = await openai.chat.completions.create({
-      messages: [{ role: "system", content: systemPrompt }],
-      model: "gpt-4o",
+    // Call OpenAI API
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [{ role: "system", content: systemPrompt }],
+      }),
     });
 
-    const script = completion.choices[0].message.content;
+    const data = await response.json();
+    
+    if (data.error) {
+        console.error("OpenAI API Error:", data.error);
+        throw new Error(data.error.message || "Failed to generate script via OpenAI");
+    }
 
-    return NextResponse.json({ script });
+    const script = data.choices?.[0]?.message?.content;
+
+    return new Response(JSON.stringify({ script }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
 
   } catch (error: any) {
     console.error("Error generating script:", error);
-    return NextResponse.json(
-      { error: error?.message || "Failed to generate script" },
-      { status: 500 }
-    );
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
   }
-}
-
+});

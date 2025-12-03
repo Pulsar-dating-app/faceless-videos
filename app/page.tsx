@@ -5,6 +5,7 @@ import { ArrowRight, Sparkles, Loader2, Video, FileText, Wand2, Play, Pause, Use
 import { useState, useRef } from "react";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/lib/auth-context";
+import { supabase } from "@/lib/supabase";
 
 export default function Home() {
   const { user } = useAuth();
@@ -25,18 +26,19 @@ export default function Home() {
   const handleGenerateScript = async () => {
     setIsGeneratingScript(true);
     try {
-      const response = await fetch("/api/script", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category, prompt: customPrompt, duration }),
+      // Call Supabase Edge Function
+      const { data, error } = await supabase.functions.invoke("generate-script", {
+        body: { category, prompt: customPrompt, duration },
       });
+
+      if (error) throw error;
       
-      const data = await response.json();
-      if (data.script) {
+      if (data?.script) {
         setScript(data.script);
       }
     } catch (error) {
       console.error("Error generating script:", error);
+      alert("Failed to generate script. Please check console for details.");
     } finally {
       setIsGeneratingScript(false);
     }
