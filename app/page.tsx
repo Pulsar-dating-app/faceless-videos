@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Sparkles, Loader2, Video, FileText, Wand2, Play, Pause, User, Image, Gamepad2 } from "lucide-react";
+import { ArrowRight, Sparkles, Loader2, Video, FileText, Wand2, Play, Pause, User, Image, Gamepad2, Volume2 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
+import { CustomSelect } from "@/components/CustomSelect";
 
 export default function Home() {
   const { user } = useAuth();
@@ -24,8 +25,10 @@ export default function Home() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [useMockData, setUseMockData] = useState(false);
   const [mockPayload, setMockPayload] = useState<string>("");
+  const [playingVoicePreview, setPlayingVoicePreview] = useState<string | null>(null);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const voicePreviewRef = useRef<HTMLAudioElement | null>(null);
 
   // Load mock payload from localStorage on mount
   useEffect(() => {
@@ -65,6 +68,36 @@ export default function Home() {
       }
       setIsPlayingAudio(!isPlayingAudio);
     }
+  };
+
+  const playVoicePreview = (voiceName: string) => {
+    // Stop currently playing preview if any
+    if (voicePreviewRef.current) {
+      voicePreviewRef.current.pause();
+      voicePreviewRef.current.currentTime = 0;
+    }
+
+    // If clicking the same voice that's playing, just stop it
+    if (playingVoicePreview === voiceName) {
+      setPlayingVoicePreview(null);
+      return;
+    }
+
+    // Play the new voice preview
+    const audio = new Audio(`/voice-samples/${voiceName}.mp3`);
+    voicePreviewRef.current = audio;
+    
+    audio.play().catch((error) => {
+      console.error('Error playing voice preview:', error);
+      alert(`Voice preview for "${voiceName}" not found. Please generate voice samples first.`);
+    });
+
+    setPlayingVoicePreview(voiceName);
+
+    // Reset when audio ends
+    audio.onended = () => {
+      setPlayingVoicePreview(null);
+    };
   };
 
   const handleGenerate = async () => {
@@ -199,13 +232,13 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <Navbar />
+      <Navbar onLogoClick={() => setShowForm(false)} />
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center text-center px-4 py-12 sm:py-20">
         {!showForm ? (
           // Hero Section
-          <div className="max-w-3xl space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="max-w-3xl space-y-8">
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-xs font-semibold tracking-wide uppercase">
               <Sparkles className="w-3 h-3" />
@@ -243,12 +276,12 @@ export default function Home() {
           </div>
         ) : (
           // Generation Form Section
-          <div className="max-w-xl w-full space-y-8 animate-in fade-in zoom-in-95 duration-300 bg-white dark:bg-zinc-900 p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl">
+          <div className="max-w-xl w-full space-y-8 bg-white dark:bg-zinc-900 p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl">
             <div className="text-center space-y-2">
               <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mx-auto mb-4">
                 <Video className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
-              <h2 className="text-2xl font-bold">Configure Your Videoo</h2>
+              <h2 className="text-2xl font-bold">Configure Your Video</h2>
               <p className="text-zinc-500 dark:text-zinc-400">Choose a viral topic or write your own.</p>
             </div>
 
@@ -309,76 +342,86 @@ export default function Home() {
                   <label className="text-sm font-medium">Narrator Voice</label>
                   <div className="grid grid-cols-3 gap-2">
                     {['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'].map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => setVoice(v)}
-                        className={`px-3 py-2 text-sm capitalize rounded-lg border transition-all ${
-                          voice === v
-                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
-                            : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
-                        }`}
-                      >
-                        {v}
-                      </button>
+                      <div key={v} className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setVoice(v)}
+                          className={`w-full px-3 py-2 pr-8 text-sm capitalize rounded-lg border transition-all ${
+                            voice === v
+                              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                              : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+                          }`}
+                        >
+                          {v}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            playVoicePreview(v);
+                          }}
+                          className={`absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded transition-colors ${
+                            playingVoicePreview === v
+                              ? "text-blue-600 dark:text-blue-400"
+                              : "text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400"
+                          }`}
+                          title="Preview voice"
+                        >
+                          <Volume2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
 
                 {/* Art Style Selector - Only shown for AI Images */}
                 {videoType === "ai-images" && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Art Style</label>
-                    <select 
-                      value={artStyle}
-                      onChange={(e) => setArtStyle(e.target.value)}
-                      className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                    >
-                      <option value="cartoon">Cartoon</option>
-                      <option value="horror">Horror</option>
-                      <option value="realistic">Realistic</option>
-                      <option value="anime">Anime</option>
-                      <option value="watercolor">Watercolor</option>
-                      <option value="cyberpunk">Cyberpunk</option>
-                      <option value="minimalist">Minimalist</option>
-                      <option value="oil-painting">Oil Painting</option>
-                      <option value="sketch">Sketch</option>
-                      <option value="3d-render">3D Render</option>
-                    </select>
-                  </div>
+                  <CustomSelect
+                    label="Art Style"
+                    value={artStyle}
+                    onChange={setArtStyle}
+                    options={[
+                      { value: "cartoon", label: "Cartoon" },
+                      { value: "horror", label: "Horror" },
+                      { value: "realistic", label: "Realistic" },
+                      { value: "anime", label: "Anime" },
+                      { value: "watercolor", label: "Watercolor" },
+                      { value: "cyberpunk", label: "Cyberpunk" },
+                      { value: "minimalist", label: "Minimalist" },
+                      { value: "oil-painting", label: "Oil Painting" },
+                      { value: "sketch", label: "Sketch" },
+                      { value: "3d-render", label: "3D Render" },
+                    ]}
+                  />
                 )}
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Viral Category</label>
-                    <select 
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                    >
-                      <option value="joke">Funny Joke</option>
-                      <option value="animal">Cute Animals</option>
-                      <option value="motivational">Daily Motivation</option>
-                      <option value="tech">Tech Facts</option>
-                      <option value="scary">Scary Story</option>
-                      <option value="history">History Facts</option>
-                      <option value="reddit">Reddit Story</option>
-                      <option value="reddit-relationship">Reddit Relationship</option>
-                    </select>
-                  </div>
+                  <CustomSelect
+                    label="Viral Category"
+                    value={category}
+                    onChange={setCategory}
+                    options={[
+                      { value: "joke", label: "Funny Joke" },
+                      { value: "animal", label: "Cute Animals" },
+                      { value: "motivational", label: "Daily Motivation" },
+                      { value: "tech", label: "Tech Facts" },
+                      { value: "scary", label: "Scary Story" },
+                      { value: "history", label: "History Facts" },
+                      { value: "reddit", label: "Reddit Story" },
+                      { value: "reddit-relationship", label: "Reddit Relationship" },
+                    ]}
+                  />
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Duration</label>
-                    <select 
-                      value={duration}
-                      onChange={(e) => setDuration(e.target.value)}
-                      className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                    >
-                      <option value="30">30 Seconds</option>
-                      <option value="60">1 Minute</option>
-                      <option value="120">2 Minutes</option>
-                    </select>
-                  </div>
+                  <CustomSelect
+                    label="Duration"
+                    value={duration}
+                    onChange={setDuration}
+                    options={[
+                      { value: "30", label: "30 Seconds" },
+                      { value: "60", label: "1 Minute" },
+                      { value: "120", label: "2 Minutes" },
+                    ]}
+                  />
                 </div>
 
                 <div className="space-y-2">
