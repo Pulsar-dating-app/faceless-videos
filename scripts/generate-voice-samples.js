@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-const OPENAI_API_KEY = "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";
+const OPENAI_API_KEY = "";
 
 if (!OPENAI_API_KEY) {
   console.error('Error: OPENAI_API_KEY environment variable not set');
