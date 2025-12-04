@@ -2,13 +2,32 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { useRouter, usePathname } from "next/navigation";
 
-export function Navbar() {
+interface NavbarProps {
+  onLogoClick?: () => void;
+}
+
+export function Navbar({ onLogoClick }: NavbarProps) {
   const { user, isLoading, signOut } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handleLogoClick = (e: React.MouseEvent) => {
+    // If we're on the home page and have a callback, prevent navigation and call the callback
+    if (pathname === "/" && onLogoClick) {
+      e.preventDefault();
+      onLogoClick();
+    }
+  };
 
   return (
     <header className="w-full p-6 flex justify-between items-center max-w-6xl mx-auto">
-      <Link href="/" className="flex items-center gap-2 font-bold text-xl cursor-pointer">
+      <Link 
+        href="/" 
+        onClick={handleLogoClick}
+        className="flex items-center gap-2 font-bold text-xl cursor-pointer"
+      >
         <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
           <span className="text-white text-lg">V</span>
         </div>
