@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Sparkles, Loader2, Video, FileText, Wand2, Play, Pause, User } from "lucide-react";
+import { ArrowRight, Sparkles, Loader2, Video, FileText, Wand2, Play, Pause, User, Image, Gamepad2 } from "lucide-react";
 import { useState, useRef } from "react";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/lib/auth-context";
@@ -14,6 +14,8 @@ export default function Home() {
   const [showForm, setShowForm] = useState(false);
   const [category, setCategory] = useState("joke");
   const [duration, setDuration] = useState("30");
+  const [videoType, setVideoType] = useState<"gameplay" | "ai-images">("gameplay");
+  const [artStyle, setArtStyle] = useState("cartoon");
   const [customPrompt, setCustomPrompt] = useState("");
   const [script, setScript] = useState("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -70,42 +72,97 @@ export default function Home() {
     setVideoUrl(null);
 
     try {
-      // 1. Generate Audio + Subtitles via Supabase Edge Function
-      const { data: audioData, error: audioError } = await supabase.functions.invoke("generate-video", {
-        body: { text: script, voice: "alloy" },
-      });
+      if (videoType === "ai-images") {
+        // AI Images flow
+        // 1. Generate Audio + Subtitles + Image Prompts via Supabase Edge Function
+        const { data: aiData, error: aiError } = await supabase.functions.invoke("generate-ai-video", {
+          body: { text: script, voice: "alloy", artStyle },
+        });
 
-      if (audioError) throw audioError;
-      if (!audioData?.audioUrl) {
-        throw new Error("Failed to generate audio");
-      }
-      
-      const currentAudioUrl = audioData.audioUrl;
-      const subtitles = audioData.subtitles || "";
-      setAudioUrl(currentAudioUrl);
+        if (aiError) throw aiError;
+        if (!aiData?.audioUrl) {
+          throw new Error("Failed to generate audio");
+        }
 
-      // 2. Merge Video using local API (FFmpeg requires server)
-      const response = await fetch("/api/merge", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          audioUrl: currentAudioUrl,
-          subtitles: subtitles,
-        }),
-      });
+        const currentAudioUrl = aiData.audioUrl;
+        const subtitles = aiData.subtitles || "";
+        const generatedImages = aiData.generatedImages || [];
+        const audioDuration = aiData.audioDuration || 0;
+        setAudioUrl(currentAudioUrl);
 
-      if (!response.ok) {
-        throw new Error("Failed to generate video");
-      }
+        console.log("Generated images:", generatedImages.length);
+        console.log("Audio duration:", audioDuration, "seconds");
 
-      const data = await response.json();
-      
-      if (data.url) {
-        setVideoUrl(data.url);
+        if (generatedImages.length === 0) {
+          throw new Error("No images were generated");
+        }
+
+        // 2. Merge images + audio into video using local API (FFmpeg)
+        const mergeResponse = await fetch("/api/merge-ai-video", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            audioUrl: currentAudioUrl,
+            subtitles: subtitles,
+            generatedImages: generatedImages,
+            audioDuration: audioDuration,
+          }),
+        });
+
+        if (!mergeResponse.ok) {
+          const errorData = await mergeResponse.json();
+          throw new Error(errorData.error || "Failed to merge AI video");
+        }
+
+        const mergeData = await mergeResponse.json();
+        
+        if (mergeData.url) {
+          setVideoUrl(mergeData.url);
+        } else {
+          throw new Error("No video URL returned from merge");
+        }
+        
       } else {
-        throw new Error("No video URL returned");
+        // Gameplay video flow (existing logic)
+        // 1. Generate Audio + Subtitles via Supabase Edge Function
+        const { data: audioData, error: audioError } = await supabase.functions.invoke("generate-video", {
+          body: { text: script, voice: "alloy" },
+        });
+
+        if (audioError) throw audioError;
+        if (!audioData?.audioUrl) {
+          throw new Error("Failed to generate audio");
+        }
+        
+        const currentAudioUrl = audioData.audioUrl;
+        const subtitles = audioData.subtitles || "";
+        setAudioUrl(currentAudioUrl);
+
+        // 2. Merge Video using local API (FFmpeg requires server)
+        const response = await fetch("/api/merge", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            audioUrl: currentAudioUrl,
+            subtitles: subtitles,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to generate video");
+        }
+
+        const data = await response.json();
+        
+        if (data.url) {
+          setVideoUrl(data.url);
+        } else {
+          throw new Error("No video URL returned");
+        }
       }
     } catch (error) {
       console.error("Error generating video:", error);
@@ -172,6 +229,79 @@ export default function Home() {
 
             {!videoUrl ? (
               <div className="space-y-6 text-left">
+                {/* Video Type Selection */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Video Type</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setVideoType("gameplay")}
+                      className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${
+                        videoType === "gameplay"
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                          : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600"
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        videoType === "gameplay"
+                          ? "bg-blue-600 text-white"
+                          : "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400"
+                      }`}>
+                        <Gamepad2 className="w-5 h-5" />
+                      </div>
+                      <div className="text-left">
+                        <div className="font-medium text-sm">Gameplay Video</div>
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400">Background gameplay</div>
+                      </div>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setVideoType("ai-images")}
+                      className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${
+                        videoType === "ai-images"
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                          : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600"
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        videoType === "ai-images"
+                          ? "bg-blue-600 text-white"
+                          : "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400"
+                      }`}>
+                        <Image className="w-5 h-5" />
+                      </div>
+                      <div className="text-left">
+                        <div className="font-medium text-sm">AI Images</div>
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400">AI generated visuals</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Art Style Selector - Only shown for AI Images */}
+                {videoType === "ai-images" && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Art Style</label>
+                    <select 
+                      value={artStyle}
+                      onChange={(e) => setArtStyle(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    >
+                      <option value="cartoon">Cartoon</option>
+                      <option value="horror">Horror</option>
+                      <option value="realistic">Realistic</option>
+                      <option value="anime">Anime</option>
+                      <option value="watercolor">Watercolor</option>
+                      <option value="cyberpunk">Cyberpunk</option>
+                      <option value="minimalist">Minimalist</option>
+                      <option value="oil-painting">Oil Painting</option>
+                      <option value="sketch">Sketch</option>
+                      <option value="3d-render">3D Render</option>
+                    </select>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Viral Category</label>
