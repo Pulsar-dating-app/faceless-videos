@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Sparkles, Loader2, Video, FileText, Wand2, Play, Pause, User, Image, Gamepad2 } from "lucide-react";
+import { ArrowRight, Sparkles, Loader2, Video, FileText, Wand2, Play, Pause, User, Image, Gamepad2, Volume2 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/lib/auth-context";
@@ -25,8 +25,10 @@ export default function Home() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [useMockData, setUseMockData] = useState(false);
   const [mockPayload, setMockPayload] = useState<string>("");
+  const [playingVoicePreview, setPlayingVoicePreview] = useState<string | null>(null);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const voicePreviewRef = useRef<HTMLAudioElement | null>(null);
 
   // Load mock payload from localStorage on mount
   useEffect(() => {
@@ -66,6 +68,36 @@ export default function Home() {
       }
       setIsPlayingAudio(!isPlayingAudio);
     }
+  };
+
+  const playVoicePreview = (voiceName: string) => {
+    // Stop currently playing preview if any
+    if (voicePreviewRef.current) {
+      voicePreviewRef.current.pause();
+      voicePreviewRef.current.currentTime = 0;
+    }
+
+    // If clicking the same voice that's playing, just stop it
+    if (playingVoicePreview === voiceName) {
+      setPlayingVoicePreview(null);
+      return;
+    }
+
+    // Play the new voice preview
+    const audio = new Audio(`/voice-samples/${voiceName}.mp3`);
+    voicePreviewRef.current = audio;
+    
+    audio.play().catch((error) => {
+      console.error('Error playing voice preview:', error);
+      alert(`Voice preview for "${voiceName}" not found. Please generate voice samples first.`);
+    });
+
+    setPlayingVoicePreview(voiceName);
+
+    // Reset when audio ends
+    audio.onended = () => {
+      setPlayingVoicePreview(null);
+    };
   };
 
   const handleGenerate = async () => {
@@ -310,18 +342,34 @@ export default function Home() {
                   <label className="text-sm font-medium">Narrator Voice</label>
                   <div className="grid grid-cols-3 gap-2">
                     {['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'].map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => setVoice(v)}
-                        className={`px-3 py-2 text-sm capitalize rounded-lg border transition-all ${
-                          voice === v
-                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
-                            : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
-                        }`}
-                      >
-                        {v}
-                      </button>
+                      <div key={v} className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setVoice(v)}
+                          className={`w-full px-3 py-2 pr-8 text-sm capitalize rounded-lg border transition-all ${
+                            voice === v
+                              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                              : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+                          }`}
+                        >
+                          {v}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            playVoicePreview(v);
+                          }}
+                          className={`absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded transition-colors ${
+                            playingVoicePreview === v
+                              ? "text-blue-600 dark:text-blue-400"
+                              : "text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400"
+                          }`}
+                          title="Preview voice"
+                        >
+                          <Volume2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
