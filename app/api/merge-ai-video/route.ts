@@ -101,18 +101,13 @@ export async function POST(request: Request) {
     let inputs = "";
     let filterComplex = "";
     
-    // Add each image as input with zoompan effect
+    // Add each image as input (no zoom effect)
     for (let i = 0; i < imagePaths.length; i++) {
       const escapedPath = imagePaths[i].replace(/\\/g, "/");
       inputs += ` -loop 1 -t ${durationPerImage} -i "${escapedPath}"`;
       
-      // Zoompan: slow zoom from 1.0 to 1.08 (8% zoom over duration)
-      // z: zoom level, d: duration in frames, s: size, x/y: center position
-      const zoomStart = 1.0;
-      const zoomEnd = 1.08;
-      const zoomIncrement = (zoomEnd - zoomStart) / framesPerImage;
-      
-      filterComplex += `[${i}:v]zoompan=z='min(${zoomStart}+${zoomIncrement}*on,${zoomEnd})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${framesPerImage}:s=720x1280:fps=${fps}[v${i}];`;
+      // Simple scale to output size, no zoom
+      filterComplex += `[${i}:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setpts=PTS-STARTPTS,fps=${fps}[v${i}];`;
     }
     
     // Chain all videos together with xfade transitions

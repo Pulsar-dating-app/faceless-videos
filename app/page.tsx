@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Sparkles, Loader2, Video, FileText, Wand2, Play, Pause, User, Image, Gamepad2 } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
@@ -16,13 +16,24 @@ export default function Home() {
   const [duration, setDuration] = useState("30");
   const [videoType, setVideoType] = useState<"gameplay" | "ai-images">("gameplay");
   const [artStyle, setArtStyle] = useState("cartoon");
+  const [voice, setVoice] = useState("alloy");
   const [customPrompt, setCustomPrompt] = useState("");
   const [script, setScript] = useState("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [useMockData, setUseMockData] = useState(false);
+  const [mockPayload, setMockPayload] = useState<string>("");
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Load mock payload from localStorage on mount
+  useEffect(() => {
+    const savedMock = localStorage.getItem("ai-video-mock-payload");
+    if (savedMock) {
+      setMockPayload(savedMock);
+    }
+  }, []);
 
   const handleGenerateScript = async () => {
     setIsGeneratingScript(true);
@@ -74,12 +85,26 @@ export default function Home() {
     try {
       if (videoType === "ai-images") {
         // AI Images flow
-        // 1. Generate Audio + Subtitles + Image Prompts via Supabase Edge Function
-        const { data: aiData, error: aiError } = await supabase.functions.invoke("generate-ai-video", {
-          body: { text: script, voice: "alloy", artStyle },
-        });
+        let aiData: any;
+        
+        // Check if we should use mock data
+        if (useMockData && mockPayload) {
+          console.log("Using mock data instead of calling Edge Function");
+          try {
+            aiData = JSON.parse(mockPayload);
+          } catch (e) {
+            throw new Error("Invalid mock payload JSON");
+          }
+        } else {
+          // 1. Generate Audio + Subtitles + Image Prompts via Supabase Edge Function
+          const { data, error: aiError } = await supabase.functions.invoke("generate-ai-video", {
+            body: { text: script, voice, artStyle },
+          });
 
-        if (aiError) throw aiError;
+          if (aiError) throw aiError;
+          aiData = data;
+        }
+
         if (!aiData?.audioUrl) {
           throw new Error("Failed to generate audio");
         }
@@ -128,7 +153,7 @@ export default function Home() {
         // Gameplay video flow (existing logic)
         // 1. Generate Audio + Subtitles via Supabase Edge Function
         const { data: audioData, error: audioError } = await supabase.functions.invoke("generate-video", {
-          body: { text: script, voice: "alloy" },
+          body: { text: script, voice },
         });
 
         if (audioError) throw audioError;
@@ -279,6 +304,27 @@ export default function Home() {
                   </div>
                 </div>
 
+                {/* Voice Selection */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Narrator Voice</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'].map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setVoice(v)}
+                        className={`px-3 py-2 text-sm capitalize rounded-lg border transition-all ${
+                          voice === v
+                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                            : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+                        }`}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Art Style Selector - Only shown for AI Images */}
                 {videoType === "ai-images" && (
                   <div className="space-y-2">
@@ -354,6 +400,49 @@ export default function Home() {
                     className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[120px] resize-none font-mono text-sm"
                   />
                 </div>
+
+                {/* Mock Mode Toggle (only for AI Images) */}
+                {videoType === "ai-images" && (
+                  <div className="space-y-3 p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="mockMode"
+                        checked={useMockData}
+                        onChange={(e) => setUseMockData(e.target.checked)}
+                        className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600"
+                      />
+                      <label htmlFor="mockMode" className="text-sm font-medium cursor-pointer">
+                        Use Mock Data (Skip API calls)
+                      </label>
+                    </div>
+                    {useMockData && (
+                      <div className="space-y-2">
+                        <label className="text-xs text-zinc-600 dark:text-zinc-400">
+                          Paste Edge Function response JSON here:
+                        </label>
+                        <textarea
+                          value={mockPayload}
+                          onChange={(e) => {
+                            setMockPayload(e.target.value);
+                            localStorage.setItem("ai-video-mock-payload", e.target.value);
+                          }}
+                          placeholder='{"audioUrl": "...", "subtitles": "...", "generatedImages": [...], ...}'
+                          className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[100px] resize-none font-mono"
+                        />
+                        <button
+                          onClick={() => {
+                            setMockPayload("");
+                            localStorage.removeItem("ai-video-mock-payload");
+                          }}
+                          className="text-xs text-red-600 hover:text-red-700"
+                        >
+                          Clear Mock Data
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <button 
                   onClick={handleGenerate}
