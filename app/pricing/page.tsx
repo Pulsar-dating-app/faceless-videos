@@ -2,54 +2,55 @@
 
 import Link from "next/link";
 import { Check } from "lucide-react";
-
-// Easy-to-edit pricing data structure
-const pricingPlans = [
-  {
-    name: "Starter",
-    price: 10,
-    description: "Perfect for getting started",
-    features: [
-      "10 videos per month",
-      "Basic templates",
-      "HD quality export",
-      "Email support",
-    ],
-    popular: false,
-  },
-  {
-    name: "Professional",
-    price: 25,
-    description: "For content creators",
-    features: [
-      "50 videos per month",
-      "All templates",
-      "4K quality export",
-      "Priority support",
-      "Custom branding",
-    ],
-    popular: true,
-  },
-  {
-    name: "Elite",
-    price: 50,
-    description: "For agencies and teams",
-    features: [
-      "Unlimited videos",
-      "All templates + custom",
-      "4K quality export",
-      "24/7 priority support",
-      "Custom branding",
-      "API access",
-      "Team collaboration",
-    ],
-    popular: false,
-  },
-];
-
 import { Navbar } from "@/components/Navbar";
+import { useI18n } from "@/lib/i18n-context";
 
 export default function PricingPage() {
+  const { t, formatMessage } = useI18n();
+
+  // Pricing data structure with translations
+  const pricingPlans = [
+    {
+      name: t.pricing.starter.name,
+      price: 10,
+      description: t.pricing.starter.description,
+      features: [
+        t.pricing.starter.feature1,
+        t.pricing.starter.feature2,
+        t.pricing.starter.feature3,
+        t.pricing.starter.feature4,
+      ],
+      popular: false,
+    },
+    {
+      name: t.pricing.professional.name,
+      price: 25,
+      description: t.pricing.professional.description,
+      features: [
+        t.pricing.professional.feature1,
+        t.pricing.professional.feature2,
+        t.pricing.professional.feature3,
+        t.pricing.professional.feature4,
+        t.pricing.professional.feature5,
+      ],
+      popular: true,
+    },
+    {
+      name: t.pricing.elite.name,
+      price: 50,
+      description: t.pricing.elite.description,
+      features: [
+        t.pricing.elite.feature1,
+        t.pricing.elite.feature2,
+        t.pricing.elite.feature3,
+        t.pricing.elite.feature4,
+        t.pricing.elite.feature5,
+        t.pricing.elite.feature6,
+        t.pricing.elite.feature7,
+      ],
+      popular: false,
+    },
+  ];
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <Navbar />
@@ -60,10 +61,10 @@ export default function PricingPage() {
           {/* Header Section */}
           <div className="text-center space-y-4">
             <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">
-              Simple, Transparent Pricing
+              {t.pricing.title}
             </h1>
             <p className="text-lg text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">
-              Choose the plan that fits your needs. All plans include our core features.
+              {t.pricing.subtitle}
             </p>
           </div>
 
@@ -82,7 +83,7 @@ export default function PricingPage() {
                 {plan.popular && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                     <span className="bg-blue-600 text-white text-xs font-semibold px-4 py-1 rounded-full">
-                      Most Popular
+                      {t.pricing.mostPopular}
                     </span>
                   </div>
                 )}
@@ -95,7 +96,7 @@ export default function PricingPage() {
                   </p>
                   <div className="flex items-baseline justify-center gap-1">
                     <span className="text-4xl font-extrabold">${plan.price}</span>
-                    <span className="text-zinc-500 dark:text-zinc-400">/month</span>
+                    <span className="text-zinc-500 dark:text-zinc-400">{t.pricing.perMonth}</span>
                   </div>
                 </div>
 
@@ -119,7 +120,7 @@ export default function PricingPage() {
                       : "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700"
                   }`}
                 >
-                  Get Started
+                  {t.pricing.getStarted}
                 </button>
               </div>
             ))}
@@ -129,7 +130,7 @@ export default function PricingPage() {
 
       {/* Footer */}
       <footer className="w-full py-6 text-center text-sm text-zinc-500 dark:text-zinc-600">
-        <p>© {new Date().getFullYear()} ViralGen. All rights reserved.</p>
+        <p>{formatMessage(t.footer.copyright, { year: new Date().getFullYear() })}</p>
       </footer>
     </div>
   );
