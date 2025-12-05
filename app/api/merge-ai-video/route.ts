@@ -96,18 +96,48 @@ export async function POST(request: Request) {
 
     // 5. Build complex filter for zoompan + xfade transitions
     // zoompan creates a slow zoom effect (Ken Burns)
+    // Workaround for shaky zoom: upscale BEFORE zoompan to reduce rounding errors
+    // See: https://superuser.com/questions/1112617/ffmpeg-smooth-zoompan-with-no-jiggle/1112680
     // xfade creates crossfade transitions between segments
     
     let inputs = "";
     let filterComplex = "";
     
-    // Add each image as input (no zoom effect)
+    // Zoom parameters - zoom from 1.0 to 1.15 (15% zoom) smoothly over duration
+    const zoomStart = 1.0;
+    const zoomEnd = 1.15;
+    const zoomIncrement = (zoomEnd - zoomStart) / framesPerImage;
+    
+    // Upscale factor to reduce rounding errors (4x upscale for smooth zoom)
+    // Higher resolution = smaller rounding impact = smoother motion
+    const upscaleFactor = 4;
+    const upscaledWidth = 720 * upscaleFactor;
+    const upscaledHeight = 1280 * upscaleFactor;
+    
+    // Define 4 zoom directions: top-left, top-right, bottom-left, bottom-right
+    const zoomDirections = [
+      { name: 'top-left', x: '0', y: '0' },
+      { name: 'top-right', x: 'iw-(iw/zoom)', y: '0' },
+      { name: 'bottom-left', x: '0', y: 'ih-(ih/zoom)' },
+      { name: 'bottom-right', x: 'iw-(iw/zoom)', y: 'ih-(ih/zoom)' }
+    ];
+    
+    // Add each image as input with smooth zoom effect
     for (let i = 0; i < imagePaths.length; i++) {
       const escapedPath = imagePaths[i].replace(/\\/g, "/");
       inputs += ` -loop 1 -t ${durationPerImage} -i "${escapedPath}"`;
       
-      // Simple scale to output size, no zoom
-      filterComplex += `[${i}:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setpts=PTS-STARTPTS,fps=${fps}[v${i}];`;
+      // Randomly select one of the 4 zoom directions for this image
+      const randomDirection = zoomDirections[Math.floor(Math.random() * zoomDirections.length)];
+      
+      // Workaround: Upscale first, then apply zoompan, then scale down to output size
+      // This reduces rounding errors in x/y expressions that cause jitter
+      // 1. Scale up to high resolution (reduces rounding impact)
+      // 2. Apply zoompan with smooth zoom expression and random direction
+      // 3. Use zoompan's 's' parameter to output at final size
+      filterComplex += `[${i}:v]scale=${upscaledWidth}:${upscaledHeight}:force_original_aspect_ratio=decrease,pad=${upscaledWidth}:${upscaledHeight}:(ow-iw)/2:(oh-ih)/2,zoompan=z='min(zoom+${zoomIncrement.toFixed(8)},${zoomEnd})':x='${randomDirection.x}':y='${randomDirection.y}':d=${framesPerImage}:s=720x1280,fps=${fps}[v${i}];`;
+      
+      console.log(`Image ${i + 1} zoom direction: ${randomDirection.name}`);
     }
     
     // Chain all videos together with xfade transitions
