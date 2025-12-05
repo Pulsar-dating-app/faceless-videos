@@ -5,11 +5,44 @@ import { ArrowRight, Sparkles, Loader2, Video, FileText, Wand2, Play, Pause, Use
 import { useState, useRef, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/lib/auth-context";
+import { useI18n } from "@/lib/i18n-context";
 import { supabase } from "@/lib/supabase";
 import { CustomSelect } from "@/components/CustomSelect";
 
+// Language configurations
+const LANGUAGES = {
+  'en': { name: 'English', flag: '🇺🇸' },
+  'es': { name: 'Spanish', flag: '🇪🇸' },
+  'fr': { name: 'French', flag: '🇫🇷' },
+  'de': { name: 'German', flag: '🇩🇪' },
+  'pt': { name: 'Portuguese', flag: '🇵🇹' },
+  'it': { name: 'Italian', flag: '🇮🇹' },
+  'nl': { name: 'Dutch', flag: '🇳🇱' },
+  'pl': { name: 'Polish', flag: '🇵🇱' },
+  'ru': { name: 'Russian', flag: '🇷🇺' },
+  'zh': { name: 'Chinese', flag: '🇨🇳' },
+  'ja': { name: 'Japanese', flag: '🇯🇵' },
+  'ko': { name: 'Korean', flag: '🇰🇷' },
+  'ar': { name: 'Arabic', flag: '🇸🇦' },
+  'hi': { name: 'Hindi', flag: '🇮🇳' },
+  'tr': { name: 'Turkish', flag: '🇹🇷' },
+  'sv': { name: 'Swedish', flag: '🇸🇪' },
+  'da': { name: 'Danish', flag: '🇩🇰' },
+  'no': { name: 'Norwegian', flag: '🇳🇴' },
+  'fi': { name: 'Finnish', flag: '🇫🇮' },
+  'id': { name: 'Indonesian', flag: '🇮🇩' },
+  'vi': { name: 'Vietnamese', flag: '🇻🇳' },
+  'th': { name: 'Thai', flag: '🇹🇭' },
+  'uk': { name: 'Ukrainian', flag: '🇺🇦' },
+  'cs': { name: 'Czech', flag: '🇨🇿' },
+  'ro': { name: 'Romanian', flag: '🇷🇴' },
+};
+
+const VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+
 export default function Home() {
   const { user } = useAuth();
+  const { t, formatMessage } = useI18n();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -17,6 +50,7 @@ export default function Home() {
   const [duration, setDuration] = useState("30");
   const [videoType, setVideoType] = useState<"gameplay" | "ai-images">("gameplay");
   const [artStyle, setArtStyle] = useState("cartoon");
+  const [language, setLanguage] = useState("en");
   const [voice, setVoice] = useState("alloy");
   const [customPrompt, setCustomPrompt] = useState("");
   const [script, setScript] = useState("");
@@ -43,7 +77,7 @@ export default function Home() {
     try {
       // Call Supabase Edge Function
       const { data, error } = await supabase.functions.invoke("generate-script", {
-        body: { category, prompt: customPrompt, duration },
+        body: { category, prompt: customPrompt, duration, language },
       });
 
       if (error) throw error;
@@ -83,13 +117,13 @@ export default function Home() {
       return;
     }
 
-    // Play the new voice preview
-    const audio = new Audio(`/voice-samples/${voiceName}.mp3`);
+    // Play the new voice preview with language
+    const audio = new Audio(`/voice-samples/${language}/${voiceName}.mp3`);
     voicePreviewRef.current = audio;
     
     audio.play().catch((error) => {
       console.error('Error playing voice preview:', error);
-      alert(`Voice preview for "${voiceName}" not found. Please generate voice samples first.`);
+      alert(formatMessage(t.messages.voicePreviewError, { voice: voiceName, language }));
     });
 
     setPlayingVoicePreview(voiceName);
@@ -102,13 +136,13 @@ export default function Home() {
 
   const handleGenerate = async () => {
     if (!user) {
-      alert("Please sign in to generate videos!");
+      alert(t.messages.signInRequired);
       window.location.href = "/login";
       return;
     }
 
     if (!script) {
-      alert("Please generate or write a script first!");
+      alert(t.messages.scriptRequired);
       return;
     }
     
@@ -118,7 +152,12 @@ export default function Home() {
     try {
       if (videoType === "ai-images") {
         // AI Images flow
-        let aiData: any;
+        let aiData: {
+          audioUrl: string;
+          subtitles: string;
+          generatedImages: string[];
+          audioDuration: number;
+        };
         
         // Check if we should use mock data
         if (useMockData && mockPayload) {
@@ -131,7 +170,7 @@ export default function Home() {
         } else {
           // 1. Generate Audio + Subtitles + Image Prompts via Supabase Edge Function
           const { data, error: aiError } = await supabase.functions.invoke("generate-ai-video", {
-            body: { text: script, voice, artStyle },
+            body: { text: script, voice, artStyle, language },
           });
 
           if (aiError) throw aiError;
@@ -186,7 +225,7 @@ export default function Home() {
         // Gameplay video flow (existing logic)
         // 1. Generate Audio + Subtitles via Supabase Edge Function
         const { data: audioData, error: audioError } = await supabase.functions.invoke("generate-video", {
-          body: { text: script, voice },
+          body: { text: script, voice, language },
         });
 
         if (audioError) throw audioError;
@@ -242,21 +281,20 @@ export default function Home() {
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-xs font-semibold tracking-wide uppercase">
               <Sparkles className="w-3 h-3" />
-              <span>AI-Powered Automation</span>
+              <span>{t.hero.badge}</span>
             </div>
 
             {/* Headline */}
             <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight leading-tight">
-              Create Viral Short Videos <br className="hidden sm:block" />
+              {t.hero.headline1} <br className="hidden sm:block" />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
-                in Seconds
+                {t.hero.headline2}
               </span>
             </h1>
 
             {/* Subheadline */}
             <p className="text-lg sm:text-xl text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-              Automate your faceless channels on TikTok and Instagram. 
-              Generate engaging scripts, visuals, and voiceovers with just one click.
+              {t.hero.subheadline}
             </p>
 
             {/* CTA Button */}
@@ -265,12 +303,12 @@ export default function Home() {
                 onClick={() => setShowForm(true)}
                 className="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-full bg-blue-600 px-8 font-medium text-white transition-all duration-300 hover:bg-blue-700 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-background"
               >
-                <span className="mr-2">Generate Video</span>
+                <span className="mr-2">{t.hero.cta}</span>
                 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </button>
               
               <button className="inline-flex h-12 items-center justify-center rounded-full px-8 font-medium text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-                Watch Demo
+                {t.hero.demo}
               </button>
             </div>
           </div>
@@ -281,15 +319,15 @@ export default function Home() {
               <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mx-auto mb-4">
                 <Video className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
-              <h2 className="text-2xl font-bold">Configure Your Video</h2>
-              <p className="text-zinc-500 dark:text-zinc-400">Choose a viral topic or write your own.</p>
+              <h2 className="text-2xl font-bold">{t.form.title}</h2>
+              <p className="text-zinc-500 dark:text-zinc-400">{t.form.subtitle}</p>
             </div>
 
             {!videoUrl ? (
               <div className="space-y-6 text-left">
                 {/* Video Type Selection */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Video Type</label>
+                  <label className="text-sm font-medium">{t.form.videoType}</label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
@@ -308,8 +346,8 @@ export default function Home() {
                         <Gamepad2 className="w-5 h-5" />
                       </div>
                       <div className="text-left">
-                        <div className="font-medium text-sm">Gameplay Video</div>
-                        <div className="text-xs text-zinc-500 dark:text-zinc-400">Background gameplay</div>
+                        <div className="font-medium text-sm">{t.form.gameplay}</div>
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400">{t.form.gameplayDesc}</div>
                       </div>
                     </button>
                     
@@ -330,18 +368,34 @@ export default function Home() {
                         <Image className="w-5 h-5" />
                       </div>
                       <div className="text-left">
-                        <div className="font-medium text-sm">AI Images</div>
-                        <div className="text-xs text-zinc-500 dark:text-zinc-400">AI generated visuals</div>
+                        <div className="font-medium text-sm">{t.form.aiImages}</div>
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400">{t.form.aiImagesDesc}</div>
                       </div>
                     </button>
                   </div>
                 </div>
 
+                {/* Language Selection */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">{t.form.voiceLanguage}</label>
+                  <select
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                  >
+                    {Object.entries(LANGUAGES).map(([code, config]) => (
+                      <option key={code} value={code}>
+                        {config.flag} {config.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Voice Selection */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Narrator Voice</label>
+                  <label className="text-sm font-medium">{t.form.narratorVoice}</label>
                   <div className="grid grid-cols-3 gap-2">
-                    {['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'].map((v) => (
+                    {VOICES.map((v) => (
                       <div key={v} className="relative">
                         <button
                           type="button"
@@ -377,69 +431,69 @@ export default function Home() {
                 {/* Art Style Selector - Only shown for AI Images */}
                 {videoType === "ai-images" && (
                   <CustomSelect
-                    label="Art Style"
+                    label={t.form.artStyle}
                     value={artStyle}
                     onChange={setArtStyle}
                     options={[
-                      { value: "cartoon", label: "Cartoon" },
-                      { value: "horror", label: "Horror" },
-                      { value: "realistic", label: "Realistic" },
-                      { value: "anime", label: "Anime" },
-                      { value: "watercolor", label: "Watercolor" },
-                      { value: "cyberpunk", label: "Cyberpunk" },
-                      { value: "minimalist", label: "Minimalist" },
-                      { value: "oil-painting", label: "Oil Painting" },
-                      { value: "sketch", label: "Sketch" },
-                      { value: "3d-render", label: "3D Render" },
+                      { value: "cartoon", label: t.artStyles.cartoon },
+                      { value: "horror", label: t.artStyles.horror },
+                      { value: "realistic", label: t.artStyles.realistic },
+                      { value: "anime", label: t.artStyles.anime },
+                      { value: "watercolor", label: t.artStyles.watercolor },
+                      { value: "cyberpunk", label: t.artStyles.cyberpunk },
+                      { value: "minimalist", label: t.artStyles.minimalist },
+                      { value: "oil-painting", label: t.artStyles["oil-painting"] },
+                      { value: "sketch", label: t.artStyles.sketch },
+                      { value: "3d-render", label: t.artStyles["3d-render"] },
                     ]}
                   />
                 )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <CustomSelect
-                    label="Viral Category"
+                    label={t.form.category}
                     value={category}
                     onChange={setCategory}
                     options={[
-                      { value: "joke", label: "Funny Joke" },
-                      { value: "animal", label: "Cute Animals" },
-                      { value: "motivational", label: "Daily Motivation" },
-                      { value: "tech", label: "Tech Facts" },
-                      { value: "scary", label: "Scary Story" },
-                      { value: "history", label: "History Facts" },
-                      { value: "reddit", label: "Reddit Story" },
-                      { value: "reddit-relationship", label: "Reddit Relationship" },
+                      { value: "joke", label: t.categories.joke },
+                      { value: "animal", label: t.categories.animal },
+                      { value: "motivational", label: t.categories.motivational },
+                      { value: "tech", label: t.categories.tech },
+                      { value: "scary", label: t.categories.scary },
+                      { value: "history", label: t.categories.history },
+                      { value: "reddit", label: t.categories.reddit },
+                      { value: "reddit-relationship", label: t.categories["reddit-relationship"] },
                     ]}
                   />
 
                   <CustomSelect
-                    label="Duration"
+                    label={t.form.duration}
                     value={duration}
                     onChange={setDuration}
                     options={[
-                      { value: "30", label: "30 Seconds" },
-                      { value: "60", label: "1 Minute" },
-                      { value: "120", label: "2 Minutes" },
+                      { value: "30", label: t.durations["30"] },
+                      { value: "60", label: t.durations["60"] },
+                      { value: "120", label: t.durations["120"] },
                     ]}
                   />
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Video Script</label>
+                    <label className="text-sm font-medium">{t.form.script}</label>
                     <button
                       onClick={handleGenerateScript}
                       disabled={isGeneratingScript}
                       className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
                     >
                       {isGeneratingScript ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
-                      Generate with AI
+                      {t.form.generateAI}
                     </button>
                   </div>
                   <textarea 
                     value={script}
                     onChange={(e) => setScript(e.target.value)}
-                    placeholder="Enter your script here or generate one..."
+                    placeholder={t.form.scriptPlaceholder}
                     className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[120px] resize-none font-mono text-sm"
                   />
                 </div>
@@ -456,13 +510,13 @@ export default function Home() {
                         className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600"
                       />
                       <label htmlFor="mockMode" className="text-sm font-medium cursor-pointer">
-                        Use Mock Data (Skip API calls)
+                        {t.form.mockMode}
                       </label>
                     </div>
                     {useMockData && (
                       <div className="space-y-2">
                         <label className="text-xs text-zinc-600 dark:text-zinc-400">
-                          Paste Edge Function response JSON here:
+                          {t.form.pasteJson}
                         </label>
                         <textarea
                           value={mockPayload}
@@ -470,7 +524,7 @@ export default function Home() {
                             setMockPayload(e.target.value);
                             localStorage.setItem("ai-video-mock-payload", e.target.value);
                           }}
-                          placeholder='{"audioUrl": "...", "subtitles": "...", "generatedImages": [...], ...}'
+                          placeholder={t.form.mockPlaceholder}
                           className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[100px] resize-none font-mono"
                         />
                         <button
@@ -480,7 +534,7 @@ export default function Home() {
                           }}
                           className="text-xs text-red-600 hover:text-red-700"
                         >
-                          Clear Mock Data
+                          {t.form.clearMock}
                         </button>
                       </div>
                     )}
@@ -495,10 +549,10 @@ export default function Home() {
                   {isGenerating ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                      Generating Magic...
+                      {t.form.generating}
                     </>
                   ) : (
-                    "Create Video"
+                    t.form.createVideo
                   )}
                 </button>
               </div>
@@ -518,14 +572,14 @@ export default function Home() {
                     onClick={() => setVideoUrl(null)}
                     className="flex-1 h-11 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium transition-all"
                   >
-                    Generate Another
+                    {t.form.generateAnother}
                   </button>
                   <a 
                     href={videoUrl} 
                     download="viral-video.mp4"
                     className="flex-1 h-11 flex items-center justify-center rounded-lg bg-green-600 text-white hover:bg-green-700 font-medium transition-all"
                   >
-                    Download
+                    {t.form.download}
                   </a>
                 </div>
               </div>
@@ -536,7 +590,7 @@ export default function Home() {
 
       {/* Simple Footer */}
       <footer className="w-full py-6 text-center text-sm text-zinc-500 dark:text-zinc-600">
-        <p>© {new Date().getFullYear()} ViralGen. All rights reserved.</p>
+        <p>{formatMessage(t.footer.copyright, { year: new Date().getFullYear() })}</p>
       </footer>
     </div>
   );

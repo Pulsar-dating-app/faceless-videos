@@ -13,6 +13,7 @@ interface RequestBody {
   category: string;
   prompt?: string;
   duration?: string | number;
+  language?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -23,11 +24,42 @@ Deno.serve(async (req: Request) => {
 
   try {
     // Get request body
-    const { category, prompt, duration }: RequestBody = await req.json();
+    const { category, prompt, duration, language = 'en' }: RequestBody = await req.json();
 
     if (!OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY is not set");
     }
+
+    // Language name mapping
+    const languageNames: { [key: string]: string } = {
+      'en': 'English',
+      'es': 'Spanish',
+      'fr': 'French',
+      'de': 'German',
+      'pt': 'Portuguese',
+      'it': 'Italian',
+      'nl': 'Dutch',
+      'pl': 'Polish',
+      'ru': 'Russian',
+      'zh': 'Chinese',
+      'ja': 'Japanese',
+      'ko': 'Korean',
+      'ar': 'Arabic',
+      'hi': 'Hindi',
+      'tr': 'Turkish',
+      'sv': 'Swedish',
+      'da': 'Danish',
+      'no': 'Norwegian',
+      'fi': 'Finnish',
+      'id': 'Indonesian',
+      'vi': 'Vietnamese',
+      'th': 'Thai',
+      'uk': 'Ukrainian',
+      'cs': 'Czech',
+      'ro': 'Romanian',
+    };
+
+    const languageName = languageNames[language] || 'English';
 
     // Estimate word count based on duration (approx. 150 words per minute for normal speech)
     const durationNum = typeof duration === 'string' ? parseInt(duration) : (duration || 30);
@@ -65,11 +97,13 @@ Deno.serve(async (req: Request) => {
     The content must be highly engaging and viral-worthy for TikTok/Reels/Shorts.
     ${specificInstructions}
     
+    IMPORTANT: You MUST write the entire script in ${languageName}. Every single word must be in ${languageName}.
+    
     Target Duration: ${durationNum} seconds (approx ${wordCount} words).
     Category: ${category}
     User Prompt: ${prompt || "Create something relevant to the category"}
     
-    Output ONLY the raw spoken text. Do not include any scene directions, sound effects, or intro/outro labels.`;
+    Output ONLY the raw spoken text in ${languageName}. Do not include any scene directions, sound effects, or intro/outro labels.`;
 
     // Call OpenAI API
     const response = await fetch("https://api.openai.com/v1/chat/completions", {

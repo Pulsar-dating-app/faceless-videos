@@ -1,0 +1,639 @@
+"use client";
+
+import React, { createContext, useContext, useState } from "react";
+
+// Define all translations
+export const translations = {
+  en: {
+    // Navbar
+    nav: {
+      features: "Features",
+      pricing: "Pricing",
+      about: "About",
+      login: "Login",
+      signUp: "Sign Up",
+      signOut: "Sign Out",
+    },
+    // Hero Section
+    hero: {
+      badge: "AI-Powered Automation",
+      headline1: "Create Viral Short Videos",
+      headline2: "in Seconds",
+      subheadline: "Automate your faceless channels on TikTok and Instagram. Generate engaging scripts, visuals, and voiceovers with just one click.",
+      cta: "Generate Video",
+      demo: "Watch Demo",
+    },
+    // Form
+    form: {
+      title: "Configure Your Video",
+      subtitle: "Choose a viral topic or write your own.",
+      videoType: "Video Type",
+      gameplay: "Gameplay Video",
+      gameplayDesc: "Background gameplay",
+      aiImages: "AI Images",
+      aiImagesDesc: "AI generated visuals",
+      voiceLanguage: "Voice Language",
+      narratorVoice: "Narrator Voice",
+      artStyle: "Art Style",
+      category: "Viral Category",
+      duration: "Duration",
+      script: "Video Script",
+      scriptPlaceholder: "Enter your script here or generate one...",
+      generateAI: "Generate with AI",
+      createVideo: "Create Video",
+      generating: "Generating Magic...",
+      generateAnother: "Generate Another",
+      download: "Download",
+      mockMode: "Use Mock Data (Skip API calls)",
+      mockPlaceholder: '{"audioUrl": "...", "subtitles": "...", "generatedImages": [...], ...}',
+      clearMock: "Clear Mock Data",
+      pasteJson: "Paste Edge Function response JSON here:",
+    },
+    // Pricing Page
+    pricing: {
+      title: "Simple, Transparent Pricing",
+      subtitle: "Choose the plan that fits your needs. All plans include our core features.",
+      mostPopular: "Most Popular",
+      perMonth: "/month",
+      getStarted: "Get Started",
+      starter: {
+        name: "Starter",
+        description: "Perfect for getting started",
+        feature1: "10 videos per month",
+        feature2: "Basic templates",
+        feature3: "HD quality export",
+        feature4: "Email support",
+      },
+      professional: {
+        name: "Professional",
+        description: "For content creators",
+        feature1: "50 videos per month",
+        feature2: "All templates",
+        feature3: "4K quality export",
+        feature4: "Priority support",
+        feature5: "Custom branding",
+      },
+      elite: {
+        name: "Elite",
+        description: "For agencies and teams",
+        feature1: "Unlimited videos",
+        feature2: "All templates + custom",
+        feature3: "4K quality export",
+        feature4: "24/7 priority support",
+        feature5: "Custom branding",
+        feature6: "API access",
+        feature7: "Team collaboration",
+      },
+    },
+    // Categories
+    categories: {
+      joke: "Funny Joke",
+      animal: "Cute Animals",
+      motivational: "Daily Motivation",
+      tech: "Tech Facts",
+      scary: "Scary Story",
+      history: "History Facts",
+      reddit: "Reddit Story",
+      "reddit-relationship": "Reddit Relationship",
+    },
+    // Art Styles
+    artStyles: {
+      cartoon: "Cartoon",
+      horror: "Horror",
+      realistic: "Realistic",
+      anime: "Anime",
+      watercolor: "Watercolor",
+      cyberpunk: "Cyberpunk",
+      minimalist: "Minimalist",
+      "oil-painting": "Oil Painting",
+      sketch: "Sketch",
+      "3d-render": "3D Render",
+    },
+    // Durations
+    durations: {
+      "30": "30 Seconds",
+      "60": "1 Minute",
+      "120": "2 Minutes",
+    },
+    // Footer
+    footer: {
+      copyright: "© {{year}} ViralGen. All rights reserved.",
+    },
+    // Messages
+    messages: {
+      signInRequired: "Please sign in to generate videos!",
+      scriptRequired: "Please generate or write a script first!",
+      voicePreviewError: 'Voice preview for "{{voice}}" in {{language}} not found. Please generate voice samples first.',
+    },
+  },
+  es: {
+    nav: {
+      features: "Características",
+      pricing: "Precios",
+      about: "Acerca de",
+      login: "Iniciar sesión",
+      signUp: "Registrarse",
+      signOut: "Cerrar sesión",
+    },
+    hero: {
+      badge: "Automatización con IA",
+      headline1: "Crea Videos Virales Cortos",
+      headline2: "en Segundos",
+      subheadline: "Automatiza tus canales sin rostro en TikTok e Instagram. Genera guiones atractivos, visuales y voces con un solo clic.",
+      cta: "Generar Video",
+      demo: "Ver Demo",
+    },
+    form: {
+      title: "Configura tu Video",
+      subtitle: "Elige un tema viral o escribe el tuyo.",
+      videoType: "Tipo de Video",
+      gameplay: "Video de Juego",
+      gameplayDesc: "Gameplay de fondo",
+      aiImages: "Imágenes IA",
+      aiImagesDesc: "Visuales generados por IA",
+      voiceLanguage: "Idioma de Voz",
+      narratorVoice: "Voz del Narrador",
+      artStyle: "Estilo de Arte",
+      category: "Categoría Viral",
+      duration: "Duración",
+      script: "Guión del Video",
+      scriptPlaceholder: "Ingresa tu guión aquí o genera uno...",
+      generateAI: "Generar con IA",
+      createVideo: "Crear Video",
+      generating: "Generando Magia...",
+      generateAnother: "Generar Otro",
+      download: "Descargar",
+      mockMode: "Usar Datos de Prueba (Omitir llamadas API)",
+      mockPlaceholder: '{"audioUrl": "...", "subtitles": "...", "generatedImages": [...], ...}',
+      clearMock: "Limpiar Datos de Prueba",
+      pasteJson: "Pega aquí la respuesta JSON de Edge Function:",
+    },
+    pricing: {
+      title: "Precios Simples y Transparentes",
+      subtitle: "Elige el plan que se adapte a tus necesidades. Todos los planes incluyen nuestras funciones principales.",
+      mostPopular: "Más Popular",
+      perMonth: "/mes",
+      getStarted: "Comenzar",
+      starter: {
+        name: "Inicial",
+        description: "Perfecto para empezar",
+        feature1: "10 videos por mes",
+        feature2: "Plantillas básicas",
+        feature3: "Exportación en HD",
+        feature4: "Soporte por email",
+      },
+      professional: {
+        name: "Profesional",
+        description: "Para creadores de contenido",
+        feature1: "50 videos por mes",
+        feature2: "Todas las plantillas",
+        feature3: "Exportación en 4K",
+        feature4: "Soporte prioritario",
+        feature5: "Marca personalizada",
+      },
+      elite: {
+        name: "Elite",
+        description: "Para agencias y equipos",
+        feature1: "Videos ilimitados",
+        feature2: "Todas las plantillas + personalizadas",
+        feature3: "Exportación en 4K",
+        feature4: "Soporte prioritario 24/7",
+        feature5: "Marca personalizada",
+        feature6: "Acceso a API",
+        feature7: "Colaboración en equipo",
+      },
+    },
+    categories: {
+      joke: "Chiste Gracioso",
+      animal: "Animales Lindos",
+      motivational: "Motivación Diaria",
+      tech: "Datos Tecnológicos",
+      scary: "Historia de Terror",
+      history: "Datos Históricos",
+      reddit: "Historia de Reddit",
+      "reddit-relationship": "Relación de Reddit",
+    },
+    artStyles: {
+      cartoon: "Dibujos Animados",
+      horror: "Terror",
+      realistic: "Realista",
+      anime: "Anime",
+      watercolor: "Acuarela",
+      cyberpunk: "Cyberpunk",
+      minimalist: "Minimalista",
+      "oil-painting": "Pintura al Óleo",
+      sketch: "Boceto",
+      "3d-render": "Renderizado 3D",
+    },
+    durations: {
+      "30": "30 Segundos",
+      "60": "1 Minuto",
+      "120": "2 Minutos",
+    },
+    footer: {
+      copyright: "© {{year}} ViralGen. Todos los derechos reservados.",
+    },
+    messages: {
+      signInRequired: "¡Por favor inicia sesión para generar videos!",
+      scriptRequired: "¡Por favor genera o escribe un guión primero!",
+      voicePreviewError: 'Vista previa de voz para "{{voice}}" en {{language}} no encontrada. Por favor genera muestras de voz primero.',
+    },
+  },
+  fr: {
+    nav: {
+      features: "Fonctionnalités",
+      pricing: "Tarifs",
+      about: "À propos",
+      login: "Connexion",
+      signUp: "S'inscrire",
+      signOut: "Déconnexion",
+    },
+    hero: {
+      badge: "Automatisation par IA",
+      headline1: "Créez des Vidéos Courtes Virales",
+      headline2: "en Quelques Secondes",
+      subheadline: "Automatisez vos chaînes sans visage sur TikTok et Instagram. Générez des scripts, des visuels et des voix captivants en un seul clic.",
+      cta: "Générer une Vidéo",
+      demo: "Voir la Démo",
+    },
+    form: {
+      title: "Configurez votre Vidéo",
+      subtitle: "Choisissez un sujet viral ou écrivez le vôtre.",
+      videoType: "Type de Vidéo",
+      gameplay: "Vidéo de Jeu",
+      gameplayDesc: "Gameplay en arrière-plan",
+      aiImages: "Images IA",
+      aiImagesDesc: "Visuels générés par IA",
+      voiceLanguage: "Langue de la Voix",
+      narratorVoice: "Voix du Narrateur",
+      artStyle: "Style d'Art",
+      category: "Catégorie Virale",
+      duration: "Durée",
+      script: "Script Vidéo",
+      scriptPlaceholder: "Entrez votre script ici ou générez-en un...",
+      generateAI: "Générer avec IA",
+      createVideo: "Créer une Vidéo",
+      generating: "Génération Magique...",
+      generateAnother: "Générer un Autre",
+      download: "Télécharger",
+      mockMode: "Utiliser des Données de Test (Ignorer les appels API)",
+      mockPlaceholder: '{"audioUrl": "...", "subtitles": "...", "generatedImages": [...], ...}',
+      clearMock: "Effacer les Données de Test",
+      pasteJson: "Collez ici la réponse JSON de Edge Function:",
+    },
+    pricing: {
+      title: "Tarifs Simples et Transparents",
+      subtitle: "Choisissez le plan qui correspond à vos besoins. Tous les plans incluent nos fonctionnalités principales.",
+      mostPopular: "Le Plus Populaire",
+      perMonth: "/mois",
+      getStarted: "Commencer",
+      starter: {
+        name: "Débutant",
+        description: "Parfait pour commencer",
+        feature1: "10 vidéos par mois",
+        feature2: "Modèles de base",
+        feature3: "Export en qualité HD",
+        feature4: "Support par email",
+      },
+      professional: {
+        name: "Professionnel",
+        description: "Pour les créateurs de contenu",
+        feature1: "50 vidéos par mois",
+        feature2: "Tous les modèles",
+        feature3: "Export en qualité 4K",
+        feature4: "Support prioritaire",
+        feature5: "Marque personnalisée",
+      },
+      elite: {
+        name: "Élite",
+        description: "Pour les agences et les équipes",
+        feature1: "Vidéos illimitées",
+        feature2: "Tous les modèles + personnalisés",
+        feature3: "Export en qualité 4K",
+        feature4: "Support prioritaire 24/7",
+        feature5: "Marque personnalisée",
+        feature6: "Accès API",
+        feature7: "Collaboration d'équipe",
+      },
+    },
+    categories: {
+      joke: "Blague Drôle",
+      animal: "Animaux Mignons",
+      motivational: "Motivation Quotidienne",
+      tech: "Faits Technologiques",
+      scary: "Histoire Effrayante",
+      history: "Faits Historiques",
+      reddit: "Histoire Reddit",
+      "reddit-relationship": "Relation Reddit",
+    },
+    artStyles: {
+      cartoon: "Dessin Animé",
+      horror: "Horreur",
+      realistic: "Réaliste",
+      anime: "Anime",
+      watercolor: "Aquarelle",
+      cyberpunk: "Cyberpunk",
+      minimalist: "Minimaliste",
+      "oil-painting": "Peinture à l'Huile",
+      sketch: "Esquisse",
+      "3d-render": "Rendu 3D",
+    },
+    durations: {
+      "30": "30 Secondes",
+      "60": "1 Minute",
+      "120": "2 Minutes",
+    },
+    footer: {
+      copyright: "© {{year}} ViralGen. Tous droits réservés.",
+    },
+    messages: {
+      signInRequired: "Veuillez vous connecter pour générer des vidéos!",
+      scriptRequired: "Veuillez générer ou écrire un script d'abord!",
+      voicePreviewError: 'Aperçu vocal pour "{{voice}}" en {{language}} introuvable. Veuillez générer des échantillons vocaux d\'abord.',
+    },
+  },
+  pt: {
+    nav: {
+      features: "Recursos",
+      pricing: "Preços",
+      about: "Sobre",
+      login: "Entrar",
+      signUp: "Cadastrar",
+      signOut: "Sair",
+    },
+    hero: {
+      badge: "Automação com IA",
+      headline1: "Crie Vídeos Curtos Virais",
+      headline2: "em Segundos",
+      subheadline: "Automatize seus canais sem rosto no TikTok e Instagram. Gere roteiros, visuais e narrações envolventes com apenas um clique.",
+      cta: "Gerar Vídeo",
+      demo: "Ver Demo",
+    },
+    form: {
+      title: "Configure seu Vídeo",
+      subtitle: "Escolha um tópico viral ou escreva o seu.",
+      videoType: "Tipo de Vídeo",
+      gameplay: "Vídeo de Gameplay",
+      gameplayDesc: "Gameplay de fundo",
+      aiImages: "Imagens IA",
+      aiImagesDesc: "Visuais gerados por IA",
+      voiceLanguage: "Idioma da Voz",
+      narratorVoice: "Voz do Narrador",
+      artStyle: "Estilo de Arte",
+      category: "Categoria Viral",
+      duration: "Duração",
+      script: "Roteiro do Vídeo",
+      scriptPlaceholder: "Digite seu roteiro aqui ou gere um...",
+      generateAI: "Gerar com IA",
+      createVideo: "Criar Vídeo",
+      generating: "Gerando Mágica...",
+      generateAnother: "Gerar Outro",
+      download: "Baixar",
+      mockMode: "Usar Dados de Teste (Pular chamadas API)",
+      mockPlaceholder: '{"audioUrl": "...", "subtitles": "...", "generatedImages": [...], ...}',
+      clearMock: "Limpar Dados de Teste",
+      pasteJson: "Cole aqui a resposta JSON da Edge Function:",
+    },
+    pricing: {
+      title: "Preços Simples e Transparentes",
+      subtitle: "Escolha o plano que se adapta às suas necessidades. Todos os planos incluem nossos recursos principais.",
+      mostPopular: "Mais Popular",
+      perMonth: "/mês",
+      getStarted: "Começar",
+      starter: {
+        name: "Inicial",
+        description: "Perfeito para começar",
+        feature1: "10 vídeos por mês",
+        feature2: "Modelos básicos",
+        feature3: "Exportação em HD",
+        feature4: "Suporte por email",
+      },
+      professional: {
+        name: "Profissional",
+        description: "Para criadores de conteúdo",
+        feature1: "50 vídeos por mês",
+        feature2: "Todos os modelos",
+        feature3: "Exportação em 4K",
+        feature4: "Suporte prioritário",
+        feature5: "Marca personalizada",
+      },
+      elite: {
+        name: "Elite",
+        description: "Para agências e equipes",
+        feature1: "Vídeos ilimitados",
+        feature2: "Todos os modelos + personalizados",
+        feature3: "Exportação em 4K",
+        feature4: "Suporte prioritário 24/7",
+        feature5: "Marca personalizada",
+        feature6: "Acesso à API",
+        feature7: "Colaboração em equipe",
+      },
+    },
+    categories: {
+      joke: "Piada Engraçada",
+      animal: "Animais Fofos",
+      motivational: "Motivação Diária",
+      tech: "Fatos Tecnológicos",
+      scary: "História de Terror",
+      history: "Fatos Históricos",
+      reddit: "História do Reddit",
+      "reddit-relationship": "Relacionamento Reddit",
+    },
+    artStyles: {
+      cartoon: "Desenho Animado",
+      horror: "Terror",
+      realistic: "Realista",
+      anime: "Anime",
+      watercolor: "Aquarela",
+      cyberpunk: "Cyberpunk",
+      minimalist: "Minimalista",
+      "oil-painting": "Pintura a Óleo",
+      sketch: "Esboço",
+      "3d-render": "Renderização 3D",
+    },
+    durations: {
+      "30": "30 Segundos",
+      "60": "1 Minuto",
+      "120": "2 Minutos",
+    },
+    footer: {
+      copyright: "© {{year}} ViralGen. Todos os direitos reservados.",
+    },
+    messages: {
+      signInRequired: "Por favor, faça login para gerar vídeos!",
+      scriptRequired: "Por favor, gere ou escreva um roteiro primeiro!",
+      voicePreviewError: 'Prévia de voz para "{{voice}}" em {{language}} não encontrada. Por favor, gere amostras de voz primeiro.',
+    },
+  },
+  de: {
+    nav: {
+      features: "Funktionen",
+      pricing: "Preise",
+      about: "Über uns",
+      login: "Anmelden",
+      signUp: "Registrieren",
+      signOut: "Abmelden",
+    },
+    hero: {
+      badge: "KI-gestützte Automatisierung",
+      headline1: "Erstelle virale Kurzvideos",
+      headline2: "in Sekunden",
+      subheadline: "Automatisiere deine gesichtslosen Kanäle auf TikTok und Instagram. Erstelle fesselnde Skripte, Visualisierungen und Voiceovers mit nur einem Klick.",
+      cta: "Video Generieren",
+      demo: "Demo Ansehen",
+    },
+    form: {
+      title: "Konfiguriere dein Video",
+      subtitle: "Wähle ein virales Thema oder schreibe dein eigenes.",
+      videoType: "Videotyp",
+      gameplay: "Gameplay-Video",
+      gameplayDesc: "Hintergrund-Gameplay",
+      aiImages: "KI-Bilder",
+      aiImagesDesc: "KI-generierte Visuals",
+      voiceLanguage: "Sprachsprache",
+      narratorVoice: "Erzählerstimme",
+      artStyle: "Kunststil",
+      category: "Virale Kategorie",
+      duration: "Dauer",
+      script: "Video-Skript",
+      scriptPlaceholder: "Geben Sie hier Ihr Skript ein oder generieren Sie eines...",
+      generateAI: "Mit KI Generieren",
+      createVideo: "Video Erstellen",
+      generating: "Generiere Magie...",
+      generateAnother: "Weiteres Generieren",
+      download: "Herunterladen",
+      mockMode: "Testdaten Verwenden (API-Aufrufe Überspringen)",
+      mockPlaceholder: '{"audioUrl": "...", "subtitles": "...", "generatedImages": [...], ...}',
+      clearMock: "Testdaten Löschen",
+      pasteJson: "JSON-Antwort der Edge-Funktion hier einfügen:",
+    },
+    pricing: {
+      title: "Einfache, Transparente Preise",
+      subtitle: "Wählen Sie den Plan, der Ihren Anforderungen entspricht. Alle Pläne enthalten unsere Kernfunktionen.",
+      mostPopular: "Am Beliebtesten",
+      perMonth: "/Monat",
+      getStarted: "Loslegen",
+      starter: {
+        name: "Starter",
+        description: "Perfekt für den Einstieg",
+        feature1: "10 Videos pro Monat",
+        feature2: "Basis-Vorlagen",
+        feature3: "HD-Qualität Export",
+        feature4: "E-Mail-Support",
+      },
+      professional: {
+        name: "Professionell",
+        description: "Für Content-Ersteller",
+        feature1: "50 Videos pro Monat",
+        feature2: "Alle Vorlagen",
+        feature3: "4K-Qualität Export",
+        feature4: "Prioritäts-Support",
+        feature5: "Individuelles Branding",
+      },
+      elite: {
+        name: "Elite",
+        description: "Für Agenturen und Teams",
+        feature1: "Unbegrenzte Videos",
+        feature2: "Alle Vorlagen + individuell",
+        feature3: "4K-Qualität Export",
+        feature4: "24/7 Prioritäts-Support",
+        feature5: "Individuelles Branding",
+        feature6: "API-Zugriff",
+        feature7: "Team-Zusammenarbeit",
+      },
+    },
+    categories: {
+      joke: "Witziger Witz",
+      animal: "Süße Tiere",
+      motivational: "Tägliche Motivation",
+      tech: "Tech-Fakten",
+      scary: "Gruselgeschichte",
+      history: "Historische Fakten",
+      reddit: "Reddit-Geschichte",
+      "reddit-relationship": "Reddit-Beziehung",
+    },
+    artStyles: {
+      cartoon: "Cartoon",
+      horror: "Horror",
+      realistic: "Realistisch",
+      anime: "Anime",
+      watercolor: "Aquarell",
+      cyberpunk: "Cyberpunk",
+      minimalist: "Minimalistisch",
+      "oil-painting": "Ölgemälde",
+      sketch: "Skizze",
+      "3d-render": "3D-Rendering",
+    },
+    durations: {
+      "30": "30 Sekunden",
+      "60": "1 Minute",
+      "120": "2 Minuten",
+    },
+    footer: {
+      copyright: "© {{year}} ViralGen. Alle Rechte vorbehalten.",
+    },
+    messages: {
+      signInRequired: "Bitte melde dich an, um Videos zu generieren!",
+      scriptRequired: "Bitte generiere oder schreibe zuerst ein Skript!",
+      voicePreviewError: 'Sprachvorschau für "{{voice}}" in {{language}} nicht gefunden. Bitte generiere zuerst Sprachproben.',
+    },
+  },
+};
+
+export type Language = keyof typeof translations;
+export type TranslationKeys = typeof translations.en;
+
+interface I18nContextType {
+  language: Language;
+  setLanguage: (lang: Language) => void;
+  t: TranslationKeys;
+  formatMessage: (message: string, params?: Record<string, string | number>) => string;
+}
+
+const I18nContext = createContext<I18nContextType | undefined>(undefined);
+
+export function I18nProvider({ children }: { children: React.ReactNode }) {
+  // Initialize with saved language from localStorage
+  const [language, setLanguageState] = useState<Language>(() => {
+    if (typeof window !== "undefined") {
+      const savedLang = localStorage.getItem("app-language") as Language;
+      if (savedLang && translations[savedLang]) {
+        return savedLang;
+      }
+    }
+    return "en";
+  });
+
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang);
+    localStorage.setItem("app-language", lang);
+  };
+
+  const formatMessage = (message: string, params?: Record<string, string | number>): string => {
+    if (!params) return message;
+    
+    let formatted = message;
+    Object.entries(params).forEach(([key, value]) => {
+      formatted = formatted.replace(`{{${key}}}`, String(value));
+    });
+    return formatted;
+  };
+
+  const value: I18nContextType = {
+    language,
+    setLanguage,
+    t: translations[language],
+    formatMessage,
+  };
+
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+}
+
+export function useI18n() {
+  const context = useContext(I18nContext);
+  if (context === undefined) {
+    throw new Error("useI18n must be used within an I18nProvider");
+  }
+  return context;
+}
+
