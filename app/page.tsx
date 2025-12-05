@@ -8,6 +8,37 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import { CustomSelect } from "@/components/CustomSelect";
 
+// Language configurations
+const LANGUAGES = {
+  'en': { name: 'English', flag: '🇺🇸' },
+  'es': { name: 'Spanish', flag: '🇪🇸' },
+  'fr': { name: 'French', flag: '🇫🇷' },
+  'de': { name: 'German', flag: '🇩🇪' },
+  'pt': { name: 'Portuguese', flag: '🇵🇹' },
+  'it': { name: 'Italian', flag: '🇮🇹' },
+  'nl': { name: 'Dutch', flag: '🇳🇱' },
+  'pl': { name: 'Polish', flag: '🇵🇱' },
+  'ru': { name: 'Russian', flag: '🇷🇺' },
+  'zh': { name: 'Chinese', flag: '🇨🇳' },
+  'ja': { name: 'Japanese', flag: '🇯🇵' },
+  'ko': { name: 'Korean', flag: '🇰🇷' },
+  'ar': { name: 'Arabic', flag: '🇸🇦' },
+  'hi': { name: 'Hindi', flag: '🇮🇳' },
+  'tr': { name: 'Turkish', flag: '🇹🇷' },
+  'sv': { name: 'Swedish', flag: '🇸🇪' },
+  'da': { name: 'Danish', flag: '🇩🇰' },
+  'no': { name: 'Norwegian', flag: '🇳🇴' },
+  'fi': { name: 'Finnish', flag: '🇫🇮' },
+  'id': { name: 'Indonesian', flag: '🇮🇩' },
+  'vi': { name: 'Vietnamese', flag: '🇻🇳' },
+  'th': { name: 'Thai', flag: '🇹🇭' },
+  'uk': { name: 'Ukrainian', flag: '🇺🇦' },
+  'cs': { name: 'Czech', flag: '🇨🇿' },
+  'ro': { name: 'Romanian', flag: '🇷🇴' },
+};
+
+const VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+
 export default function Home() {
   const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
@@ -17,6 +48,7 @@ export default function Home() {
   const [duration, setDuration] = useState("30");
   const [videoType, setVideoType] = useState<"gameplay" | "ai-images">("gameplay");
   const [artStyle, setArtStyle] = useState("cartoon");
+  const [language, setLanguage] = useState("en");
   const [voice, setVoice] = useState("alloy");
   const [customPrompt, setCustomPrompt] = useState("");
   const [script, setScript] = useState("");
@@ -43,7 +75,7 @@ export default function Home() {
     try {
       // Call Supabase Edge Function
       const { data, error } = await supabase.functions.invoke("generate-script", {
-        body: { category, prompt: customPrompt, duration },
+        body: { category, prompt: customPrompt, duration, language },
       });
 
       if (error) throw error;
@@ -83,13 +115,13 @@ export default function Home() {
       return;
     }
 
-    // Play the new voice preview
-    const audio = new Audio(`/voice-samples/${voiceName}.mp3`);
+    // Play the new voice preview with language
+    const audio = new Audio(`/voice-samples/${language}/${voiceName}.mp3`);
     voicePreviewRef.current = audio;
     
     audio.play().catch((error) => {
       console.error('Error playing voice preview:', error);
-      alert(`Voice preview for "${voiceName}" not found. Please generate voice samples first.`);
+      alert(`Voice preview for "${voiceName}" in ${language} not found. Please generate voice samples first.`);
     });
 
     setPlayingVoicePreview(voiceName);
@@ -118,7 +150,12 @@ export default function Home() {
     try {
       if (videoType === "ai-images") {
         // AI Images flow
-        let aiData: any;
+        let aiData: {
+          audioUrl: string;
+          subtitles: string;
+          generatedImages: string[];
+          audioDuration: number;
+        };
         
         // Check if we should use mock data
         if (useMockData && mockPayload) {
@@ -131,7 +168,7 @@ export default function Home() {
         } else {
           // 1. Generate Audio + Subtitles + Image Prompts via Supabase Edge Function
           const { data, error: aiError } = await supabase.functions.invoke("generate-ai-video", {
-            body: { text: script, voice, artStyle },
+            body: { text: script, voice, artStyle, language },
           });
 
           if (aiError) throw aiError;
@@ -186,7 +223,7 @@ export default function Home() {
         // Gameplay video flow (existing logic)
         // 1. Generate Audio + Subtitles via Supabase Edge Function
         const { data: audioData, error: audioError } = await supabase.functions.invoke("generate-video", {
-          body: { text: script, voice },
+          body: { text: script, voice, language },
         });
 
         if (audioError) throw audioError;
@@ -337,11 +374,27 @@ export default function Home() {
                   </div>
                 </div>
 
+                {/* Language Selection */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Voice Language</label>
+                  <select
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                  >
+                    {Object.entries(LANGUAGES).map(([code, config]) => (
+                      <option key={code} value={code}>
+                        {config.flag} {config.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Voice Selection */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Narrator Voice</label>
                   <div className="grid grid-cols-3 gap-2">
-                    {['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'].map((v) => (
+                    {VOICES.map((v) => (
                       <div key={v} className="relative">
                         <button
                           type="button"
