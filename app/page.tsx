@@ -9,33 +9,33 @@ import { useI18n } from "@/lib/i18n-context";
 import { supabase } from "@/lib/supabase";
 import { CustomSelect } from "@/components/CustomSelect";
 
-// Language configurations
-const LANGUAGES = {
-  'en': { name: 'English', flag: '🇺🇸' },
-  'es': { name: 'Spanish', flag: '🇪🇸' },
-  'fr': { name: 'French', flag: '🇫🇷' },
-  'de': { name: 'German', flag: '🇩🇪' },
-  'pt': { name: 'Portuguese', flag: '🇵🇹' },
-  'it': { name: 'Italian', flag: '🇮🇹' },
-  'nl': { name: 'Dutch', flag: '🇳🇱' },
-  'pl': { name: 'Polish', flag: '🇵🇱' },
-  'ru': { name: 'Russian', flag: '🇷🇺' },
-  'zh': { name: 'Chinese', flag: '🇨🇳' },
-  'ja': { name: 'Japanese', flag: '🇯🇵' },
-  'ko': { name: 'Korean', flag: '🇰🇷' },
-  'ar': { name: 'Arabic', flag: '🇸🇦' },
-  'hi': { name: 'Hindi', flag: '🇮🇳' },
-  'tr': { name: 'Turkish', flag: '🇹🇷' },
-  'sv': { name: 'Swedish', flag: '🇸🇪' },
-  'da': { name: 'Danish', flag: '🇩🇰' },
-  'no': { name: 'Norwegian', flag: '🇳🇴' },
-  'fi': { name: 'Finnish', flag: '🇫🇮' },
-  'id': { name: 'Indonesian', flag: '🇮🇩' },
-  'vi': { name: 'Vietnamese', flag: '🇻🇳' },
-  'th': { name: 'Thai', flag: '🇹🇭' },
-  'uk': { name: 'Ukrainian', flag: '🇺🇦' },
-  'cs': { name: 'Czech', flag: '🇨🇿' },
-  'ro': { name: 'Romanian', flag: '🇷🇴' },
+// Language configurations (flags only - names come from translations)
+const LANGUAGE_FLAGS: { [key: string]: string } = {
+  'en': '🇺🇸',
+  'es': '🇪🇸',
+  'fr': '🇫🇷',
+  'de': '🇩🇪',
+  'pt': '🇵🇹',
+  'it': '🇮🇹',
+  'nl': '🇳🇱',
+  'pl': '🇵🇱',
+  'ru': '🇷🇺',
+  'zh': '🇨🇳',
+  'ja': '🇯🇵',
+  'ko': '🇰🇷',
+  'ar': '🇸🇦',
+  'hi': '🇮🇳',
+  'tr': '🇹🇷',
+  'sv': '🇸🇪',
+  'da': '🇩🇰',
+  'no': '🇳🇴',
+  'fi': '🇫🇮',
+  'id': '🇮🇩',
+  'vi': '🇻🇳',
+  'th': '🇹🇭',
+  'uk': '🇺🇦',
+  'cs': '🇨🇿',
+  'ro': '🇷🇴',
 };
 
 const VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
@@ -383,9 +383,9 @@ export default function Home() {
                     onChange={(e) => setLanguage(e.target.value)}
                     className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                   >
-                    {Object.entries(LANGUAGES).map(([code, config]) => (
+                    {Object.entries(LANGUAGE_FLAGS).map(([code, flag]) => (
                       <option key={code} value={code}>
-                        {config.flag} {config.name}
+                        {flag} {t.languages[code as keyof typeof t.languages]}
                       </option>
                     ))}
                   </select>
