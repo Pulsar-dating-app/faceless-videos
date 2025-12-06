@@ -170,6 +170,20 @@ export const translations = {
       scriptRequired: "Please generate or write a script first!",
       voicePreviewError: 'Voice preview for "{{voice}}" in {{language}} not found. Please generate voice samples first.',
     },
+    // Dashboard
+    dashboard: {
+      menu: {
+        videoCreation: "Video Creation",
+        socialMedia: "Link Social Media",
+      },
+      socialMedia: {
+        title: "Link Your Social Media Accounts",
+        subtitle: "Connect your accounts to automatically upload videos",
+        connect: "Connect",
+        notConnected: "Not connected",
+        description: "Connect your social media accounts to automatically upload your generated videos. This feature will be available soon.",
+      },
+    },
   },
   es: {
     nav: {
@@ -325,6 +339,19 @@ export const translations = {
       signInRequired: "¡Por favor inicia sesión para generar videos!",
       scriptRequired: "¡Por favor genera o escribe un guión primero!",
       voicePreviewError: 'Vista previa de voz para "{{voice}}" en {{language}} no encontrada. Por favor genera muestras de voz primero.',
+    },
+    dashboard: {
+      menu: {
+        videoCreation: "Creación de Videos",
+        socialMedia: "Vincular Redes Sociales",
+      },
+      socialMedia: {
+        title: "Vincula tus Cuentas de Redes Sociales",
+        subtitle: "Conecta tus cuentas para subir videos automáticamente",
+        connect: "Conectar",
+        notConnected: "No conectado",
+        description: "Conecta tus cuentas de redes sociales para subir automáticamente tus videos generados. Esta función estará disponible pronto.",
+      },
     },
   },
   fr: {
@@ -482,6 +509,19 @@ export const translations = {
       scriptRequired: "Veuillez générer ou écrire un script d'abord!",
       voicePreviewError: 'Aperçu vocal pour "{{voice}}" en {{language}} introuvable. Veuillez générer des échantillons vocaux d\'abord.',
     },
+    dashboard: {
+      menu: {
+        videoCreation: "Création de Vidéos",
+        socialMedia: "Lier les Réseaux Sociaux",
+      },
+      socialMedia: {
+        title: "Liez vos Comptes de Réseaux Sociaux",
+        subtitle: "Connectez vos comptes pour télécharger automatiquement des vidéos",
+        connect: "Connecter",
+        notConnected: "Non connecté",
+        description: "Connectez vos comptes de réseaux sociaux pour télécharger automatiquement vos vidéos générées. Cette fonctionnalité sera bientôt disponible.",
+      },
+    },
   },
   pt: {
     nav: {
@@ -638,6 +678,19 @@ export const translations = {
       scriptRequired: "Por favor, gere ou escreva um roteiro primeiro!",
       voicePreviewError: 'Prévia de voz para "{{voice}}" em {{language}} não encontrada. Por favor, gere amostras de voz primeiro.',
     },
+    dashboard: {
+      menu: {
+        videoCreation: "Criação de Vídeos",
+        socialMedia: "Vincular Redes Sociais",
+      },
+      socialMedia: {
+        title: "Vincule suas Contas de Redes Sociais",
+        subtitle: "Conecte suas contas para fazer upload automático de vídeos",
+        connect: "Conectar",
+        notConnected: "Não conectado",
+        description: "Conecte suas contas de redes sociais para fazer upload automático dos seus vídeos gerados. Esta funcionalidade estará disponível em breve.",
+      },
+    },
   },
   de: {
     nav: {
@@ -793,6 +846,19 @@ export const translations = {
       signInRequired: "Bitte melde dich an, um Videos zu generieren!",
       scriptRequired: "Bitte generiere oder schreibe zuerst ein Skript!",
       voicePreviewError: 'Sprachvorschau für "{{voice}}" in {{language}} nicht gefunden. Bitte generiere zuerst Sprachproben.',
+    },
+    dashboard: {
+      menu: {
+        videoCreation: "Videoerstellung",
+        socialMedia: "Social Media Verknüpfen",
+      },
+      socialMedia: {
+        title: "Verknüpfe deine Social Media Konten",
+        subtitle: "Verbinde deine Konten, um Videos automatisch hochzuladen",
+        connect: "Verbinden",
+        notConnected: "Nicht verbunden",
+        description: "Verknüpfe deine Social Media Konten, um deine generierten Videos automatisch hochzuladen. Diese Funktion wird bald verfügbar sein.",
+      },
     },
   },
 };
