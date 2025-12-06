@@ -58,7 +58,7 @@ export const translations = {
       getStarted: "Get Started",
       starter: {
         name: "Starter",
-        description: "Perfect for getting started",
+        description: "Best for starting creators who want to learn.",
         feature1: "10 videos per month",
         feature2: "Basic templates",
         feature3: "HD quality export",
@@ -66,7 +66,7 @@ export const translations = {
       },
       professional: {
         name: "Professional",
-        description: "For content creators",
+        description: "Best for content creators who wants to grow fast every day.",
         feature1: "50 videos per month",
         feature2: "All templates",
         feature3: "4K quality export",
@@ -204,7 +204,7 @@ export const translations = {
       getStarted: "Comenzar",
       starter: {
         name: "Inicial",
-        description: "Perfecto para empezar",
+        description: "Ideal para creadores principiantes que quieren aprender.",
         feature1: "10 videos por mes",
         feature2: "Plantillas básicas",
         feature3: "Exportación en HD",
@@ -212,7 +212,7 @@ export const translations = {
       },
       professional: {
         name: "Profesional",
-        description: "Para creadores de contenido",
+        description: "Ideal para creadores de contenido que quieren crecer rápido todos los días.",
         feature1: "50 videos por mes",
         feature2: "Todas las plantillas",
         feature3: "Exportación en 4K",
@@ -344,7 +344,7 @@ export const translations = {
       getStarted: "Commencer",
       starter: {
         name: "Débutant",
-        description: "Parfait pour commencer",
+        description: "Idéal pour les créateurs débutants qui veulent apprendre.",
         feature1: "10 vidéos par mois",
         feature2: "Modèles de base",
         feature3: "Export en qualité HD",
@@ -352,7 +352,7 @@ export const translations = {
       },
       professional: {
         name: "Professionnel",
-        description: "Pour les créateurs de contenu",
+        description: "Idéal pour les créateurs de contenu qui veulent grandir rapidement chaque jour.",
         feature1: "50 vidéos par mois",
         feature2: "Tous les modèles",
         feature3: "Export en qualité 4K",
@@ -484,7 +484,7 @@ export const translations = {
       getStarted: "Começar",
       starter: {
         name: "Inicial",
-        description: "Perfeito para começar",
+        description: "Ideal para criadores iniciantes que querem aprender.",
         feature1: "10 vídeos por mês",
         feature2: "Modelos básicos",
         feature3: "Exportação em HD",
@@ -492,7 +492,7 @@ export const translations = {
       },
       professional: {
         name: "Profissional",
-        description: "Para criadores de conteúdo",
+        description: "Ideal para criadores de conteúdo que querem crescer rápido todos os dias.",
         feature1: "50 vídeos por mês",
         feature2: "Todos os modelos",
         feature3: "Exportação em 4K",
@@ -624,7 +624,7 @@ export const translations = {
       getStarted: "Loslegen",
       starter: {
         name: "Starter",
-        description: "Perfekt für den Einstieg",
+        description: "Ideal für Anfänger-Ersteller, die lernen möchten.",
         feature1: "10 Videos pro Monat",
         feature2: "Basis-Vorlagen",
         feature3: "HD-Qualität Export",
@@ -632,7 +632,7 @@ export const translations = {
       },
       professional: {
         name: "Professionell",
-        description: "Für Content-Ersteller",
+        description: "Ideal für Content-Ersteller, die jeden Tag schnell wachsen möchten.",
         feature1: "50 Videos pro Monat",
         feature2: "Alle Vorlagen",
         feature3: "4K-Qualität Export",
