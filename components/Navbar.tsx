@@ -16,7 +16,7 @@ const LANGUAGE_OPTIONS = [
   { code: 'es' as Language, name: 'Español', flag: '🇪🇸' },
   { code: 'fr' as Language, name: 'Français', flag: '🇫🇷' },
   { code: 'de' as Language, name: 'Deutsch', flag: '🇩🇪' },
-  { code: 'pt' as Language, name: 'Português', flag: '🇵🇹' },
+  { code: 'pt' as Language, name: 'Português', flag: '🇧🇷' },
 ];
 
 export function Navbar({ onLogoClick }: NavbarProps) {
