@@ -49,6 +49,15 @@ const ART_STYLES = [
   { value: "realistic", preview: "/images/realistic_preview.png" },
 ];
 
+// Background videos with preview images and URLs
+const BACKGROUND_VIDEOS = [
+  { 
+    value: "minecraft", 
+    preview: "/images/minecraft_preview.png",
+    url: "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.1/minecraft_1.mp4"
+  },
+];
+
 // Category icons mapping
 const CATEGORY_ICONS: { [key: string]: React.ReactNode } = {
   joke: <Laugh className="w-5 h-5" />,
@@ -86,6 +95,7 @@ export default function Dashboard() {
   const [language, setLanguage] = useState("en");
   const [voice, setVoice] = useState("alloy");
   const [artStyle, setArtStyle] = useState("cartoon");
+  const [backgroundVideo, setBackgroundVideo] = useState("minecraft");
   const [customPrompt, setCustomPrompt] = useState("");
   const [script, setScript] = useState("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -106,7 +116,7 @@ export default function Dashboard() {
   }, [user, isLoading, router]);
 
   // Calculate total steps based on video type
-  const totalSteps = videoType === "ai-images" ? 5 : 4;
+  const totalSteps = 5; // Both gameplay and AI images have 5 steps now
   
   // Step labels
   const getStepLabel = (step: number) => {
@@ -124,7 +134,8 @@ export default function Dashboard() {
         case 1: return t.steps.videoType;
         case 2: return t.steps.categoryDuration;
         case 3: return t.steps.voiceSettings;
-        case 4: return t.steps.script;
+        case 4: return "Background Video";
+        case 5: return t.steps.script;
         default: return "";
       }
     }
@@ -293,6 +304,9 @@ export default function Dashboard() {
         setAudioUrl(currentAudioUrl);
 
         // 2. Merge Video using local API (FFmpeg requires server)
+        const selectedBackgroundVideo = BACKGROUND_VIDEOS.find(bg => bg.value === backgroundVideo);
+        const backgroundVideoUrl = selectedBackgroundVideo?.url || BACKGROUND_VIDEOS[0].url;
+        
         const response = await fetch("/api/merge", {
           method: "POST",
           headers: {
@@ -301,6 +315,7 @@ export default function Dashboard() {
           body: JSON.stringify({
             audioUrl: currentAudioUrl,
             subtitles: subtitles,
+            backgroundVideoUrl: backgroundVideoUrl,
           }),
         });
 
@@ -515,6 +530,7 @@ export default function Dashboard() {
         );
 
       case 3:
+        // Voice step for both Gameplay and AI Images
         return (
           <div className="space-y-6">
             <div className="text-center space-y-2 mb-8">
@@ -580,8 +596,56 @@ export default function Dashboard() {
         );
 
       case 4:
-        // Art Style step for AI Images, Script step for Gameplay
-        if (videoType === "ai-images") {
+        // Background Video step for Gameplay, Art Style step for AI Images
+        if (videoType === "gameplay") {
+          return (
+            <div className="space-y-6">
+              <div className="text-center space-y-2 mb-8">
+                <h3 className="text-xl font-semibold">Choose Background Video</h3>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">Select the background video for your gameplay video</p>
+              </div>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+                {BACKGROUND_VIDEOS.map((bgVideo) => (
+                  <button
+                    key={bgVideo.value}
+                    type="button"
+                    onClick={() => setBackgroundVideo(bgVideo.value)}
+                    className={`relative overflow-hidden rounded-xl border-2 transition-all ${
+                      backgroundVideo === bgVideo.value
+                        ? "border-blue-500 ring-2 ring-blue-500/50"
+                        : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600"
+                    }`}
+                  >
+                    <div className="aspect-[9/16] relative">
+                      <NextImage
+                        src={bgVideo.preview}
+                        alt={bgVideo.value}
+                        fill
+                        className="object-cover"
+                      />
+                      {backgroundVideo === bgVideo.value && (
+                        <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
+                          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                            <Check className="w-5 h-5 text-white" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className={`p-2 text-center text-sm font-medium ${
+                      backgroundVideo === bgVideo.value
+                        ? "text-blue-700 dark:text-blue-300"
+                        : "text-zinc-700 dark:text-zinc-300"
+                    }`}>
+                      {bgVideo.value.charAt(0).toUpperCase() + bgVideo.value.slice(1)}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        } else {
+          // Art Style step for AI Images
           return (
             <div className="space-y-6">
               <div className="text-center space-y-2 mb-8">
@@ -618,8 +682,8 @@ export default function Dashboard() {
                     </div>
                     <div className={`p-2 text-center text-sm font-medium ${
                       artStyle === style.value
-                        ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                        : "bg-zinc-50 dark:bg-zinc-800"
+                        ? "text-blue-700 dark:text-blue-300"
+                        : "text-zinc-700 dark:text-zinc-300"
                     }`}>
                       {t.artStyles[style.value as keyof typeof t.artStyles]}
                     </div>
@@ -628,13 +692,10 @@ export default function Dashboard() {
               </div>
             </div>
           );
-        } else {
-          // Script step for Gameplay
-          return renderScriptStep();
         }
 
       case 5:
-        // Script step for AI Images
+        // Script step for both Gameplay and AI Images
         return renderScriptStep();
 
       default:
