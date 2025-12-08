@@ -6,6 +6,23 @@ import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 
+// Carousel configuration
+const CAROUSEL_MAX_WIDTH = "1300px"; // Easy to configure - max width of the carousel
+
+// Sample video URLs - replace with your actual video URLs
+const CAROUSEL_VIDEOS = [
+  "/videos/minecraft_1.mp4",
+  "/videos/minecraft_1.mp4",
+  "/videos/minecraft_1.mp4",
+  "/videos/minecraft_1.mp4",
+  "/videos/minecraft_1.mp4",
+  "/videos/minecraft_1.mp4",
+  "/videos/minecraft_1.mp4",
+  // Add more video URLs here as you create them
+  // "/videos/example2.mp4",
+  // "/videos/example3.mp4",
+];
+
 export default function Home() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
@@ -18,6 +35,9 @@ export default function Home() {
       router.push("/login");
     }
   };
+
+  // Duplicate videos for seamless infinite loop
+  const carouselVideos = [...CAROUSEL_VIDEOS, ...CAROUSEL_VIDEOS];
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -64,6 +84,36 @@ export default function Home() {
             <button className="inline-flex h-12 items-center justify-center rounded-full px-8 font-medium text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
               {t.hero.demo}
             </button>
+          </div>
+        </div>
+
+        {/* Video Carousel */}
+        <div className="w-full mt-20 sm:mt-32 overflow-hidden relative" style={{ maxWidth: CAROUSEL_MAX_WIDTH, marginLeft: 'auto', marginRight: 'auto' }}>
+          {/* Left fade gradient */}
+          <div className="absolute left-0 top-0 bottom-0 w-32 sm:w-48 z-10 bg-gradient-to-r from-background via-background/80 to-transparent pointer-events-none" />
+          
+          {/* Right fade gradient */}
+          <div className="absolute right-0 top-0 bottom-0 w-32 sm:w-48 z-10 bg-gradient-to-l from-background via-background/80 to-transparent pointer-events-none" />
+          
+          <div className="relative w-full">
+            <div className="flex gap-4 animate-scroll">
+              {carouselVideos.map((video, index) => (
+                <div
+                  key={index}
+                  className="flex-shrink-0 w-[140px] sm:w-[180px] rounded-2xl overflow-hidden shadow-2xl border-2 border-zinc-200 dark:border-zinc-800 bg-zinc-900"
+                >
+                  <video
+                    src={video}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                    style={{ aspectRatio: '9/16' }}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </main>
