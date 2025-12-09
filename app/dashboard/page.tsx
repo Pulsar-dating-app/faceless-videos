@@ -15,7 +15,7 @@ const LANGUAGE_FLAGS: { [key: string]: string } = {
   'es': '🇪🇸',
   'fr': '🇫🇷',
   'de': '🇩🇪',
-  'pt': '🇵🇹',
+  'pt': '🇧🇷',
   'it': '🇮🇹',
   'nl': '🇳🇱',
   'pl': '🇵🇱',
@@ -53,8 +53,27 @@ const ART_STYLES = [
 const BACKGROUND_VIDEOS = [
   { 
     value: "minecraft", 
+    label: "Minecraft",
     preview: "/images/minecraft_preview.png",
-    url: "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.1/minecraft_1.mp4"
+    url: "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.2/minecraft_preview.mp4"
+  },
+  { 
+    value: "gta", 
+    label: "GTA",
+    preview: "/images/gta_preview.png",
+    url: "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.2/gta_preview.mp4"
+  },
+  { 
+    value: "satisfying", 
+    label: "Satisfying",
+    preview: "/images/satisfying_preview.png",
+    url: "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.2/satisfying_preview.mp4"
+  },
+  { 
+    value: "mario_kart", 
+    label: "Mario Kart",
+    preview: "/images/mario_kart_preview.png",
+    url: "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.2/mario_kart_preview.mp4"
   },
 ];
 
@@ -637,7 +656,7 @@ export default function Dashboard() {
                         ? "text-blue-700 dark:text-blue-300"
                         : "text-zinc-700 dark:text-zinc-300"
                     }`}>
-                      {bgVideo.value.charAt(0).toUpperCase() + bgVideo.value.slice(1)}
+                      {bgVideo.label || bgVideo.value.charAt(0).toUpperCase() + bgVideo.value.slice(1)}
                     </div>
                   </button>
                 ))}
@@ -778,7 +797,7 @@ export default function Dashboard() {
   );
 
   const renderSocialMediaPage = () => (
-    <div className="max-w-4xl w-full bg-white dark:bg-zinc-900 p-4 sm:p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl">
+    <div className="max-w-4xl w-full">
       <div className="space-y-6">
         <div className="text-center space-y-2 mb-8">
           <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mx-auto mb-4">
@@ -869,7 +888,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="min-h-screen bg-white dark:bg-zinc-900 text-foreground flex flex-col">
       <Navbar onLogoClick={() => resetWizard()} />
 
       {/* Main Content with Sidebar */}
@@ -927,10 +946,10 @@ export default function Dashboard() {
         </aside>
 
         {/* Main Content Area */}
-        <main className="flex-1 flex flex-col items-center justify-center px-4 py-8 sm:py-12 md:py-20 overflow-y-auto">
+        <main className="flex-1 flex flex-col items-center justify-center px-4 py-4 sm:py-6 md:py-8 overflow-y-auto">
           {activeSection === "video-creation" ? (
             /* Multi-step Wizard */
-            <div className="max-w-2xl w-full bg-white dark:bg-zinc-900 p-4 sm:p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl">
+            <div className="max-w-2xl w-full">
           {!videoUrl ? (
             <>
               {/* Header */}
