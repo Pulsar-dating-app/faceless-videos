@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
 const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY || '';
-const REDIRECT_URI = process.env.NEXT_PUBLIC_APP_URL 
-  ? `https://bifacial-daniele-westerly.ngrok-free.dev/api/tiktok/callback`
-  : 'https://bifacial-daniele-westerly.ngrok-free.dev/api/tiktok/callback';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://bifacial-daniele-westerly.ngrok-free.dev';
+const REDIRECT_URI = `${APP_URL}/api/tiktok/callback`;
 
 // TikTok OAuth scopes - apenas o básico para começar
 const SCOPES = ['user.info.basic'].join(',');
@@ -27,18 +26,12 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const userId = searchParams.get('user_id');
 
-  // Debug: Log das variáveis de ambiente (remover em produção)
-  console.log('=== TikTok Auth Debug ===');
-  console.log('REDIRECT_URI:', REDIRECT_URI);
-  console.log('========================');
-
   if (!userId) {
     return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
   }
 
   if (!TIKTOK_CLIENT_KEY || TIKTOK_CLIENT_KEY.trim() === '') {
     console.error('❌ TIKTOK_CLIENT_KEY não está configurado!');
-    console.error('Verifique seu arquivo .env.local');
     return NextResponse.json({ 
       error: 'TikTok Client Key not configured',
       hint: 'Adicione TIKTOK_CLIENT_KEY ao arquivo .env.local e reinicie o servidor'

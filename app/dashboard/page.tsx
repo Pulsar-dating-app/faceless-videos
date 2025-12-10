@@ -196,11 +196,11 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const checkTiktokConnection = async () => {
+  const checkTiktokConnection = () => {
     if (!user) return;
 
     try {
-      // Check localStorage for TikTok connection
+      // Check localStorage for TikTok connection (no API call needed!)
       const tiktokData = localStorage.getItem('tiktok_connection');
       
       if (tiktokData) {
@@ -208,10 +208,12 @@ export default function Dashboard() {
         setTiktokConnected(true);
         setTiktokUsername(data.username);
         setTiktokAvatar(data.avatar_url);
+        console.log('✅ TikTok conectado:', data.username);
       } else {
         setTiktokConnected(false);
         setTiktokUsername(null);
         setTiktokAvatar(null);
+        console.log('❌ TikTok não conectado');
       }
     } catch (error) {
       console.error('Error checking TikTok connection:', error);
