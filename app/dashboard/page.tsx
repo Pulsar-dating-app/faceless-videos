@@ -124,6 +124,13 @@ export default function Dashboard() {
   const [mockPayload, setMockPayload] = useState<string>("");
   const [playingVoicePreview, setPlayingVoicePreview] = useState<string | null>(null);
   
+  // Social media connection states
+  const [tiktokConnected, setTiktokConnected] = useState(false);
+  const [tiktokUsername, setTiktokUsername] = useState<string | null>(null);
+  const [tiktokAvatar, setTiktokAvatar] = useState<string | null>(null);
+  const [isConnectingTiktok, setIsConnectingTiktok] = useState(false);
+  const [isDisconnectingTiktok, setIsDisconnectingTiktok] = useState(false);
+  
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const voicePreviewRef = useRef<HTMLAudioElement | null>(null);
 
@@ -133,6 +140,115 @@ export default function Dashboard() {
       router.push("/login");
     }
   }, [user, isLoading, router]);
+
+  // Check TikTok connection status on mount and when returning from OAuth
+  useEffect(() => {
+    if (user) {
+      checkTiktokConnection();
+    }
+
+    // Check for OAuth callback parameters
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get('connected');
+    const error = params.get('error');
+    const section = params.get('section');
+
+    if (connected === 'tiktok') {
+      // Get TikTok data from URL
+      const tiktokDataParam = params.get('tiktok_data');
+      
+      if (tiktokDataParam) {
+        try {
+          // Decode and save to localStorage
+          const decodedData = Buffer.from(tiktokDataParam, 'base64').toString('utf-8');
+          const tiktokData = JSON.parse(decodedData);
+          localStorage.setItem('tiktok_connection', JSON.stringify(tiktokData));
+        } catch (e) {
+          console.error('Error saving TikTok data:', e);
+        }
+      }
+      
+      // Show success message
+      alert(formatMessage(t.dashboard.socialMedia.connectSuccess, { platform: 'TikTok' }));
+      checkTiktokConnection();
+      
+      // Switch to social media section if specified
+      if (section === 'social-media') {
+        setActiveSection('social-media');
+      }
+      
+      // Clean up URL
+      window.history.replaceState({}, '', '/dashboard');
+    }
+
+    if (error) {
+      // Show error message
+      const errorMessages: { [key: string]: string } = {
+        'missing_params': 'OAuth parameters missing',
+        'oauth_failed': 'Failed to connect to TikTok',
+        'access_denied': 'You denied access to TikTok',
+      };
+      alert(`Error: ${errorMessages[error] || 'Unknown error occurred'}`);
+      
+      // Clean up URL
+      window.history.replaceState({}, '', '/dashboard');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const checkTiktokConnection = async () => {
+    if (!user) return;
+
+    try {
+      // Check localStorage for TikTok connection
+      const tiktokData = localStorage.getItem('tiktok_connection');
+      
+      if (tiktokData) {
+        const data = JSON.parse(tiktokData);
+        setTiktokConnected(true);
+        setTiktokUsername(data.username);
+        setTiktokAvatar(data.avatar_url);
+      } else {
+        setTiktokConnected(false);
+        setTiktokUsername(null);
+        setTiktokAvatar(null);
+      }
+    } catch (error) {
+      console.error('Error checking TikTok connection:', error);
+    }
+  };
+
+  const handleConnectTiktok = () => {
+    if (!user) return;
+    
+    setIsConnectingTiktok(true);
+    // Redirect to TikTok OAuth
+    window.location.href = `/api/tiktok/auth?user_id=${user.id}`;
+  };
+
+  const handleDisconnectTiktok = async () => {
+    if (!user) return;
+
+    const confirmed = confirm(formatMessage(t.dashboard.socialMedia.disconnectConfirm, { platform: 'TikTok' }));
+    if (!confirmed) return;
+
+    setIsDisconnectingTiktok(true);
+
+    try {
+      // Remove from localStorage
+      localStorage.removeItem('tiktok_connection');
+      
+      setTiktokConnected(false);
+      setTiktokUsername(null);
+      setTiktokAvatar(null);
+      alert(formatMessage(t.dashboard.socialMedia.disconnectSuccess, { platform: 'TikTok' }));
+    } catch (error) {
+      console.error('Error disconnecting TikTok:', error);
+      alert(formatMessage(t.dashboard.socialMedia.disconnectError, { platform: 'TikTok' }));
+    } finally {
+      setIsDisconnectingTiktok(false);
+    }
+  };
 
   // Calculate total steps based on video type
   const totalSteps = 5; // Both gameplay and AI images have 5 steps now
@@ -809,19 +925,72 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* TikTok */}
-          <div className="p-6 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all">
+          <div className={`p-6 rounded-xl border-2 transition-all ${
+            tiktokConnected 
+              ? "border-green-500 dark:border-green-500 bg-green-50 dark:bg-green-900/10" 
+              : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+          }`}>
             <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">TT</span>
-              </div>
-              <div>
+              {tiktokAvatar ? (
+                <NextImage 
+                  src={tiktokAvatar} 
+                  alt="TikTok Avatar"
+                  width={48}
+                  height={48}
+                  className="w-12 h-12 rounded-lg object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">TT</span>
+                </div>
+              )}
+              <div className="flex-1">
                 <h3 className="font-semibold text-lg">TikTok</h3>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">{t.dashboard.socialMedia.notConnected}</p>
+                {tiktokConnected ? (
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                      @{tiktokUsername}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    {t.dashboard.socialMedia.notConnected}
+                  </p>
+                )}
               </div>
             </div>
-            <button className="w-full px-4 py-2 rounded-lg bg-black text-white font-medium hover:bg-zinc-800 transition-colors">
-              {t.dashboard.socialMedia.connect}
-            </button>
+            {tiktokConnected ? (
+              <button 
+                onClick={handleDisconnectTiktok}
+                disabled={isDisconnectingTiktok}
+                className="w-full px-4 py-2 rounded-lg border-2 border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              >
+                {isDisconnectingTiktok ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {t.dashboard.socialMedia.disconnecting}
+                  </span>
+                ) : (
+                  t.dashboard.socialMedia.disconnect
+                )}
+              </button>
+            ) : (
+              <button 
+                onClick={handleConnectTiktok}
+                disabled={isConnectingTiktok}
+                className="w-full px-4 py-2 rounded-lg bg-black text-white font-medium hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              >
+                {isConnectingTiktok ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {t.dashboard.socialMedia.connecting}
+                  </span>
+                ) : (
+                  t.dashboard.socialMedia.connect
+                )}
+              </button>
+            )}
           </div>
 
           {/* Instagram */}
