@@ -136,6 +136,32 @@ export const translations = {
     footer: {
       copyright: "© {{year}} ViralGen. All rights reserved.",
     },
+    // Why Choose Us Section
+    whyChooseUs: {
+      title: "Why Choose Us?",
+      subtitle: "Start building your passive income stream today with AI-powered video creation",
+      card1: {
+        title: "No Face Required",
+        description: "Create engaging content without showing your face. Perfect for introverts or anyone who wants privacy while building their brand.",
+      },
+      card2: {
+        title: "No Video Editors Needed",
+        description: "Skip expensive video editors. Our AI handles everything from script to final video, saving you hundreds of dollars monthly.",
+      },
+      card3: {
+        title: "Hours to Minutes",
+        description: "What used to take hours of editing, recording, and production now takes just a couple of minutes. Focus on scaling, not creating.",
+      },
+      card4: {
+        title: "Passive Income Ready",
+        description: "Generate unlimited content for TikTok, Instagram, and YouTube. Build multiple revenue streams while you sleep.",
+      },
+    },
+    // Reviews Section
+    reviews: {
+      title: "What Our Users Say",
+      subtitle: "Join thousands of creators building passive income with AI-powered videos",
+    },
     // Language Names
     languages: {
       en: "English",
@@ -317,6 +343,30 @@ export const translations = {
     footer: {
       copyright: "© {{year}} ViralGen. Todos los derechos reservados.",
     },
+    whyChooseUs: {
+      title: "¿Por Qué Elegirnos?",
+      subtitle: "Comienza a construir tu flujo de ingresos pasivos hoy con la creación de videos impulsada por IA",
+      card1: {
+        title: "No Se Requiere Rostro",
+        description: "Crea contenido atractivo sin mostrar tu rostro. Perfecto para introvertidos o cualquiera que quiera privacidad mientras construye su marca.",
+      },
+      card2: {
+        title: "No Se Necesitan Editores",
+        description: "Omite editores de video costosos. Nuestra IA maneja todo desde el guión hasta el video final, ahorrándote cientos de dólares mensualmente.",
+      },
+      card3: {
+        title: "De Horas a Minutos",
+        description: "Lo que solía tomar horas de edición, grabación y producción ahora toma solo un par de minutos. Enfócate en escalar, no en crear.",
+      },
+      card4: {
+        title: "Listo para Ingresos Pasivos",
+        description: "Genera contenido ilimitado para TikTok, Instagram y YouTube. Construye múltiples flujos de ingresos mientras duermes.",
+      },
+    },
+    reviews: {
+      title: "Lo Que Dicen Nuestros Usuarios",
+      subtitle: "Únete a miles de creadores construyendo ingresos pasivos con videos impulsados por IA",
+    },
     languages: {
       en: "Inglés",
       es: "Español",
@@ -494,6 +544,30 @@ export const translations = {
     },
     footer: {
       copyright: "© {{year}} ViralGen. Tous droits réservés.",
+    },
+    whyChooseUs: {
+      title: "Pourquoi Nous Choisir?",
+      subtitle: "Commencez à construire votre flux de revenus passifs aujourd'hui avec la création de vidéos alimentée par l'IA",
+      card1: {
+        title: "Pas Besoin de Visage",
+        description: "Créez du contenu engageant sans montrer votre visage. Parfait pour les introvertis ou quiconque souhaite la confidentialité tout en construisant sa marque.",
+      },
+      card2: {
+        title: "Pas Besoin d'Éditeurs",
+        description: "Évitez les éditeurs vidéo coûteux. Notre IA gère tout du script à la vidéo finale, vous faisant économiser des centaines de dollars par mois.",
+      },
+      card3: {
+        title: "D'Heures à Minutes",
+        description: "Ce qui prenait des heures d'édition, d'enregistrement et de production ne prend maintenant que quelques minutes. Concentrez-vous sur la mise à l'échelle, pas sur la création.",
+      },
+      card4: {
+        title: "Prêt pour les Revenus Passifs",
+        description: "Générez du contenu illimité pour TikTok, Instagram et YouTube. Construisez plusieurs flux de revenus pendant que vous dormez.",
+      },
+    },
+    reviews: {
+      title: "Ce Que Disent Nos Utilisateurs",
+      subtitle: "Rejoignez des milliers de créateurs qui construisent des revenus passifs avec des vidéos alimentées par l'IA",
     },
     languages: {
       en: "Anglais",
@@ -673,6 +747,30 @@ export const translations = {
     footer: {
       copyright: "© {{year}} ViralGen. Todos os direitos reservados.",
     },
+    whyChooseUs: {
+      title: "Por Que Nos Escolher?",
+      subtitle: "Comece a construir sua fonte de renda passiva hoje com criação de vídeos alimentada por IA",
+      card1: {
+        title: "Sem Rosto Necessário",
+        description: "Crie conteúdo envolvente sem mostrar seu rosto. Perfeito para introvertidos ou qualquer pessoa que queira privacidade enquanto constrói sua marca.",
+      },
+      card2: {
+        title: "Sem Editores Necessários",
+        description: "Pule editores de vídeo caros. Nossa IA cuida de tudo, do roteiro ao vídeo final, economizando centenas de dólares mensalmente.",
+      },
+      card3: {
+        title: "De Horas para Minutos",
+        description: "O que costumava levar horas de edição, gravação e produção agora leva apenas alguns minutos. Foque em escalar, não em criar.",
+      },
+      card4: {
+        title: "Pronto para Renda Passiva",
+        description: "Gere conteúdo ilimitado para TikTok, Instagram e YouTube. Construa múltiplas fontes de receita enquanto você dorme.",
+      },
+    },
+    reviews: {
+      title: "O Que Nossos Usuários Dizem",
+      subtitle: "Junte-se a milhares de criadores construindo renda passiva com vídeos alimentados por IA",
+    },
     languages: {
       en: "Inglês",
       es: "Espanhol",
@@ -850,6 +948,30 @@ export const translations = {
     },
     footer: {
       copyright: "© {{year}} ViralGen. Alle Rechte vorbehalten.",
+    },
+    whyChooseUs: {
+      title: "Warum Uns Wählen?",
+      subtitle: "Beginnen Sie noch heute, Ihren passiven Einkommensstrom mit KI-gestützter Videoproduktion aufzubauen",
+      card1: {
+        title: "Kein Gesicht Erforderlich",
+        description: "Erstellen Sie ansprechende Inhalte ohne Ihr Gesicht zu zeigen. Perfekt für Introvertierte oder alle, die Privatsphäre beim Aufbau ihrer Marke wünschen.",
+      },
+      card2: {
+        title: "Keine Videoeditoren Nötig",
+        description: "Überspringen Sie teure Videoeditoren. Unsere KI übernimmt alles vom Skript bis zum fertigen Video und spart Ihnen monatlich Hunderte von Dollar.",
+      },
+      card3: {
+        title: "Von Stunden zu Minuten",
+        description: "Was früher Stunden an Bearbeitung, Aufnahme und Produktion dauerte, dauert jetzt nur noch ein paar Minuten. Konzentrieren Sie sich auf Skalierung, nicht auf Erstellung.",
+      },
+      card4: {
+        title: "Bereit für Passives Einkommen",
+        description: "Generieren Sie unbegrenzte Inhalte für TikTok, Instagram und YouTube. Bauen Sie mehrere Einnahmequellen auf, während Sie schlafen.",
+      },
+    },
+    reviews: {
+      title: "Was Unsere Benutzer Sagen",
+      subtitle: "Schließen Sie sich Tausenden von Creators an, die passives Einkommen mit KI-gestützten Videos aufbauen",
     },
     languages: {
       en: "Englisch",
