@@ -12,8 +12,8 @@ const CAROUSEL_MAX_WIDTH = "1300px"; // Easy to configure - max width of the car
 // Sample video URLs - replace with your actual video URLs
 const CAROUSEL_VIDEOS = [
   "/videos/minecraft_1.mp4",
-  "/videos/minecraft_1.mp4",
-  "/videos/minecraft_1.mp4",
+  "/videos/category_examples/preview_background.mp4",
+  "/videos/category_examples/preview_full_ai.mp4",
   "/videos/minecraft_1.mp4",
   "/videos/minecraft_1.mp4",
   "/videos/minecraft_1.mp4",
