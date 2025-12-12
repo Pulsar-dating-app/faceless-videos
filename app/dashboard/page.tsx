@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X } from "lucide-react";
+import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X, Info } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
@@ -123,6 +123,7 @@ export default function Dashboard() {
   const [useMockData, setUseMockData] = useState(false);
   const [mockPayload, setMockPayload] = useState<string>("");
   const [playingVoicePreview, setPlayingVoicePreview] = useState<string | null>(null);
+  const [previewVideoType, setPreviewVideoType] = useState<"gameplay" | "ai-images" | null>(null);
   
   // Social media connection states
   const [tiktokConnected, setTiktokConnected] = useState(false);
@@ -616,49 +617,75 @@ export default function Dashboard() {
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => handleVideoTypeChange("gameplay")}
-                className={`flex flex-col items-center gap-4 p-6 rounded-xl border-2 transition-all ${
-                  videoType === "gameplay"
-                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                    : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600"
-                }`}
-              >
-                <div className={`w-16 h-16 rounded-xl flex items-center justify-center ${
-                  videoType === "gameplay"
-                    ? "bg-blue-600 text-white"
-                    : "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400"
-                }`}>
-                  <Gamepad2 className="w-8 h-8" />
-                </div>
-                <div className="text-center">
-                  <div className="font-semibold text-lg">{t.form.gameplay}</div>
-                  <div className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{t.form.gameplayDesc}</div>
-                </div>
-              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => handleVideoTypeChange("gameplay")}
+                  className={`w-full flex flex-col items-center gap-4 p-6 rounded-xl border-2 transition-all ${
+                    videoType === "gameplay"
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                      : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600"
+                  }`}
+                >
+                  <div className={`w-16 h-16 rounded-xl flex items-center justify-center ${
+                    videoType === "gameplay"
+                      ? "bg-blue-600 text-white"
+                      : "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400"
+                  }`}>
+                    <Gamepad2 className="w-8 h-8" />
+                  </div>
+                  <div className="text-center">
+                    <div className="font-semibold text-lg">{t.form.gameplay}</div>
+                    <div className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{t.form.gameplayDesc}</div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreviewVideoType("gameplay");
+                  }}
+                  className="absolute top-2 right-2 p-2 rounded-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors shadow-sm"
+                  title="View example"
+                >
+                  <Info className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                </button>
+              </div>
               
-              <button
-                type="button"
-                onClick={() => handleVideoTypeChange("ai-images")}
-                className={`flex flex-col items-center gap-4 p-6 rounded-xl border-2 transition-all ${
-                  videoType === "ai-images"
-                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                    : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600"
-                }`}
-              >
-                <div className={`w-16 h-16 rounded-xl flex items-center justify-center ${
-                  videoType === "ai-images"
-                    ? "bg-blue-600 text-white"
-                    : "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400"
-                }`}>
-                  <Image className="w-8 h-8" />
-                </div>
-                <div className="text-center">
-                  <div className="font-semibold text-lg">{t.form.aiImages}</div>
-                  <div className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{t.form.aiImagesDesc}</div>
-                </div>
-              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => handleVideoTypeChange("ai-images")}
+                  className={`w-full flex flex-col items-center gap-4 p-6 rounded-xl border-2 transition-all ${
+                    videoType === "ai-images"
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                      : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600"
+                  }`}
+                >
+                  <div className={`w-16 h-16 rounded-xl flex items-center justify-center ${
+                    videoType === "ai-images"
+                      ? "bg-blue-600 text-white"
+                      : "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400"
+                  }`}>
+                    <Image className="w-8 h-8" />
+                  </div>
+                  <div className="text-center">
+                    <div className="font-semibold text-lg">{t.form.aiImages}</div>
+                    <div className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{t.form.aiImagesDesc}</div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreviewVideoType("ai-images");
+                  }}
+                  className="absolute top-2 right-2 p-2 rounded-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors shadow-sm"
+                  title="View example"
+                >
+                  <Info className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                </button>
+              </div>
             </div>
           </div>
         );
@@ -1386,6 +1413,46 @@ export default function Dashboard() {
           )}
         </main>
       </div>
+
+      {/* Preview Video Dialog */}
+      {previewVideoType && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => setPreviewVideoType(null)}
+        >
+          <div 
+            className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                {previewVideoType === "gameplay" ? t.form.gameplay : t.form.aiImages}
+              </h3>
+              <button
+                onClick={() => setPreviewVideoType(null)}
+                className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <X className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+              </button>
+            </div>
+
+            {/* Video Preview */}
+            <div className="flex items-center justify-center">
+              <video
+                src={previewVideoType === "gameplay" 
+                  ? "/videos/category_examples/preview_background.mp4"
+                  : "/videos/category_examples/preview_full_ai.mp4"
+                }
+                controls
+                autoPlay
+                loop
+                className="max-h-[calc(90vh-80px)] w-auto"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
