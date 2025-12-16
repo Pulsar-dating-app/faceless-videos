@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Mail, Lock, User, Loader2 } from "lucide-react";
+import { Mail, Lock, User, Loader2, CheckCircle2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Navbar } from "@/components/Navbar";
 
@@ -14,6 +14,7 @@ export default function SignupPage() {
   const [fullName, setFullName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,14 +48,12 @@ export default function SignupPage() {
         throw error;
       }
       
-      // Redirect to home after successful signup (or check email verification)
-      // For now we just redirect, but typically you'd show a "Check your email" message
+      // Redirect to home after successful signup when email confirmation is disabled
       if (data.session) {
-          window.location.href = "/";
+        window.location.href = "/";
       } else {
-          // If email confirmation is on, data.session will be null
-          alert("Account created! Please check your email to verify your account.");
-          window.location.href = "/login";
+        // If email confirmation is enabled, show a nice dialog instead of a browser alert
+        setShowSuccessDialog(true);
       }
 
     } catch (err: any) {
@@ -199,6 +198,51 @@ export default function SignupPage() {
       <footer className="w-full py-6 text-center text-sm text-zinc-500 dark:text-zinc-600">
         <p>© {new Date().getFullYear()} ViralGen. All rights reserved.</p>
       </footer>
+
+      {/* Success Dialog */}
+      {showSuccessDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6 sm:p-8">
+            <button
+              type="button"
+              onClick={() => setShowSuccessDialog(false)}
+              className="absolute right-3 top-3 rounded-full p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex flex-col items-center text-center">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-blue-600 text-white shadow-lg">
+                <CheckCircle2 className="w-8 h-8" />
+              </div>
+              <h2 className="text-xl font-semibold mb-2 text-zinc-900 dark:text-zinc-50">
+                Account created!
+              </h2>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-1">
+                We just sent a verification link to:
+              </p>
+              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-4">
+                {email}
+              </p>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6">
+                Please check your inbox (and spam folder) to verify your email before logging in.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSuccessDialog(false);
+                  window.location.href = "/login";
+                }}
+                className="w-full h-11 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+              >
+                Go to login
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

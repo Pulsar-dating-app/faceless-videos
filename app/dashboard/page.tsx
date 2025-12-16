@@ -132,6 +132,12 @@ export default function Dashboard() {
   const [isConnectingTiktok, setIsConnectingTiktok] = useState(false);
   const [isDisconnectingTiktok, setIsDisconnectingTiktok] = useState(false);
   
+  // Instagram connection states
+  const [instagramConnected, setInstagramConnected] = useState(false);
+  const [instagramUsername, setInstagramUsername] = useState<string | null>(null);
+  const [isConnectingInstagram, setIsConnectingInstagram] = useState(false);
+  const [isDisconnectingInstagram, setIsDisconnectingInstagram] = useState(false);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const voicePreviewRef = useRef<HTMLAudioElement | null>(null);
 
@@ -142,10 +148,11 @@ export default function Dashboard() {
     }
   }, [user, isLoading, router]);
 
-  // Check TikTok connection status on mount and when returning from OAuth
+  // Check TikTok/Instagram connection status on mount and when returning from OAuth
   useEffect(() => {
     if (user) {
       checkTiktokConnection();
+      checkInstagramConnection();
     }
 
     // Check for OAuth callback parameters
@@ -182,12 +189,40 @@ export default function Dashboard() {
       window.history.replaceState({}, '', '/dashboard');
     }
 
+    if (connected === 'instagram') {
+      // Get Instagram data from URL
+      const instagramDataParam = params.get('instagram_data');
+      
+      if (instagramDataParam) {
+        try {
+          // Decode and save to localStorage
+          const decodedData = Buffer.from(instagramDataParam, 'base64').toString('utf-8');
+          const instagramData = JSON.parse(decodedData);
+          localStorage.setItem('instagram_connection', JSON.stringify(instagramData));
+        } catch (e) {
+          console.error('Error saving Instagram data:', e);
+        }
+      }
+      
+      // Show success message
+      alert(formatMessage(t.dashboard.socialMedia.connectSuccess, { platform: 'Instagram' }));
+      checkInstagramConnection();
+      
+      // Switch to social media section if specified
+      if (section === 'social-media') {
+        setActiveSection('social-media');
+      }
+      
+      // Clean up URL
+      window.history.replaceState({}, '', '/dashboard');
+    }
+
     if (error) {
       // Show error message
       const errorMessages: { [key: string]: string } = {
         'missing_params': 'OAuth parameters missing',
-        'oauth_failed': 'Failed to connect to TikTok',
-        'access_denied': 'You denied access to TikTok',
+        'oauth_failed': 'Failed to connect to social media',
+        'access_denied': 'You denied access',
       };
       alert(`Error: ${errorMessages[error] || 'Unknown error occurred'}`);
       
@@ -221,12 +256,42 @@ export default function Dashboard() {
     }
   };
 
+  const checkInstagramConnection = () => {
+    if (!user) return;
+
+    try {
+      // Check localStorage for Instagram connection
+      const instagramData = localStorage.getItem('instagram_connection');
+      
+      if (instagramData) {
+        const data = JSON.parse(instagramData);
+        setInstagramConnected(true);
+        setInstagramUsername(data.username);
+        console.log('✅ Instagram conectado:', data.username);
+      } else {
+        setInstagramConnected(false);
+        setInstagramUsername(null);
+        console.log('❌ Instagram não conectado');
+      }
+    } catch (error) {
+      console.error('Error checking Instagram connection:', error);
+    }
+  };
+
   const handleConnectTiktok = () => {
     if (!user) return;
     
     setIsConnectingTiktok(true);
     // Redirect to TikTok OAuth
     window.location.href = `/api/tiktok/auth?user_id=${user.id}`;
+  };
+
+  const handleConnectInstagram = () => {
+    if (!user) return;
+    
+    setIsConnectingInstagram(true);
+    // Redirect to Instagram OAuth
+    window.location.href = `/api/instagram/auth?user_id=${user.id}`;
   };
 
   const handleDisconnectTiktok = async () => {
@@ -250,6 +315,29 @@ export default function Dashboard() {
       alert(formatMessage(t.dashboard.socialMedia.disconnectError, { platform: 'TikTok' }));
     } finally {
       setIsDisconnectingTiktok(false);
+    }
+  };
+
+  const handleDisconnectInstagram = async () => {
+    if (!user) return;
+
+    const confirmed = confirm(formatMessage(t.dashboard.socialMedia.disconnectConfirm, { platform: 'Instagram' }));
+    if (!confirmed) return;
+
+    setIsDisconnectingInstagram(true);
+
+    try {
+      // Remove from localStorage
+      localStorage.removeItem('instagram_connection');
+      
+      setInstagramConnected(false);
+      setInstagramUsername(null);
+      alert(formatMessage(t.dashboard.socialMedia.disconnectSuccess, { platform: 'Instagram' }));
+    } catch (error) {
+      console.error('Error disconnecting Instagram:', error);
+      alert(formatMessage(t.dashboard.socialMedia.disconnectError, { platform: 'Instagram' }));
+    } finally {
+      setIsDisconnectingInstagram(false);
     }
   };
 
@@ -1023,19 +1111,62 @@ export default function Dashboard() {
           </div>
 
           {/* Instagram */}
-          <div className="p-6 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all">
+          <div className={`p-6 rounded-xl border-2 transition-all ${
+            instagramConnected 
+              ? "border-green-500 dark:border-green-500 bg-green-50 dark:bg-green-900/10" 
+              : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+          }`}>
             <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-600 via-pink-600 to-orange-500 rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-600 via-pink-600 to-orange-500 rounded-lg flex items-center justify-center shadow-lg">
                 <span className="text-white font-bold text-lg">IG</span>
               </div>
-              <div>
+              <div className="flex-1">
                 <h3 className="font-semibold text-lg">Instagram</h3>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">{t.dashboard.socialMedia.notConnected}</p>
+                {instagramConnected ? (
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                      @{instagramUsername}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    {t.dashboard.socialMedia.notConnected}
+                  </p>
+                )}
               </div>
             </div>
-            <button className="w-full px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white font-medium hover:from-purple-700 hover:to-pink-700 transition-colors">
-              {t.dashboard.socialMedia.connect}
-            </button>
+            {instagramConnected ? (
+              <button 
+                onClick={handleDisconnectInstagram}
+                disabled={isDisconnectingInstagram}
+                className="w-full px-4 py-2 rounded-lg border-2 border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              >
+                {isDisconnectingInstagram ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {t.dashboard.socialMedia.disconnecting}
+                  </span>
+                ) : (
+                  t.dashboard.socialMedia.disconnect
+                )}
+              </button>
+            ) : (
+              <button 
+                onClick={handleConnectInstagram}
+                disabled={isConnectingInstagram}
+                className="w-full px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white font-medium hover:from-purple-700 hover:to-pink-700 transition-colors disabled:opacity-50"
+              >
+                {isConnectingInstagram ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {t.dashboard.socialMedia.connecting}
+                  </span>
+                ) : (
+                  t.dashboard.socialMedia.connect
+                )}
+              </button>
+            )}
           </div>
 
           {/* YouTube */}
