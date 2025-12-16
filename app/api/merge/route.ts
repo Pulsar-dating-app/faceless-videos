@@ -5,8 +5,8 @@ import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import ffmpegStatic from "ffmpeg-static";
 
-// Background video URL (hosted on GitHub)
-const BACKGROUND_VIDEO_URL = "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.1/minecraft_1.mp4";
+// Default background video URL (hosted on GitHub)
+const DEFAULT_BACKGROUND_VIDEO_URL = "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.1/minecraft_1.mp4";
 
 // Tell fluent-ffmpeg where to find the ffmpeg binary
 if (ffmpegStatic) {
@@ -18,7 +18,7 @@ if (ffmpegStatic) {
 
 export async function POST(request: Request) {
   try {
-    const { audioUrl, subtitles } = await request.json();
+    const { audioUrl, subtitles, backgroundVideoUrl } = await request.json();
 
     if (!audioUrl) {
       return NextResponse.json(
@@ -26,6 +26,9 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    // Use provided background video URL or fall back to default
+    const videoUrl = backgroundVideoUrl || DEFAULT_BACKGROUND_VIDEO_URL;
 
     // 1. Save the audio (which is base64) to a temp file
     const audioBuffer = Buffer.from(audioUrl.split(",")[1], "base64");
@@ -43,8 +46,8 @@ export async function POST(request: Request) {
     fs.writeFileSync(audioPath, audioBuffer);
 
     // 2. Download background video from URL
-    console.log("Downloading background video...");
-    const videoResponse = await fetch(BACKGROUND_VIDEO_URL);
+    console.log("Downloading background video from:", videoUrl);
+    const videoResponse = await fetch(videoUrl);
     if (!videoResponse.ok) {
       throw new Error("Failed to download background video");
     }

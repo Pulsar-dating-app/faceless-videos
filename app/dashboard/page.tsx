@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X } from "lucide-react";
+import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X, Info } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
@@ -15,7 +15,7 @@ const LANGUAGE_FLAGS: { [key: string]: string } = {
   'es': '🇪🇸',
   'fr': '🇫🇷',
   'de': '🇩🇪',
-  'pt': '🇵🇹',
+  'pt': '🇧🇷',
   'it': '🇮🇹',
   'nl': '🇳🇱',
   'pl': '🇵🇱',
@@ -47,6 +47,34 @@ const ART_STYLES = [
   { value: "ghibli", preview: "/images/ghibli_preview.png" },
   { value: "horror", preview: "/images/horror_preview.png" },
   { value: "realistic", preview: "/images/realistic_preview.png" },
+];
+
+// Background videos with preview images and URLs
+const BACKGROUND_VIDEOS = [
+  { 
+    value: "minecraft", 
+    label: "Minecraft",
+    preview: "/images/minecraft_preview.png",
+    url: "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.2/minecraft_preview.mp4"
+  },
+  { 
+    value: "gta", 
+    label: "GTA",
+    preview: "/images/gta_preview.png",
+    url: "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.2/gta_preview.mp4"
+  },
+  { 
+    value: "satisfying", 
+    label: "Satisfying",
+    preview: "/images/satisfying_preview.png",
+    url: "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.2/satisfying_preview.mp4"
+  },
+  { 
+    value: "mario_kart", 
+    label: "Mario Kart",
+    preview: "/images/mario_kart_preview.png",
+    url: "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.2/mario_kart_preview.mp4"
+  },
 ];
 
 // Category icons mapping
@@ -86,6 +114,7 @@ export default function Dashboard() {
   const [language, setLanguage] = useState("en");
   const [voice, setVoice] = useState("alloy");
   const [artStyle, setArtStyle] = useState("cartoon");
+  const [backgroundVideo, setBackgroundVideo] = useState("minecraft");
   const [customPrompt, setCustomPrompt] = useState("");
   const [script, setScript] = useState("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -94,7 +123,21 @@ export default function Dashboard() {
   const [useMockData, setUseMockData] = useState(false);
   const [mockPayload, setMockPayload] = useState<string>("");
   const [playingVoicePreview, setPlayingVoicePreview] = useState<string | null>(null);
+  const [previewVideoType, setPreviewVideoType] = useState<"gameplay" | "ai-images" | null>(null);
   
+  // Social media connection states
+  const [tiktokConnected, setTiktokConnected] = useState(false);
+  const [tiktokUsername, setTiktokUsername] = useState<string | null>(null);
+  const [tiktokAvatar, setTiktokAvatar] = useState<string | null>(null);
+  const [isConnectingTiktok, setIsConnectingTiktok] = useState(false);
+  const [isDisconnectingTiktok, setIsDisconnectingTiktok] = useState(false);
+  
+  // Instagram connection states
+  const [instagramConnected, setInstagramConnected] = useState(false);
+  const [instagramUsername, setInstagramUsername] = useState<string | null>(null);
+  const [isConnectingInstagram, setIsConnectingInstagram] = useState(false);
+  const [isDisconnectingInstagram, setIsDisconnectingInstagram] = useState(false);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const voicePreviewRef = useRef<HTMLAudioElement | null>(null);
 
@@ -105,8 +148,201 @@ export default function Dashboard() {
     }
   }, [user, isLoading, router]);
 
+  // Check TikTok/Instagram connection status on mount and when returning from OAuth
+  useEffect(() => {
+    if (user) {
+      checkTiktokConnection();
+      checkInstagramConnection();
+    }
+
+    // Check for OAuth callback parameters
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get('connected');
+    const error = params.get('error');
+    const section = params.get('section');
+
+    if (connected === 'tiktok') {
+      // Get TikTok data from URL
+      const tiktokDataParam = params.get('tiktok_data');
+      
+      if (tiktokDataParam) {
+        try {
+          // Decode and save to localStorage
+          const decodedData = Buffer.from(tiktokDataParam, 'base64').toString('utf-8');
+          const tiktokData = JSON.parse(decodedData);
+          localStorage.setItem('tiktok_connection', JSON.stringify(tiktokData));
+        } catch (e) {
+          console.error('Error saving TikTok data:', e);
+        }
+      }
+      
+      // Show success message
+      alert(formatMessage(t.dashboard.socialMedia.connectSuccess, { platform: 'TikTok' }));
+      checkTiktokConnection();
+      
+      // Switch to social media section if specified
+      if (section === 'social-media') {
+        setActiveSection('social-media');
+      }
+      
+      // Clean up URL
+      window.history.replaceState({}, '', '/dashboard');
+    }
+
+    if (connected === 'instagram') {
+      // Get Instagram data from URL
+      const instagramDataParam = params.get('instagram_data');
+      
+      if (instagramDataParam) {
+        try {
+          // Decode and save to localStorage
+          const decodedData = Buffer.from(instagramDataParam, 'base64').toString('utf-8');
+          const instagramData = JSON.parse(decodedData);
+          localStorage.setItem('instagram_connection', JSON.stringify(instagramData));
+        } catch (e) {
+          console.error('Error saving Instagram data:', e);
+        }
+      }
+      
+      // Show success message
+      alert(formatMessage(t.dashboard.socialMedia.connectSuccess, { platform: 'Instagram' }));
+      checkInstagramConnection();
+      
+      // Switch to social media section if specified
+      if (section === 'social-media') {
+        setActiveSection('social-media');
+      }
+      
+      // Clean up URL
+      window.history.replaceState({}, '', '/dashboard');
+    }
+
+    if (error) {
+      // Show error message
+      const errorMessages: { [key: string]: string } = {
+        'missing_params': 'OAuth parameters missing',
+        'oauth_failed': 'Failed to connect to social media',
+        'access_denied': 'You denied access',
+      };
+      alert(`Error: ${errorMessages[error] || 'Unknown error occurred'}`);
+      
+      // Clean up URL
+      window.history.replaceState({}, '', '/dashboard');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const checkTiktokConnection = () => {
+    if (!user) return;
+
+    try {
+      // Check localStorage for TikTok connection (no API call needed!)
+      const tiktokData = localStorage.getItem('tiktok_connection');
+      
+      if (tiktokData) {
+        const data = JSON.parse(tiktokData);
+        setTiktokConnected(true);
+        setTiktokUsername(data.username);
+        setTiktokAvatar(data.avatar_url);
+        console.log('✅ TikTok conectado:', data.username);
+      } else {
+        setTiktokConnected(false);
+        setTiktokUsername(null);
+        setTiktokAvatar(null);
+        console.log('❌ TikTok não conectado');
+      }
+    } catch (error) {
+      console.error('Error checking TikTok connection:', error);
+    }
+  };
+
+  const checkInstagramConnection = () => {
+    if (!user) return;
+
+    try {
+      // Check localStorage for Instagram connection
+      const instagramData = localStorage.getItem('instagram_connection');
+      
+      if (instagramData) {
+        const data = JSON.parse(instagramData);
+        setInstagramConnected(true);
+        setInstagramUsername(data.username);
+        console.log('✅ Instagram conectado:', data.username);
+      } else {
+        setInstagramConnected(false);
+        setInstagramUsername(null);
+        console.log('❌ Instagram não conectado');
+      }
+    } catch (error) {
+      console.error('Error checking Instagram connection:', error);
+    }
+  };
+
+  const handleConnectTiktok = () => {
+    if (!user) return;
+    
+    setIsConnectingTiktok(true);
+    // Redirect to TikTok OAuth
+    window.location.href = `/api/tiktok/auth?user_id=${user.id}`;
+  };
+
+  const handleConnectInstagram = () => {
+    if (!user) return;
+    
+    setIsConnectingInstagram(true);
+    // Redirect to Instagram OAuth
+    window.location.href = `/api/instagram/auth?user_id=${user.id}`;
+  };
+
+  const handleDisconnectTiktok = async () => {
+    if (!user) return;
+
+    const confirmed = confirm(formatMessage(t.dashboard.socialMedia.disconnectConfirm, { platform: 'TikTok' }));
+    if (!confirmed) return;
+
+    setIsDisconnectingTiktok(true);
+
+    try {
+      // Remove from localStorage
+      localStorage.removeItem('tiktok_connection');
+      
+      setTiktokConnected(false);
+      setTiktokUsername(null);
+      setTiktokAvatar(null);
+      alert(formatMessage(t.dashboard.socialMedia.disconnectSuccess, { platform: 'TikTok' }));
+    } catch (error) {
+      console.error('Error disconnecting TikTok:', error);
+      alert(formatMessage(t.dashboard.socialMedia.disconnectError, { platform: 'TikTok' }));
+    } finally {
+      setIsDisconnectingTiktok(false);
+    }
+  };
+
+  const handleDisconnectInstagram = async () => {
+    if (!user) return;
+
+    const confirmed = confirm(formatMessage(t.dashboard.socialMedia.disconnectConfirm, { platform: 'Instagram' }));
+    if (!confirmed) return;
+
+    setIsDisconnectingInstagram(true);
+
+    try {
+      // Remove from localStorage
+      localStorage.removeItem('instagram_connection');
+      
+      setInstagramConnected(false);
+      setInstagramUsername(null);
+      alert(formatMessage(t.dashboard.socialMedia.disconnectSuccess, { platform: 'Instagram' }));
+    } catch (error) {
+      console.error('Error disconnecting Instagram:', error);
+      alert(formatMessage(t.dashboard.socialMedia.disconnectError, { platform: 'Instagram' }));
+    } finally {
+      setIsDisconnectingInstagram(false);
+    }
+  };
+
   // Calculate total steps based on video type
-  const totalSteps = videoType === "ai-images" ? 5 : 4;
+  const totalSteps = 5; // Both gameplay and AI images have 5 steps now
   
   // Step labels
   const getStepLabel = (step: number) => {
@@ -124,7 +360,8 @@ export default function Dashboard() {
         case 1: return t.steps.videoType;
         case 2: return t.steps.categoryDuration;
         case 3: return t.steps.voiceSettings;
-        case 4: return t.steps.script;
+        case 4: return "Background Video";
+        case 5: return t.steps.script;
         default: return "";
       }
     }
@@ -293,6 +530,9 @@ export default function Dashboard() {
         setAudioUrl(currentAudioUrl);
 
         // 2. Merge Video using local API (FFmpeg requires server)
+        const selectedBackgroundVideo = BACKGROUND_VIDEOS.find(bg => bg.value === backgroundVideo);
+        const backgroundVideoUrl = selectedBackgroundVideo?.url || BACKGROUND_VIDEOS[0].url;
+        
         const response = await fetch("/api/merge", {
           method: "POST",
           headers: {
@@ -301,6 +541,7 @@ export default function Dashboard() {
           body: JSON.stringify({
             audioUrl: currentAudioUrl,
             subtitles: subtitles,
+            backgroundVideoUrl: backgroundVideoUrl,
           }),
         });
 
@@ -376,49 +617,75 @@ export default function Dashboard() {
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => handleVideoTypeChange("gameplay")}
-                className={`flex flex-col items-center gap-4 p-6 rounded-xl border-2 transition-all ${
-                  videoType === "gameplay"
-                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                    : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600"
-                }`}
-              >
-                <div className={`w-16 h-16 rounded-xl flex items-center justify-center ${
-                  videoType === "gameplay"
-                    ? "bg-blue-600 text-white"
-                    : "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400"
-                }`}>
-                  <Gamepad2 className="w-8 h-8" />
-                </div>
-                <div className="text-center">
-                  <div className="font-semibold text-lg">{t.form.gameplay}</div>
-                  <div className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{t.form.gameplayDesc}</div>
-                </div>
-              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => handleVideoTypeChange("gameplay")}
+                  className={`w-full flex flex-col items-center gap-4 p-6 rounded-xl border-2 transition-all ${
+                    videoType === "gameplay"
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                      : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600"
+                  }`}
+                >
+                  <div className={`w-16 h-16 rounded-xl flex items-center justify-center ${
+                    videoType === "gameplay"
+                      ? "bg-blue-600 text-white"
+                      : "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400"
+                  }`}>
+                    <Gamepad2 className="w-8 h-8" />
+                  </div>
+                  <div className="text-center">
+                    <div className="font-semibold text-lg">{t.form.gameplay}</div>
+                    <div className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{t.form.gameplayDesc}</div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreviewVideoType("gameplay");
+                  }}
+                  className="absolute top-2 right-2 p-2 rounded-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors shadow-sm"
+                  title="View example"
+                >
+                  <Info className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                </button>
+              </div>
               
-              <button
-                type="button"
-                onClick={() => handleVideoTypeChange("ai-images")}
-                className={`flex flex-col items-center gap-4 p-6 rounded-xl border-2 transition-all ${
-                  videoType === "ai-images"
-                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                    : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600"
-                }`}
-              >
-                <div className={`w-16 h-16 rounded-xl flex items-center justify-center ${
-                  videoType === "ai-images"
-                    ? "bg-blue-600 text-white"
-                    : "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400"
-                }`}>
-                  <Image className="w-8 h-8" />
-                </div>
-                <div className="text-center">
-                  <div className="font-semibold text-lg">{t.form.aiImages}</div>
-                  <div className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{t.form.aiImagesDesc}</div>
-                </div>
-              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => handleVideoTypeChange("ai-images")}
+                  className={`w-full flex flex-col items-center gap-4 p-6 rounded-xl border-2 transition-all ${
+                    videoType === "ai-images"
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                      : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600"
+                  }`}
+                >
+                  <div className={`w-16 h-16 rounded-xl flex items-center justify-center ${
+                    videoType === "ai-images"
+                      ? "bg-blue-600 text-white"
+                      : "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400"
+                  }`}>
+                    <Image className="w-8 h-8" />
+                  </div>
+                  <div className="text-center">
+                    <div className="font-semibold text-lg">{t.form.aiImages}</div>
+                    <div className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{t.form.aiImagesDesc}</div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreviewVideoType("ai-images");
+                  }}
+                  className="absolute top-2 right-2 p-2 rounded-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors shadow-sm"
+                  title="View example"
+                >
+                  <Info className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                </button>
+              </div>
             </div>
           </div>
         );
@@ -515,6 +782,7 @@ export default function Dashboard() {
         );
 
       case 3:
+        // Voice step for both Gameplay and AI Images
         return (
           <div className="space-y-6">
             <div className="text-center space-y-2 mb-8">
@@ -580,8 +848,56 @@ export default function Dashboard() {
         );
 
       case 4:
-        // Art Style step for AI Images, Script step for Gameplay
-        if (videoType === "ai-images") {
+        // Background Video step for Gameplay, Art Style step for AI Images
+        if (videoType === "gameplay") {
+          return (
+            <div className="space-y-6">
+              <div className="text-center space-y-2 mb-8">
+                <h3 className="text-xl font-semibold">Choose Background Video</h3>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">Select the background video for your gameplay video</p>
+              </div>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+                {BACKGROUND_VIDEOS.map((bgVideo) => (
+                  <button
+                    key={bgVideo.value}
+                    type="button"
+                    onClick={() => setBackgroundVideo(bgVideo.value)}
+                    className={`relative overflow-hidden rounded-xl border-2 transition-all ${
+                      backgroundVideo === bgVideo.value
+                        ? "border-blue-500 ring-2 ring-blue-500/50"
+                        : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600"
+                    }`}
+                  >
+                    <div className="aspect-[9/16] relative">
+                      <NextImage
+                        src={bgVideo.preview}
+                        alt={bgVideo.value}
+                        fill
+                        className="object-cover"
+                      />
+                      {backgroundVideo === bgVideo.value && (
+                        <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
+                          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                            <Check className="w-5 h-5 text-white" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className={`p-2 text-center text-sm font-medium ${
+                      backgroundVideo === bgVideo.value
+                        ? "text-blue-700 dark:text-blue-300"
+                        : "text-zinc-700 dark:text-zinc-300"
+                    }`}>
+                      {bgVideo.label || bgVideo.value.charAt(0).toUpperCase() + bgVideo.value.slice(1)}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        } else {
+          // Art Style step for AI Images
           return (
             <div className="space-y-6">
               <div className="text-center space-y-2 mb-8">
@@ -618,8 +934,8 @@ export default function Dashboard() {
                     </div>
                     <div className={`p-2 text-center text-sm font-medium ${
                       artStyle === style.value
-                        ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                        : "bg-zinc-50 dark:bg-zinc-800"
+                        ? "text-blue-700 dark:text-blue-300"
+                        : "text-zinc-700 dark:text-zinc-300"
                     }`}>
                       {t.artStyles[style.value as keyof typeof t.artStyles]}
                     </div>
@@ -628,13 +944,10 @@ export default function Dashboard() {
               </div>
             </div>
           );
-        } else {
-          // Script step for Gameplay
-          return renderScriptStep();
         }
 
       case 5:
-        // Script step for AI Images
+        // Script step for both Gameplay and AI Images
         return renderScriptStep();
 
       default:
@@ -717,7 +1030,7 @@ export default function Dashboard() {
   );
 
   const renderSocialMediaPage = () => (
-    <div className="max-w-4xl w-full bg-white dark:bg-zinc-900 p-4 sm:p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl">
+    <div className="max-w-4xl w-full">
       <div className="space-y-6">
         <div className="text-center space-y-2 mb-8">
           <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mx-auto mb-4">
@@ -729,35 +1042,131 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* TikTok */}
-          <div className="p-6 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all">
+          <div className={`p-6 rounded-xl border-2 transition-all ${
+            tiktokConnected 
+              ? "border-green-500 dark:border-green-500 bg-green-50 dark:bg-green-900/10" 
+              : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+          }`}>
             <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">TT</span>
-              </div>
-              <div>
+              {tiktokAvatar ? (
+                <NextImage 
+                  src={tiktokAvatar} 
+                  alt="TikTok Avatar"
+                  width={48}
+                  height={48}
+                  className="w-12 h-12 rounded-lg object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">TT</span>
+                </div>
+              )}
+              <div className="flex-1">
                 <h3 className="font-semibold text-lg">TikTok</h3>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">{t.dashboard.socialMedia.notConnected}</p>
+                {tiktokConnected ? (
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                      @{tiktokUsername}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    {t.dashboard.socialMedia.notConnected}
+                  </p>
+                )}
               </div>
             </div>
-            <button className="w-full px-4 py-2 rounded-lg bg-black text-white font-medium hover:bg-zinc-800 transition-colors">
-              {t.dashboard.socialMedia.connect}
-            </button>
+            {tiktokConnected ? (
+              <button 
+                onClick={handleDisconnectTiktok}
+                disabled={isDisconnectingTiktok}
+                className="w-full px-4 py-2 rounded-lg border-2 border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              >
+                {isDisconnectingTiktok ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {t.dashboard.socialMedia.disconnecting}
+                  </span>
+                ) : (
+                  t.dashboard.socialMedia.disconnect
+                )}
+              </button>
+            ) : (
+              <button 
+                onClick={handleConnectTiktok}
+                disabled={isConnectingTiktok}
+                className="w-full px-4 py-2 rounded-lg bg-black text-white font-medium hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              >
+                {isConnectingTiktok ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {t.dashboard.socialMedia.connecting}
+                  </span>
+                ) : (
+                  t.dashboard.socialMedia.connect
+                )}
+              </button>
+            )}
           </div>
 
           {/* Instagram */}
-          <div className="p-6 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all">
+          <div className={`p-6 rounded-xl border-2 transition-all ${
+            instagramConnected 
+              ? "border-green-500 dark:border-green-500 bg-green-50 dark:bg-green-900/10" 
+              : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+          }`}>
             <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-600 via-pink-600 to-orange-500 rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-600 via-pink-600 to-orange-500 rounded-lg flex items-center justify-center shadow-lg">
                 <span className="text-white font-bold text-lg">IG</span>
               </div>
-              <div>
+              <div className="flex-1">
                 <h3 className="font-semibold text-lg">Instagram</h3>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">{t.dashboard.socialMedia.notConnected}</p>
+                {instagramConnected ? (
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                      @{instagramUsername}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    {t.dashboard.socialMedia.notConnected}
+                  </p>
+                )}
               </div>
             </div>
-            <button className="w-full px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white font-medium hover:from-purple-700 hover:to-pink-700 transition-colors">
-              {t.dashboard.socialMedia.connect}
-            </button>
+            {instagramConnected ? (
+              <button 
+                onClick={handleDisconnectInstagram}
+                disabled={isDisconnectingInstagram}
+                className="w-full px-4 py-2 rounded-lg border-2 border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              >
+                {isDisconnectingInstagram ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {t.dashboard.socialMedia.disconnecting}
+                  </span>
+                ) : (
+                  t.dashboard.socialMedia.disconnect
+                )}
+              </button>
+            ) : (
+              <button 
+                onClick={handleConnectInstagram}
+                disabled={isConnectingInstagram}
+                className="w-full px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white font-medium hover:from-purple-700 hover:to-pink-700 transition-colors disabled:opacity-50"
+              >
+                {isConnectingInstagram ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {t.dashboard.socialMedia.connecting}
+                  </span>
+                ) : (
+                  t.dashboard.socialMedia.connect
+                )}
+              </button>
+            )}
           </div>
 
           {/* YouTube */}
@@ -808,7 +1217,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="min-h-screen bg-white dark:bg-zinc-900 text-foreground flex flex-col">
       <Navbar onLogoClick={() => resetWizard()} />
 
       {/* Main Content with Sidebar */}
@@ -866,10 +1275,10 @@ export default function Dashboard() {
         </aside>
 
         {/* Main Content Area */}
-        <main className="flex-1 flex flex-col items-center justify-center px-4 py-8 sm:py-12 md:py-20 overflow-y-auto">
+        <main className="flex-1 flex flex-col items-center justify-center px-4 py-4 sm:py-6 md:py-8 overflow-y-auto">
           {activeSection === "video-creation" ? (
             /* Multi-step Wizard */
-            <div className="max-w-2xl w-full bg-white dark:bg-zinc-900 p-4 sm:p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl">
+            <div className="max-w-2xl w-full">
           {!videoUrl ? (
             <>
               {/* Header */}
@@ -1004,6 +1413,46 @@ export default function Dashboard() {
           )}
         </main>
       </div>
+
+      {/* Preview Video Dialog */}
+      {previewVideoType && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => setPreviewVideoType(null)}
+        >
+          <div 
+            className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                {previewVideoType === "gameplay" ? t.form.gameplay : t.form.aiImages}
+              </h3>
+              <button
+                onClick={() => setPreviewVideoType(null)}
+                className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <X className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+              </button>
+            </div>
+
+            {/* Video Preview */}
+            <div className="flex items-center justify-center">
+              <video
+                src={previewVideoType === "gameplay" 
+                  ? "/videos/category_examples/preview_background.mp4"
+                  : "/videos/category_examples/preview_full_ai.mp4"
+                }
+                controls
+                autoPlay
+                loop
+                className="max-h-[calc(90vh-80px)] w-auto"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
