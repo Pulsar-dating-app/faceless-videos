@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const INSTAGRAM_CLIENT_ID = process.env.INSTAGRAM_CLIENT_ID || '';
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
-const REDIRECT_URI = `${APP_URL}/api/instagram/callback/`;
+const REDIRECT_URI = `${APP_URL}/api/instagram/callback`;
 
 // Instagram Business / Publishing scopes (Graph API)
 // These allow reading a business account and publishing content.
