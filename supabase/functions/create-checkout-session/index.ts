@@ -217,7 +217,29 @@ Deno.serve(async (req: Request) => {
     let customerId: string;
     if (customers.data.length > 0) {
       customerId = customers.data[0].id;
-      console.log("✅ [SUCCESS] Found existing customer:", customerId);
+      const existingCustomer = customers.data[0];
+      const existingUserId = existingCustomer.metadata?.supabase_user_id;
+      
+      console.log("✅ [SUCCESS] Found existing customer");
+      
+      // Atualizar metadata do customer se necessário (garantir que tem o user_id correto)
+      if (existingUserId !== user.id) {
+        console.log("⚠️ [UPDATE] Customer metadata mismatch! Updating...");
+        
+        try {
+          await stripeClient.customers.update(customerId, {
+            metadata: {
+              supabase_user_id: user.id,
+            },
+          });
+          console.log("✅ [SUCCESS] Customer metadata updated");
+        } catch (updateError) {
+          console.log("⚠️ [ERROR] Failed to update customer metadata:", updateError);
+          // Continuar mesmo se a atualização falhar
+        }
+      } else {
+        console.log("✅ [SKIP] Customer metadata already correct");
+      }
     } else {
       // Create new customer
       console.log("🔵 [DEBUG] Creating new customer...");
@@ -228,9 +250,153 @@ Deno.serve(async (req: Request) => {
         },
       });
       customerId = customer.id;
-      console.log("✅ [SUCCESS] Created new customer:", customerId);
+      console.log("✅ [SUCCESS] Created new customer");
     }
 
+    // Verificar se usuário já tem subscription ativa
+    const { data: existingSubscription } = await supabaseClient
+      .from("subscriptions")
+      .select("stripe_subscription_id, status, plan_id, stripe_price_id")
+      .eq("user_id", user.id)
+      .single();
+
+    const finalLocale = locale || "auto";
+
+    // Se já tem subscription ativa, atualizar e criar Checkout para pagar diferença
+    if (existingSubscription?.stripe_subscription_id && 
+        existingSubscription.status !== "canceled" &&
+        existingSubscription.status !== "unpaid") {
+      
+      console.log("🔄 [UPGRADE] User has active subscription, checking for plan change");
+      
+      try {
+        // Buscar subscription atual do Stripe
+        const currentSubscription = await stripeClient.subscriptions.retrieve(
+          existingSubscription.stripe_subscription_id
+        );
+
+        // Verificar se é realmente uma troca de plano
+        const currentPriceId = currentSubscription.items.data[0]?.price.id;
+        if (currentPriceId === priceId) {
+          // Mesmo plano, não precisa fazer nada
+          console.log("ℹ️ [INFO] User already has this plan");
+          return new Response(
+            JSON.stringify({ 
+              message: "You already have this plan",
+              subscription_id: existingSubscription.stripe_subscription_id,
+              same_plan: true
+            }),
+            {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 200,
+            }
+          );
+        }
+
+        console.log("🔄 [UPGRADE] Updating subscription from", existingSubscription.plan_id, "to", planId);
+
+        // Atualizar subscription para novo plano
+        const updatedSubscription = await stripeClient.subscriptions.update(
+          existingSubscription.stripe_subscription_id,
+          {
+            items: [{
+              id: currentSubscription.items.data[0].id,
+              price: priceId, // Novo price ID
+            }],
+            proration_behavior: "always_invoice", // Criar invoice com proratação
+            metadata: {
+              supabase_user_id: user.id,
+              plan_id: planId,
+              currency: currency,
+            },
+          }
+        );
+
+        console.log("✅ [SUCCESS] Subscription updated, checking for invoice...");
+
+        // Buscar invoices pendentes para esta subscription
+        const invoices = await stripeClient.invoices.list({
+          subscription: updatedSubscription.id,
+          status: "open",
+          limit: 1,
+        });
+
+        // Se há invoice aberta que precisa de pagamento, criar Checkout Session
+        if (invoices.data.length > 0) {
+          const invoice = invoices.data[0];
+          console.log("💰 [INVOICE] Found open invoice, creating checkout session to collect payment");
+
+          // Criar Checkout Session em modo "payment" para pagar a invoice
+          const session = await stripeClient.checkout.sessions.create({
+            customer: customerId,
+            mode: "payment", // Modo payment para pagar invoice única
+            locale: finalLocale,
+            line_items: [
+              {
+                price: priceId,
+                quantity: 1,
+              },
+            ],
+            success_url: `${APP_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${APP_URL}/checkout/cancel`,
+            metadata: {
+              supabase_user_id: user.id,
+              plan_id: planId,
+              currency: currency,
+              subscription_update: "true",
+              subscription_id: updatedSubscription.id,
+              invoice_id: invoice.id,
+            },
+          });
+
+          console.log("✅ [SUCCESS] Checkout session created for invoice payment:", session.id);
+
+          return new Response(
+            JSON.stringify({ 
+              url: session.url,
+              updated: true,
+              payment_required: true,
+              subscription_id: updatedSubscription.id
+            }),
+            {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 200,
+            }
+          );
+        } else {
+          // Invoice foi paga automaticamente ou não há diferença a pagar
+          console.log("✅ [SUCCESS] Subscription updated, no payment needed");
+          return new Response(
+            JSON.stringify({ 
+              message: "Subscription updated successfully",
+              subscription_id: updatedSubscription.id,
+              updated: true,
+              payment_required: false
+            }),
+            {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 200,
+            }
+          );
+        }
+      } catch (updateError) {
+        console.log("⚠️ [ERROR] Failed to update subscription:", updateError);
+        return new Response(
+          JSON.stringify({ 
+            error: "Failed to update subscription. Please try again or contact support.",
+            details: updateError instanceof Error ? updateError.message : "Unknown error"
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 500,
+          }
+        );
+      }
+    }
+
+    // Se não tem subscription, criar nova Checkout Session normalmente
+    console.log("🆕 [NEW] Creating new checkout session for new subscription");
+    
     // Create checkout session
     console.log("🔵 [DEBUG] Creating checkout session...");
     console.log("🔵 [DEBUG] - Customer:", customerId);
@@ -238,9 +404,10 @@ Deno.serve(async (req: Request) => {
     console.log("🔵 [DEBUG] - Plan:", planId);
     console.log("🔵 [DEBUG] - Plan Name (translated):", planName);
     
-    const finalLocale = locale || "auto";
     console.log("🌍 [LOCALE] Stripe Checkout locale being sent:", finalLocale);
     console.log("🌍 [LOCALE] Original locale received:", locale || "undefined (using 'auto')");
+    
+    console.log("📋 [METADATA] Session will have plan_id:", planId, "currency:", currency);
 
     const session = await stripeClient.checkout.sessions.create({
       customer: customerId,

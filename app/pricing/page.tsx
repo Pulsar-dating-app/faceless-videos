@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useEffect } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
@@ -185,7 +184,7 @@ export default function PricingPage() {
                           language === "de" ? "de" : 
                           language === "en" ? "en" : 
                           "auto"; // Stripe will auto-detect if language not supported
-        debugger;
+      
       // Call Edge Function to create checkout session
       const response = await fetch(
         functionUrl,
@@ -212,11 +211,27 @@ export default function PricingPage() {
         throw new Error(errorData.error || "Failed to create checkout session");
       }
 
-      const { url } = await response.json();
+      const responseData = await response.json();
 
-      if (url) {
-        // Redirect to Stripe Checkout
-        window.location.href = url;
+      // Se já tem o mesmo plano
+      if (responseData.same_plan) {
+        alert(responseData.message || "You already have this plan.");
+        setLoadingPlanId(null);
+        return;
+      }
+
+      // Se foi atualização de subscription sem pagamento necessário
+      if (responseData.updated && !responseData.payment_required) {
+        alert("Subscription updated successfully! Your plan change will be reflected shortly.");
+        // Recarregar a página para atualizar UI
+        window.location.reload();
+        return;
+      }
+
+      // Se tem URL (nova subscription ou atualização com pagamento)
+      if (responseData.url) {
+        // Redirecionar para Stripe Checkout
+        window.location.href = responseData.url;
       } else {
         throw new Error("No checkout URL returned");
       }
