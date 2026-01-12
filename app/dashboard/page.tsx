@@ -138,6 +138,13 @@ export default function Dashboard() {
   const [isConnectingInstagram, setIsConnectingInstagram] = useState(false);
   const [isDisconnectingInstagram, setIsDisconnectingInstagram] = useState(false);
 
+  // YouTube connection states
+  const [youtubeConnected, setYoutubeConnected] = useState(false);
+  const [youtubeChannelTitle, setYoutubeChannelTitle] = useState<string | null>(null);
+  const [youtubeThumbnail, setYoutubeThumbnail] = useState<string | null>(null);
+  const [isConnectingYoutube, setIsConnectingYoutube] = useState(false);
+  const [isDisconnectingYoutube, setIsDisconnectingYoutube] = useState(false);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const voicePreviewRef = useRef<HTMLAudioElement | null>(null);
 
@@ -148,11 +155,12 @@ export default function Dashboard() {
     }
   }, [user, isLoading, router]);
 
-  // Check TikTok/Instagram connection status on mount and when returning from OAuth
+  // Check TikTok/Instagram/YouTube connection status on mount and when returning from OAuth
   useEffect(() => {
     if (user) {
       checkTiktokConnection();
       checkInstagramConnection();
+      checkYoutubeConnection();
     }
 
     // Check for OAuth callback parameters
@@ -207,6 +215,34 @@ export default function Dashboard() {
       // Show success message
       alert(formatMessage(t.dashboard.socialMedia.connectSuccess, { platform: 'Instagram' }));
       checkInstagramConnection();
+      
+      // Switch to social media section if specified
+      if (section === 'social-media') {
+        setActiveSection('social-media');
+      }
+      
+      // Clean up URL
+      window.history.replaceState({}, '', '/dashboard');
+    }
+
+    if (connected === 'youtube') {
+      // Get YouTube data from URL
+      const youtubeDataParam = params.get('youtube_data');
+      
+      if (youtubeDataParam) {
+        try {
+          // Decode and save to localStorage
+          const decodedData = Buffer.from(youtubeDataParam, 'base64').toString('utf-8');
+          const youtubeData = JSON.parse(decodedData);
+          localStorage.setItem('youtube_connection', JSON.stringify(youtubeData));
+        } catch (e) {
+          console.error('Error saving YouTube data:', e);
+        }
+      }
+      
+      // Show success message
+      alert(formatMessage(t.dashboard.socialMedia.connectSuccess, { platform: 'YouTube' }));
+      checkYoutubeConnection();
       
       // Switch to social media section if specified
       if (section === 'social-media') {
@@ -278,6 +314,30 @@ export default function Dashboard() {
     }
   };
 
+  const checkYoutubeConnection = () => {
+    if (!user) return;
+
+    try {
+      // Check localStorage for YouTube connection
+      const youtubeData = localStorage.getItem('youtube_connection');
+      
+      if (youtubeData) {
+        const data = JSON.parse(youtubeData);
+        setYoutubeConnected(true);
+        setYoutubeChannelTitle(data.channel_title);
+        setYoutubeThumbnail(data.thumbnail_url);
+        console.log('✅ YouTube conectado:', data.channel_title);
+      } else {
+        setYoutubeConnected(false);
+        setYoutubeChannelTitle(null);
+        setYoutubeThumbnail(null);
+        console.log('❌ YouTube não conectado');
+      }
+    } catch (error) {
+      console.error('Error checking YouTube connection:', error);
+    }
+  };
+
   const handleConnectTiktok = () => {
     if (!user) return;
     
@@ -292,6 +352,14 @@ export default function Dashboard() {
     setIsConnectingInstagram(true);
     // Redirect to Instagram OAuth
     window.location.href = `/api/instagram/auth?user_id=${user.id}`;
+  };
+
+  const handleConnectYoutube = () => {
+    if (!user) return;
+    
+    setIsConnectingYoutube(true);
+    // Redirect to YouTube OAuth
+    window.location.href = `/api/youtube/auth?user_id=${user.id}`;
   };
 
   const handleDisconnectTiktok = async () => {
@@ -338,6 +406,30 @@ export default function Dashboard() {
       alert(formatMessage(t.dashboard.socialMedia.disconnectError, { platform: 'Instagram' }));
     } finally {
       setIsDisconnectingInstagram(false);
+    }
+  };
+
+  const handleDisconnectYoutube = async () => {
+    if (!user) return;
+
+    const confirmed = confirm(formatMessage(t.dashboard.socialMedia.disconnectConfirm, { platform: 'YouTube' }));
+    if (!confirmed) return;
+
+    setIsDisconnectingYoutube(true);
+
+    try {
+      // Remove from localStorage
+      localStorage.removeItem('youtube_connection');
+      
+      setYoutubeConnected(false);
+      setYoutubeChannelTitle(null);
+      setYoutubeThumbnail(null);
+      alert(formatMessage(t.dashboard.socialMedia.disconnectSuccess, { platform: 'YouTube' }));
+    } catch (error) {
+      console.error('Error disconnecting YouTube:', error);
+      alert(formatMessage(t.dashboard.socialMedia.disconnectError, { platform: 'YouTube' }));
+    } finally {
+      setIsDisconnectingYoutube(false);
     }
   };
 
@@ -1170,19 +1262,72 @@ export default function Dashboard() {
           </div>
 
           {/* YouTube */}
-          <div className="p-6 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all">
+          <div className={`p-6 rounded-xl border-2 transition-all ${
+            youtubeConnected 
+              ? "border-green-500 dark:border-green-500 bg-green-50 dark:bg-green-900/10" 
+              : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+          }`}>
             <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">YT</span>
-              </div>
-              <div>
+              {youtubeThumbnail ? (
+                <NextImage 
+                  src={youtubeThumbnail} 
+                  alt="YouTube Channel"
+                  width={48}
+                  height={48}
+                  className="w-12 h-12 rounded-lg object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">YT</span>
+                </div>
+              )}
+              <div className="flex-1">
                 <h3 className="font-semibold text-lg">YouTube</h3>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">{t.dashboard.socialMedia.notConnected}</p>
+                {youtubeConnected ? (
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                      {youtubeChannelTitle}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    {t.dashboard.socialMedia.notConnected}
+                  </p>
+                )}
               </div>
             </div>
-            <button className="w-full px-4 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors">
-              {t.dashboard.socialMedia.connect}
-            </button>
+            {youtubeConnected ? (
+              <button 
+                onClick={handleDisconnectYoutube}
+                disabled={isDisconnectingYoutube}
+                className="w-full px-4 py-2 rounded-lg border-2 border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              >
+                {isDisconnectingYoutube ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {t.dashboard.socialMedia.disconnecting}
+                  </span>
+                ) : (
+                  t.dashboard.socialMedia.disconnect
+                )}
+              </button>
+            ) : (
+              <button 
+                onClick={handleConnectYoutube}
+                disabled={isConnectingYoutube}
+                className="w-full px-4 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {isConnectingYoutube ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {t.dashboard.socialMedia.connecting}
+                  </span>
+                ) : (
+                  t.dashboard.socialMedia.connect
+                )}
+              </button>
+            )}
           </div>
 
           {/* Facebook */}
