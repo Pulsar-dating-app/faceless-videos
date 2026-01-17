@@ -15,81 +15,51 @@ const corsHeaders = {
 
 interface RequestBody {
   planId: string;
-  currency?: string; // Optional: "usd", "eur", "brl", etc. Default: "usd"
   planName?: string; // Translated plan name for Stripe Checkout
   locale?: string; // Stripe Checkout locale (pt, en, es, fr, de, etc.)
 }
 
-// Get Stripe Price ID from database table
+// Get Stripe Price ID from database table (USD only)
 // Falls back to environment variables if table doesn't exist
 async function getPriceId(
   supabaseClient: ReturnType<typeof createClient>,
-  planId: string,
-  currency: string = "usd"
+  planId: string
 ): Promise<string> {
-  const normalizedCurrency = currency.toLowerCase();
   const normalizedPlanId = planId.toLowerCase();
   
   try {
-    // Try to get from database table first
+    // Try to get USD price from database table first
+    console.log(`🔵 [DEBUG] Querying database for plan: ${normalizedPlanId}, currency: usd`);
     const { data: priceData, error } = await supabaseClient
       .from("stripe_prices")
-      .select("stripe_price_id")
+      .select("stripe_price_id, currency, active")
       .eq("plan_id", normalizedPlanId)
-      .eq("currency", normalizedCurrency)
+      .eq("currency", "usd")
       .eq("active", true)
       .single();
 
-    if (!error && priceData?.stripe_price_id) {
-      console.log(`✅ [SUCCESS] Found price ID in database: ${priceData.stripe_price_id}`);
+    if (error) {
+      console.log(`⚠️ [WARN] Database query error:`, error.message);
+    } else if (priceData?.stripe_price_id) {
+      console.log(`✅ [SUCCESS] Found price ID in database: ${priceData.stripe_price_id} (currency: ${priceData.currency}, active: ${priceData.active})`);
       return priceData.stripe_price_id;
-    }
-
-    // If not found in database, try USD as fallback
-    if (normalizedCurrency !== "usd") {
-      const { data: usdPriceData } = await supabaseClient
-        .from("stripe_prices")
-        .select("stripe_price_id")
-        .eq("plan_id", normalizedPlanId)
-        .eq("currency", "usd")
-        .eq("active", true)
-        .single();
-
-      if (usdPriceData?.stripe_price_id) {
-        console.log(`✅ [SUCCESS] Found USD fallback in database: ${usdPriceData.stripe_price_id}`);
-        return usdPriceData.stripe_price_id;
-      }
+    } else {
+      console.log(`⚠️ [WARN] No USD price found in database for plan: ${normalizedPlanId}`);
     }
   } catch (dbError) {
     console.log("⚠️ [WARN] Database query failed, falling back to env vars:", dbError);
   }
 
   // Fallback to environment variables (for backward compatibility)
-  const envKey = `STRIPE_PRICE_ID_${planId.toUpperCase()}_${currency.toUpperCase()}`;
-  const currencyPrice = Deno.env.get(envKey);
-  if (currencyPrice) {
-    console.log(`✅ [SUCCESS] Found price ID in env: ${envKey}`);
-    return currencyPrice;
+  const envKey = `STRIPE_PRICE_ID_${planId.toUpperCase()}`;
+  const envPrice = Deno.env.get(envKey);
+  if (envPrice) {
+    console.log(`⚠️ [WARN] Using price ID from env var ${envKey}: ${envPrice}`);
+    console.log(`⚠️ [WARN] WARNING: Env vars may contain old BRL prices. Please use database table instead.`);
+    return envPrice;
   }
 
-  // Try default USD env var
-  if (normalizedCurrency !== "usd") {
-    const defaultEnvKey = `STRIPE_PRICE_ID_${planId.toUpperCase()}`;
-    const defaultPrice = Deno.env.get(defaultEnvKey);
-    if (defaultPrice) {
-      console.log(`✅ [SUCCESS] Found USD fallback in env: ${defaultEnvKey}`);
-      return defaultPrice;
-    }
-  }
-
-  // Legacy support
-  const legacyEnvKey = `STRIPE_PRICE_ID_${planId.toUpperCase()}`;
-  const legacyPrice = Deno.env.get(legacyEnvKey);
-  if (legacyPrice) {
-    console.log(`✅ [SUCCESS] Found legacy price ID in env: ${legacyEnvKey}`);
-    return legacyPrice;
-  }
-
+  console.log(`❌ [ERROR] No price ID found in database or env vars for plan: ${normalizedPlanId}`);
   return "";
 }
 
@@ -164,8 +134,8 @@ Deno.serve(async (req: Request) => {
     console.log("✅ [SUCCESS] User authenticated:", user.email);
 
     // Get request body
-    const { planId, currency = "usd", planName, locale }: RequestBody = await req.json();
-    console.log("🔵 [DEBUG] Request body - planId:", planId, "currency:", currency);
+    const { planId, planName, locale }: RequestBody = await req.json();
+    console.log("🔵 [DEBUG] Request body - planId:", planId);
     console.log("🔵 [DEBUG] Plan name (translated):", planName);
     console.log("🔵 [DEBUG] Stripe Checkout locale:", locale);
 
@@ -180,16 +150,16 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Get Stripe price ID for the plan and currency
-    console.log("🔵 [DEBUG] Looking for price ID...");
-    const priceId = await getPriceId(supabaseClient, planId, currency);
+    // Get Stripe price ID for the plan (USD only)
+    console.log("🔵 [DEBUG] Looking for USD price ID for plan:", planId);
+    const priceId = await getPriceId(supabaseClient, planId);
     console.log("🔵 [DEBUG] Price ID found:", priceId || "❌ Not found");
     
     if (!priceId) {
-      console.log("❌ [ERROR] Price ID not configured for plan:", planId, "currency:", currency);
+      console.log("❌ [ERROR] Price ID not configured for plan:", planId);
       return new Response(
         JSON.stringify({ 
-          error: `Price ID not found for plan: ${planId}, currency: ${currency}. Please configure in stripe_prices table or environment variables.` 
+          error: `Price ID not found for plan: ${planId}. Please configure in stripe_prices table or environment variables.` 
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -205,6 +175,57 @@ Deno.serve(async (req: Request) => {
       apiVersion: "2024-12-18.acacia",
       httpClient: stripe.Stripe.createFetchHttpClient(),
     });
+
+    // Validate price ID - check if it's USD and active
+    console.log("🔵 [DEBUG] Validating price ID in Stripe...");
+    try {
+      const price = await stripeClient.prices.retrieve(priceId);
+      console.log("🔵 [DEBUG] Price details from Stripe:", {
+        id: price.id,
+        currency: price.currency,
+        amount: price.unit_amount,
+        active: price.active,
+      });
+      
+      if (price.currency !== "usd") {
+        console.log(`❌ [ERROR] Price ID ${priceId} is in ${price.currency.toUpperCase()}, expected USD!`);
+        return new Response(
+          JSON.stringify({ 
+            error: `Invalid price configuration: Price ${priceId} is in ${price.currency.toUpperCase()}, but only USD is supported. Please check your stripe_prices table or environment variables.` 
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400,
+          }
+        );
+      }
+      
+      if (!price.active) {
+        console.log(`❌ [ERROR] Price ID ${priceId} is archived/inactive in Stripe!`);
+        return new Response(
+          JSON.stringify({ 
+            error: `Price ${priceId} is archived in Stripe. Please use an active price.` 
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400,
+          }
+        );
+      }
+      
+      console.log("✅ [SUCCESS] Price ID validated: USD and active");
+    } catch (priceError) {
+      console.log("❌ [ERROR] Could not validate price in Stripe:", priceError);
+      return new Response(
+        JSON.stringify({ 
+          error: `Invalid price ID: ${priceId}. Please check your configuration.` 
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
+    }
 
     // Create or get Stripe customer
     // First, try to find existing customer by email
@@ -256,142 +277,31 @@ Deno.serve(async (req: Request) => {
     // Verificar se usuário já tem subscription ativa
     const { data: existingSubscription } = await supabaseClient
       .from("subscriptions")
-      .select("stripe_subscription_id, status, plan_id, stripe_price_id")
+      .select("stripe_subscription_id, status, plan_id")
       .eq("user_id", user.id)
       .single();
 
     const finalLocale = locale || "auto";
 
-    // Se já tem subscription ativa, atualizar e criar Checkout para pagar diferença
+    // Se já tem subscription ativa, bloquear criação de nova
     if (existingSubscription?.stripe_subscription_id && 
         existingSubscription.status !== "canceled" &&
-        existingSubscription.status !== "unpaid") {
+        existingSubscription.status !== "unpaid" &&
+        existingSubscription.status !== "incomplete_expired") {
       
-      console.log("🔄 [UPGRADE] User has active subscription, checking for plan change");
-      
-      try {
-        // Buscar subscription atual do Stripe
-        const currentSubscription = await stripeClient.subscriptions.retrieve(
-          existingSubscription.stripe_subscription_id
-        );
-
-        // Verificar se é realmente uma troca de plano
-        const currentPriceId = currentSubscription.items.data[0]?.price.id;
-        if (currentPriceId === priceId) {
-          // Mesmo plano, não precisa fazer nada
-          console.log("ℹ️ [INFO] User already has this plan");
-          return new Response(
-            JSON.stringify({ 
-              message: "You already have this plan",
-              subscription_id: existingSubscription.stripe_subscription_id,
-              same_plan: true
-            }),
-            {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-              status: 200,
-            }
-          );
+      console.log("⚠️ [BLOCKED] User already has an active subscription");
+      return new Response(
+        JSON.stringify({ 
+          error: "You already have an active subscription. Please use the billing portal to manage or change your plan.",
+          has_subscription: true,
+          current_plan: existingSubscription.plan_id,
+          subscription_id: existingSubscription.stripe_subscription_id
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
         }
-
-        console.log("🔄 [UPGRADE] Updating subscription from", existingSubscription.plan_id, "to", planId);
-
-        // Atualizar subscription para novo plano
-        const updatedSubscription = await stripeClient.subscriptions.update(
-          existingSubscription.stripe_subscription_id,
-          {
-            items: [{
-              id: currentSubscription.items.data[0].id,
-              price: priceId, // Novo price ID
-            }],
-            proration_behavior: "always_invoice", // Criar invoice com proratação
-            metadata: {
-              supabase_user_id: user.id,
-              plan_id: planId,
-              currency: currency,
-            },
-          }
-        );
-
-        console.log("✅ [SUCCESS] Subscription updated, checking for invoice...");
-
-        // Buscar invoices pendentes para esta subscription
-        const invoices = await stripeClient.invoices.list({
-          subscription: updatedSubscription.id,
-          status: "open",
-          limit: 1,
-        });
-
-        // Se há invoice aberta que precisa de pagamento, criar Checkout Session
-        if (invoices.data.length > 0) {
-          const invoice = invoices.data[0];
-          console.log("💰 [INVOICE] Found open invoice, creating checkout session to collect payment");
-
-          // Criar Checkout Session em modo "payment" para pagar a invoice
-          const session = await stripeClient.checkout.sessions.create({
-            customer: customerId,
-            mode: "payment", // Modo payment para pagar invoice única
-            locale: finalLocale,
-            line_items: [
-              {
-                price: priceId,
-                quantity: 1,
-              },
-            ],
-            success_url: `${APP_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${APP_URL}/checkout/cancel`,
-            metadata: {
-              supabase_user_id: user.id,
-              plan_id: planId,
-              currency: currency,
-              subscription_update: "true",
-              subscription_id: updatedSubscription.id,
-              invoice_id: invoice.id,
-            },
-          });
-
-          console.log("✅ [SUCCESS] Checkout session created for invoice payment:", session.id);
-
-          return new Response(
-            JSON.stringify({ 
-              url: session.url,
-              updated: true,
-              payment_required: true,
-              subscription_id: updatedSubscription.id
-            }),
-            {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-              status: 200,
-            }
-          );
-        } else {
-          // Invoice foi paga automaticamente ou não há diferença a pagar
-          console.log("✅ [SUCCESS] Subscription updated, no payment needed");
-          return new Response(
-            JSON.stringify({ 
-              message: "Subscription updated successfully",
-              subscription_id: updatedSubscription.id,
-              updated: true,
-              payment_required: false
-            }),
-            {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-              status: 200,
-            }
-          );
-        }
-      } catch (updateError) {
-        console.log("⚠️ [ERROR] Failed to update subscription:", updateError);
-        return new Response(
-          JSON.stringify({ 
-            error: "Failed to update subscription. Please try again or contact support.",
-            details: updateError instanceof Error ? updateError.message : "Unknown error"
-          }),
-          {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 500,
-          }
-        );
-      }
+      );
     }
 
     // Se não tem subscription, criar nova Checkout Session normalmente
@@ -407,7 +317,7 @@ Deno.serve(async (req: Request) => {
     console.log("🌍 [LOCALE] Stripe Checkout locale being sent:", finalLocale);
     console.log("🌍 [LOCALE] Original locale received:", locale || "undefined (using 'auto')");
     
-    console.log("📋 [METADATA] Session will have plan_id:", planId, "currency:", currency);
+    console.log("📋 [METADATA] Session will have plan_id:", planId);
 
     const session = await stripeClient.checkout.sessions.create({
       customer: customerId,
@@ -424,7 +334,6 @@ Deno.serve(async (req: Request) => {
       metadata: {
         supabase_user_id: user.id,
         plan_id: planId,
-        currency: currency,
       },
     });
 

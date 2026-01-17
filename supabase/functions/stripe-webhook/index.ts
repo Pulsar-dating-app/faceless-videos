@@ -24,6 +24,12 @@ type SubscriptionStatus =
   | "incomplete_expired"
   | "paused";
 
+// Helper para log com timestamp
+function logWithTimestamp(message: string) {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${message}`);
+}
+
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight request
   if (req.method === "OPTIONS") {
@@ -163,6 +169,28 @@ Deno.serve(async (req: Request) => {
       };
 
       return statusMap[stripeStatus] || null;
+    }
+
+    // Comparar status - retorna true se newStatus é melhor ou igual ao currentStatus
+    function isStatusBetterOrEqual(
+      currentStatus: SubscriptionStatus | null,
+      newStatus: SubscriptionStatus
+    ): boolean {
+      if (!currentStatus) return true; // Se não tem status, aceita qualquer um
+
+      // Hierarquia de status (do pior para o melhor)
+      const statusPriority: Record<SubscriptionStatus, number> = {
+        incomplete_expired: 0,
+        canceled: 1,
+        unpaid: 2,
+        incomplete: 3,
+        past_due: 4,
+        trialing: 5,
+        paused: 6,
+        active: 7,
+      };
+
+      return statusPriority[newStatus] >= statusPriority[currentStatus];
     }
 
     // Verificar se tokens já foram creditados para o período atual
@@ -329,7 +357,7 @@ Deno.serve(async (req: Request) => {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as stripe.Stripe.Checkout.Session;
-        console.log(`✅ [WEBHOOK] Checkout session completed: ${session.id}`);
+        logWithTimestamp(`✅ [WEBHOOK] [1/3] Checkout session completed: ${session.id}`);
         console.log("👤 [CUSTOMER] Customer ID:", session.customer);
         console.log("👤 [USER_ID] From session metadata:", session.metadata?.supabase_user_id || "NOT FOUND");
         console.log("📋 [PLAN_ID] From session metadata:", session.metadata?.plan_id || "NOT FOUND");
@@ -362,7 +390,13 @@ Deno.serve(async (req: Request) => {
 
           const stripePriceId =
             fullSubscription.items.data[0]?.price.id || null;
+          
+          console.log(`📊 [STATUS] Stripe subscription status: ${fullSubscription.status}`);
+          console.log(`📊 [STATUS] Payment status: ${fullSubscription.latest_invoice ? 'Has invoice' : 'No invoice'}`);
+          
           const mappedStatus = mapStripeStatusToEnum(fullSubscription.status);
+          console.log(`📊 [STATUS] Mapped status for database: ${mappedStatus || 'NULL'}`);
+          logWithTimestamp(`📊 [STATUS] [1/3] Initial status from checkout: ${mappedStatus || 'NULL'}`);
 
           if (!mappedStatus) {
             console.log(
@@ -389,61 +423,107 @@ Deno.serve(async (req: Request) => {
             // Continuar mesmo se não conseguir atualizar
           }
 
-          // Upsert em subscriptions
-          const now = new Date().toISOString();
-          const { error: upsertError } = await supabaseClient
+          // Verificar se já existe subscription para este usuário
+          const { data: existingSub } = await supabaseClient
             .from("subscriptions")
-            .upsert(
-              {
+            .select("id, status")
+            .eq("user_id", userId)
+            .single();
+
+          const now = new Date().toISOString();
+          const periodStart = fullSubscription.current_period_start
+            ? new Date(fullSubscription.current_period_start * 1000).toISOString()
+            : null;
+          const periodEnd = fullSubscription.current_period_end
+            ? new Date(fullSubscription.current_period_end * 1000).toISOString()
+            : null;
+
+          if (existingSub) {
+            // Atualizar subscription existente (garantindo que períodos sejam atualizados)
+            const { error: updateError } = await supabaseClient
+              .from("subscriptions")
+              .update({
+                plan_id: planId,
+                status: mappedStatus,
+                stripe_customer_id: customerId,
+                stripe_subscription_id: subscriptionId,
+                stripe_price_id: stripePriceId,
+                current_period_start: periodStart,
+                current_period_end: periodEnd,
+                cancel_at_period_end:
+                  fullSubscription.cancel_at_period_end || false,
+                updated_at: now,
+              })
+              .eq("user_id", userId);
+
+            if (updateError) {
+              console.log(
+                `⚠️ [WEBHOOK] Error updating subscription:`,
+                updateError
+              );
+            } else {
+              console.log(
+                `✅ [WEBHOOK] Subscription updated successfully for plan: ${planId}`
+              );
+
+              // Se status for active e for primeira assinatura, creditar tokens
+              if (
+                mappedStatus === "active" &&
+                fullSubscription.current_period_start &&
+                fullSubscription.current_period_end
+              ) {
+                await creditTokensToUser(
+                  userId,
+                  subscriptionId,
+                  planId,
+                  new Date(fullSubscription.current_period_start * 1000),
+                  new Date(fullSubscription.current_period_end * 1000)
+                );
+              }
+            }
+          } else {
+            // Criar nova subscription
+            const { error: insertError } = await supabaseClient
+              .from("subscriptions")
+              .insert({
                 user_id: userId,
                 plan_id: planId,
                 status: mappedStatus,
                 stripe_customer_id: customerId,
                 stripe_subscription_id: subscriptionId,
                 stripe_price_id: stripePriceId,
-                current_period_start:
-                  fullSubscription.current_period_start
-                    ? new Date(
-                        fullSubscription.current_period_start * 1000
-                      ).toISOString()
-                    : null,
-                current_period_end: fullSubscription.current_period_end
-                  ? new Date(
-                      fullSubscription.current_period_end * 1000
-                    ).toISOString()
-                  : null,
+                current_period_start: periodStart,
+                current_period_end: periodEnd,
                 cancel_at_period_end:
                   fullSubscription.cancel_at_period_end || false,
+                created_at: now,
                 updated_at: now,
-              },
-              {
-                onConflict: "user_id",
-              }
-            );
+              });
 
-          if (upsertError) {
-            console.log(
-              `⚠️ [WEBHOOK] Error upserting subscription:`,
-              upsertError
-            );
-          } else {
-            console.log(
-              `✅ [WEBHOOK] Subscription upserted successfully for plan: ${planId}`
-            );
-
-            // Se status for active e for primeira assinatura, creditar tokens
-            if (
-              mappedStatus === "active" &&
-              fullSubscription.current_period_start &&
-              fullSubscription.current_period_end
-            ) {
-              await creditTokensToUser(
-                userId,
-                subscriptionId,
-                planId,
-                new Date(fullSubscription.current_period_start * 1000),
-                new Date(fullSubscription.current_period_end * 1000)
+            if (insertError) {
+              console.log(
+                `⚠️ [WEBHOOK] Error inserting subscription:`,
+                insertError
               );
+            } else {
+              console.log(
+                `✅ [WEBHOOK] Subscription created successfully for plan: ${planId}`
+              );
+
+              // Se status for active e for primeira assinatura, creditar tokens
+              if (
+                mappedStatus === "active" &&
+                fullSubscription.current_period_start &&
+                fullSubscription.current_period_end
+              ) {
+                await creditTokensToUser(
+                  userId,
+                  subscriptionId,
+                  planId,
+                  new Date(fullSubscription.current_period_start * 1000),
+                  new Date(fullSubscription.current_period_end * 1000)
+                );
+              }
             }
           }
         }
@@ -554,37 +634,109 @@ Deno.serve(async (req: Request) => {
             console.log(`⚠️ [WEBHOOK] Error updating subscription:`, error);
           }
         } else {
-          // Nova subscription - verificar se já existe pelo subscription ID
-          const { data: existingSub } = await supabaseClient
+          // Nova subscription - verificar se já existe pelo subscription ID ou user_id
+          const { data: existingSubBySubId } = await supabaseClient
             .from("subscriptions")
-            .select("id, user_id")
+            .select("id, user_id, status")
             .eq("stripe_subscription_id", subscription.id)
             .single();
 
+          const { data: existingSubByUserId } = await supabaseClient
+            .from("subscriptions")
+            .select("id, stripe_subscription_id, status")
+            .eq("user_id", userId)
+            .single();
+
+          const existingSub = existingSubBySubId || existingSubByUserId;
+
           if (existingSub) {
-            // Subscription já existe (criada por checkout.session.completed)
-            const { error } = await supabaseClient
+            // Subscription já existe - verificar se deve atualizar status
+            const currentStatus = existingSub.status as SubscriptionStatus | null;
+            const shouldUpdateStatus = isStatusBetterOrEqual(currentStatus, status);
+            
+            if (!shouldUpdateStatus) {
+              console.log(
+                `⚠️ [WEBHOOK] Not updating status from ${currentStatus} to ${status} (current status is better)`
+              );
+              // Ainda atualizar outros campos, mas manter o status atual
+            }
+
+            // Preparar dados de update
+            const updateData: {
+              plan_id: string;
+              stripe_customer_id: string;
+              stripe_subscription_id: string;
+              stripe_price_id: string;
+              current_period_start: string | null;
+              current_period_end: string | null;
+              cancel_at_period_end: boolean;
+              updated_at: string;
+              status?: SubscriptionStatus;
+            } = {
+              plan_id: planId,
+              stripe_customer_id: customerId,
+              stripe_subscription_id: subscription.id,
+              stripe_price_id: stripePriceId,
+              current_period_start: subscription.current_period_start
+                ? new Date(
+                    subscription.current_period_start * 1000
+                  ).toISOString()
+                : null,
+              current_period_end: subscription.current_period_end
+                ? new Date(subscription.current_period_end * 1000).toISOString()
+                : null,
+              cancel_at_period_end: subscription.cancel_at_period_end || false,
+              updated_at: now,
+            };
+
+            // Só atualizar status se o novo for melhor ou igual
+            if (shouldUpdateStatus) {
+              updateData.status = status;
+            }
+
+            // Usar o identificador correto para o update
+            let updateQuery = supabaseClient
               .from("subscriptions")
-              .update({
-                status: status,
-                stripe_price_id: stripePriceId,
-                current_period_start: subscription.current_period_start
-                  ? new Date(
-                      subscription.current_period_start * 1000
-                    ).toISOString()
-                  : null,
-                current_period_end: subscription.current_period_end
-                  ? new Date(subscription.current_period_end * 1000).toISOString()
-                  : null,
-                cancel_at_period_end: subscription.cancel_at_period_end || false,
-                updated_at: now,
-              })
-              .eq("user_id", userId);
+              .update(updateData);
+
+            if (existingSubBySubId) {
+              updateQuery = updateQuery.eq("stripe_subscription_id", subscription.id);
+            } else {
+              updateQuery = updateQuery.eq("user_id", userId);
+            }
+
+            const { error } = await updateQuery;
 
             if (!error) {
-              console.log(
-                `✅ [WEBHOOK] Subscription status updated to: ${status}`
-              );
+              if (shouldUpdateStatus) {
+                console.log(
+                  `✅ [WEBHOOK] Subscription status updated to: ${status}`
+                );
+              } else {
+                console.log(
+                  `✅ [WEBHOOK] Subscription updated (status kept as ${currentStatus})`
+                );
+              }
+              
+              // Se status for active e mudou de incomplete/trialing, creditar tokens
+              const finalStatus = shouldUpdateStatus ? status : currentStatus;
+              const isFirstActivation =
+                (currentStatus === "incomplete" || currentStatus === "trialing") &&
+                finalStatus === "active";
+              
+              if (
+                isFirstActivation &&
+                subscription.current_period_start &&
+                subscription.current_period_end
+              ) {
+                await creditTokensToUser(
+                  userId,
+                  subscription.id,
+                  planId,
+                  new Date(subscription.current_period_start * 1000),
+                  new Date(subscription.current_period_end * 1000)
+                );
+              }
             } else {
               console.log(`⚠️ [WEBHOOK] Error updating subscription:`, error);
             }
@@ -628,7 +780,53 @@ Deno.serve(async (req: Request) => {
                 );
               }
             } else {
-              console.log(`⚠️ [WEBHOOK] Error creating subscription:`, error);
+              // Se deu erro de constraint unique (user_id), fazer update
+              if (error.code === '23505') {
+                console.log(`🔄 [WEBHOOK] User already has subscription, updating instead`);
+                const { error: updateError } = await supabaseClient
+                  .from("subscriptions")
+                  .update({
+                    plan_id: planId,
+                    status: status,
+                    stripe_customer_id: customerId,
+                    stripe_subscription_id: subscription.id,
+                    stripe_price_id: stripePriceId,
+                    current_period_start: subscription.current_period_start
+                      ? new Date(
+                          subscription.current_period_start * 1000
+                        ).toISOString()
+                      : null,
+                    current_period_end: subscription.current_period_end
+                      ? new Date(subscription.current_period_end * 1000).toISOString()
+                      : null,
+                    cancel_at_period_end: subscription.cancel_at_period_end || false,
+                    updated_at: now,
+                  })
+                  .eq("user_id", userId);
+
+                if (!updateError) {
+                  console.log(`✅ [WEBHOOK] Subscription updated via user_id in created event`);
+                  
+                  // Se status for active, creditar tokens
+                  if (
+                    status === "active" &&
+                    subscription.current_period_start &&
+                    subscription.current_period_end
+                  ) {
+                    await creditTokensToUser(
+                      userId,
+                      subscription.id,
+                      planId,
+                      new Date(subscription.current_period_start * 1000),
+                      new Date(subscription.current_period_end * 1000)
+                    );
+                  }
+                } else {
+                  console.log(`⚠️ [WEBHOOK] Error updating subscription:`, updateError);
+                }
+              } else {
+                console.log(`⚠️ [WEBHOOK] Error creating subscription:`, error);
+              }
             }
           }
         }
@@ -641,8 +839,12 @@ Deno.serve(async (req: Request) => {
         console.log(
           `✅ [WEBHOOK] Subscription updated. Status: ${stripeStatus}`
         );
+        console.log(`📊 [STATUS] Subscription ID: ${subscription.id}`);
+        console.log(`📊 [STATUS] Stripe status received: ${stripeStatus}`);
 
         status = mapStripeStatusToEnum(stripeStatus);
+        console.log(`📊 [STATUS] Mapped status for database: ${status || 'NULL'}`);
+        
         if (!status) {
           console.log(
             `⚠️ [WEBHOOK] Invalid subscription status: ${stripeStatus}`
@@ -660,25 +862,150 @@ Deno.serve(async (req: Request) => {
           break;
         }
 
+        console.log(`👤 [USER] Found user_id: ${userId}`);
+
+        // Resolver plan_id via stripe_price_id (pode ter mudado)
+        const stripePriceId = subscription.items.data[0]?.price.id;
+        let planId: string | null = null;
+        if (stripePriceId) {
+          planId = await resolvePlanIdFromPriceId(stripePriceId);
+        }
+
+        if (!planId) {
+          console.log(
+            `⚠️ [WEBHOOK] Could not resolve plan_id for subscription ${subscription.id}`
+          );
+          break;
+        }
+
+        const customerId =
+          typeof subscription.customer === "string"
+            ? subscription.customer
+            : subscription.customer.id;
+
         // Buscar subscription atual para verificar status anterior
-        const { data: currentSub } = await supabaseClient
+        // Buscar por stripe_subscription_id primeiro, depois por user_id como fallback
+        const { data: currentSubBySubId } = await supabaseClient
           .from("subscriptions")
-          .select("status")
+          .select("status, plan_id, user_id")
           .eq("stripe_subscription_id", subscription.id)
           .single();
 
+        // Se não encontrou por subscription_id, buscar por user_id (pode ter sido criada pelo created event)
+        let currentSub = currentSubBySubId;
+        if (!currentSub) {
+          const { data: currentSubByUserId } = await supabaseClient
+            .from("subscriptions")
+            .select("status, plan_id, user_id, stripe_subscription_id")
+            .eq("user_id", userId)
+            .single();
+          
+          if (currentSubByUserId) {
+            console.log(`🔄 [WEBHOOK] Found subscription by user_id, will update stripe_subscription_id`);
+            currentSub = currentSubByUserId;
+          }
+        }
+
         const previousStatus = currentSub?.status as SubscriptionStatus | null;
+        console.log(`📊 [STATUS] Previous status in DB: ${previousStatus || 'NULL'}`);
+        console.log(`📊 [STATUS] New status: ${status}`);
+        
         const isFirstActivation =
           (previousStatus === "incomplete" ||
             previousStatus === "trialing") &&
           status === "active";
+        
+        if (isFirstActivation) {
+          console.log(`🔄 [ACTIVATION] Status changing from ${previousStatus} to ${status} - will credit tokens`);
+        }
 
-        // Update subscription status
+        // Se não encontrou subscription, criar uma nova (pode ter chegado antes do checkout.session.completed)
+        if (!currentSub) {
+          console.log(`⚠️ [WEBHOOK] Subscription not found in DB, creating new one from updated event`);
+          
+          const { error: insertError } = await supabaseClient
+            .from("subscriptions")
+            .insert({
+              user_id: userId,
+              plan_id: planId,
+              status: status,
+              stripe_customer_id: customerId,
+              stripe_subscription_id: subscription.id,
+              stripe_price_id: stripePriceId,
+              current_period_start: subscription.current_period_start
+                ? new Date(
+                    subscription.current_period_start * 1000
+                  ).toISOString()
+                : null,
+              current_period_end: subscription.current_period_end
+                ? new Date(subscription.current_period_end * 1000).toISOString()
+                : null,
+              cancel_at_period_end: subscription.cancel_at_period_end || false,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+
+          if (!insertError) {
+            console.log(`✅ [WEBHOOK] Subscription created from updated event`);
+            
+            // Se status for active, creditar tokens
+            if (
+              status === "active" &&
+              subscription.current_period_start &&
+              subscription.current_period_end
+            ) {
+              await creditTokensToUser(
+                userId,
+                subscription.id,
+                planId,
+                new Date(subscription.current_period_start * 1000),
+                new Date(subscription.current_period_end * 1000)
+              );
+            }
+          } else {
+            // Se deu erro de constraint unique (user_id), fazer update
+            if (insertError.code === '23505') {
+              console.log(`🔄 [WEBHOOK] User already has subscription, updating instead`);
+              const { error: updateError } = await supabaseClient
+                .from("subscriptions")
+                .update({
+                  plan_id: planId,
+                  status: status,
+                  stripe_customer_id: customerId,
+                  stripe_subscription_id: subscription.id,
+                  stripe_price_id: stripePriceId,
+                  current_period_start: subscription.current_period_start
+                    ? new Date(
+                        subscription.current_period_start * 1000
+                      ).toISOString()
+                    : null,
+                  current_period_end: subscription.current_period_end
+                    ? new Date(subscription.current_period_end * 1000).toISOString()
+                    : null,
+                  cancel_at_period_end: subscription.cancel_at_period_end || false,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("user_id", userId);
+
+              if (!updateError) {
+                console.log(`✅ [WEBHOOK] Subscription updated via user_id`);
+              } else {
+                console.log(`⚠️ [WEBHOOK] Error updating subscription:`, updateError);
+              }
+            } else {
+              console.log(`⚠️ [WEBHOOK] Error creating subscription:`, insertError);
+            }
+          }
+          break;
+        }
+
+        // Update subscription status (já existe)
         const { error } = await supabaseClient
           .from("subscriptions")
           .update({
             status: status,
-            stripe_price_id: subscription.items.data[0]?.price.id || null,
+            plan_id: planId, // Update plan_id in case of change
+            stripe_price_id: stripePriceId,
             current_period_start: subscription.current_period_start
               ? new Date(
                   subscription.current_period_start * 1000
@@ -696,6 +1023,9 @@ Deno.serve(async (req: Request) => {
           console.log(
             `✅ [WEBHOOK] Subscription status updated to: ${status}`
           );
+          if (planId && currentSub?.plan_id !== planId) {
+            console.log(`🔄 [WEBHOOK] Plan changed from ${currentSub?.plan_id} to ${planId}`);
+          }
 
           // Se mudou para active e era incomplete/trialing, creditar tokens (primeira ativação)
           if (
@@ -775,7 +1105,7 @@ Deno.serve(async (req: Request) => {
         // Buscar subscription do banco
         const { data: subData } = await supabaseClient
           .from("subscriptions")
-          .select("id, user_id, plan_id, stripe_subscription_id")
+          .select("id, user_id, plan_id, status, stripe_subscription_id")
           .eq("stripe_subscription_id", subscriptionId)
           .single();
 
@@ -786,9 +1116,12 @@ Deno.serve(async (req: Request) => {
           break;
         }
 
-        // Buscar subscription completa do Stripe para obter períodos
+        // Buscar subscription completa do Stripe para obter períodos e status
         const fullSubscription =
           await stripeClient.subscriptions.retrieve(subscriptionId);
+
+        const subscriptionStatus = mapStripeStatusToEnum(fullSubscription.status);
+        console.log(`📊 [STATUS] Invoice paid - Subscription status from Stripe: ${fullSubscription.status} -> ${subscriptionStatus}`);
 
         if (
           fullSubscription.current_period_start &&
@@ -818,14 +1151,27 @@ Deno.serve(async (req: Request) => {
             );
           }
 
-          // Atualizar períodos da subscription
+          // Atualizar períodos e status da subscription
+          const updateData: {
+            current_period_start: string;
+            current_period_end: string;
+            updated_at: string;
+            status?: SubscriptionStatus;
+          } = {
+            current_period_start: periodStart.toISOString(),
+            current_period_end: periodEnd.toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+          // Se o status mudou para active, atualizar também
+          if (subscriptionStatus && subscriptionStatus !== subData.status) {
+            updateData.status = subscriptionStatus;
+            console.log(`🔄 [STATUS] Updating subscription status to: ${subscriptionStatus}`);
+          }
+
           await supabaseClient
             .from("subscriptions")
-            .update({
-              current_period_start: periodStart.toISOString(),
-              current_period_end: periodEnd.toISOString(),
-              updated_at: new Date().toISOString(),
-            })
+            .update(updateData)
             .eq("stripe_subscription_id", subscriptionId);
         }
         break;

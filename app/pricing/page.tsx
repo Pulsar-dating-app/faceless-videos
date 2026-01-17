@@ -18,16 +18,11 @@ export default function PricingPage() {
   const { session, isLoading: authLoading } = useAuth();
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
   const [prices, setPrices] = useState<Record<string, PriceData>>({});
-  const [currency, setCurrency] = useState<string>("usd");
   const [isLoadingPrices, setIsLoadingPrices] = useState(true);
-
-  // Detect currency from browser
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const detectedCurrency = new Intl.NumberFormat().resolvedOptions().currency?.toLowerCase() || "usd";
-      setCurrency(detectedCurrency);
-    }
-  }, []);
+  const [currentSubscription, setCurrentSubscription] = useState<{
+    plan_id: string;
+    status: string;
+  } | null>(null);
 
   // Fetch prices from database
   useEffect(() => {
@@ -43,12 +38,14 @@ export default function PricingPage() {
           return;
         }
 
-        // Create a map: "plan_id_currency" -> price data
+        // Create a map: "plan_id" -> price data (USD only)
         const priceMap: Record<string, PriceData> = {};
         data?.forEach((price) => {
-          const key = `${price.plan_id}_${price.currency}`;
-          priceMap[key] = price;
+          if (price.currency === 'usd') {
+            priceMap[price.plan_id] = price;
+          }
         });
+        console.log("✅ [PRICES] Loaded USD prices from database:", Object.keys(priceMap));
         setPrices(priceMap);
       } catch (error) {
         console.error("Error loading prices:", error);
@@ -60,34 +57,42 @@ export default function PricingPage() {
     fetchPrices();
   }, []);
 
-  // Get price for a plan and currency
-  const getPrice = (planId: string, currencyCode: string): number | null => {
-    // Try specific currency first
-    const key = `${planId}_${currencyCode}`;
-    if (prices[key]) {
-      return prices[key].amount;
+  // Fetch user's current subscription
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      if (!session?.user?.id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from("subscriptions")
+          .select("plan_id, status")
+          .eq("user_id", session.user.id)
+          .single();
+
+        if (!error && data && data.status !== "canceled") {
+          setCurrentSubscription(data);
+        }
+      } catch (error) {
+        console.error("Error fetching subscription:", error);
+      }
+    };
+
+    fetchSubscription();
+  }, [session]);
+
+  // Get price for a plan (USD only)
+  const getPrice = (planId: string): number | null => {
+    if (prices[planId]) {
+      return prices[planId].amount;
     }
-    // Fallback to USD
-    const usdKey = `${planId}_usd`;
-    if (prices[usdKey]) {
-      return prices[usdKey].amount;
-    }
+    console.log(`❌ [PRICE] No USD price found for ${planId}`);
     return null;
   };
 
-  // Format price based on currency
-  const formatPrice = (amount: number | null, currencyCode: string): string => {
+  // Format price (USD only)
+  const formatPrice = (amount: number | null): string => {
     if (amount === null) return "—";
-    
-    const currencySymbols: Record<string, string> = {
-      usd: "$",
-      brl: "R$",
-      eur: "€",
-      gbp: "£",
-    };
-
-    const symbol = currencySymbols[currencyCode.toLowerCase()] || "$";
-    return `${symbol}${amount.toFixed(2)}`;
+    return `$${amount.toFixed(2)}`;
   };
 
   // Pricing data structure with translations
@@ -95,7 +100,7 @@ export default function PricingPage() {
     {
       id: "starter",
       name: t.pricing.starter.name,
-      price: getPrice("starter", currency),
+      price: getPrice("starter"),
       description: t.pricing.starter.description,
       features: [
         t.pricing.starter.feature1,
@@ -108,7 +113,7 @@ export default function PricingPage() {
     {
       id: "professional",
       name: t.pricing.professional.name,
-      price: getPrice("professional", currency),
+      price: getPrice("professional"),
       description: t.pricing.professional.description,
       features: [
         t.pricing.professional.feature1,
@@ -122,7 +127,7 @@ export default function PricingPage() {
     {
       id: "elite",
       name: t.pricing.elite.name,
-      price: getPrice("elite", currency),
+      price: getPrice("elite"),
       description: t.pricing.elite.description,
       features: [
         t.pricing.elite.feature1,
@@ -137,7 +142,7 @@ export default function PricingPage() {
     },
   ];
 
-  const handleCheckout = async (planId: string, currency?: string) => {
+  const handleCheckout = async (planId: string) => {
     
     // Check if user is authenticated
     if (!session) {
@@ -165,18 +170,55 @@ export default function PricingPage() {
         throw new Error("NEXT_PUBLIC_SUPABASE_URL is not configured");
       }
 
-      // Detect currency from browser if not provided
-      const detectedCurrency = currency || 
-        (typeof window !== "undefined" 
-          ? new Intl.NumberFormat().resolvedOptions().currency?.toLowerCase() || "usd"
-          : "usd");
+      // Se já tem subscription ativa, abrir portal diretamente
+      if (currentSubscription && 
+          currentSubscription.status !== "canceled" && 
+          currentSubscription.status !== "unpaid") {
+        console.log("🔄 [PORTAL] User has active subscription, opening billing portal");
+        
+        // Map app language to Stripe locale for UI translation
+        const stripeLocale = language === "pt" ? "pt" : 
+                            language === "es" ? "es" : 
+                            language === "fr" ? "fr" : 
+                            language === "de" ? "de" : 
+                            language === "en" ? "en" : 
+                            "auto";
 
+        const portalResponse = await fetch(
+          `${supabaseUrl}/functions/v1/create-portal-session`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${currentSession.access_token}`,
+            },
+            body: JSON.stringify({
+              locale: stripeLocale,
+            }),
+          }
+        );
+
+        if (!portalResponse.ok) {
+          const errorData = await portalResponse.json();
+          throw new Error(errorData.error || "Failed to open billing portal");
+        }
+
+        const { url: portalUrl } = await portalResponse.json();
+        if (portalUrl) {
+          window.location.href = portalUrl;
+          return;
+        } else {
+          throw new Error("No portal URL returned");
+        }
+      }
+
+      // Se não tem subscription, criar checkout normalmente
       const functionUrl = `${supabaseUrl}/functions/v1/create-checkout-session`;
 
       // Get plan data for translated name
       const selectedPlan = pricingPlans.find(p => p.id === planId);
 
-      // Map app language to Stripe locale
+      // Map app language to Stripe locale for UI translation
       // Only map languages available in the Navbar: en, es, fr, de, pt
       const stripeLocale = language === "pt" ? "pt" : 
                           language === "es" ? "es" : 
@@ -184,7 +226,14 @@ export default function PricingPage() {
                           language === "de" ? "de" : 
                           language === "en" ? "en" : 
                           "auto"; // Stripe will auto-detect if language not supported
-      
+
+      console.log("🟢 [CHECKOUT] Starting checkout with:", {
+        planId,
+        planName: selectedPlan?.name,
+        stripeLocale,
+        language,
+      });
+
       // Call Edge Function to create checkout session
       const response = await fetch(
         functionUrl,
@@ -196,9 +245,8 @@ export default function PricingPage() {
           },
           body: JSON.stringify({ 
             planId,
-            currency: detectedCurrency,
             planName: selectedPlan?.name, // Translated plan name
-            locale: stripeLocale, // Stripe Checkout locale
+            locale: stripeLocale, // Stripe Checkout locale for UI translation
           }),
         }
       );
@@ -211,27 +259,11 @@ export default function PricingPage() {
         throw new Error(errorData.error || "Failed to create checkout session");
       }
 
-      const responseData = await response.json();
+      const { url } = await response.json();
 
-      // Se já tem o mesmo plano
-      if (responseData.same_plan) {
-        alert(responseData.message || "You already have this plan.");
-        setLoadingPlanId(null);
-        return;
-      }
-
-      // Se foi atualização de subscription sem pagamento necessário
-      if (responseData.updated && !responseData.payment_required) {
-        alert("Subscription updated successfully! Your plan change will be reflected shortly.");
-        // Recarregar a página para atualizar UI
-        window.location.reload();
-        return;
-      }
-
-      // Se tem URL (nova subscription ou atualização com pagamento)
-      if (responseData.url) {
-        // Redirecionar para Stripe Checkout
-        window.location.href = responseData.url;
+      if (url) {
+        // Redirect to Stripe Checkout
+        window.location.href = url;
       } else {
         throw new Error("No checkout URL returned");
       }
@@ -290,7 +322,7 @@ export default function PricingPage() {
                     ) : (
                       <>
                         <span className="text-4xl font-extrabold">
-                          {formatPrice(plan.price, currency)}
+                          {formatPrice(plan.price)}
                         </span>
                         <span className="text-zinc-500 dark:text-zinc-400">{t.pricing.perMonth}</span>
                       </>
@@ -311,24 +343,34 @@ export default function PricingPage() {
                 </ul>
 
                 {/* CTA Button */}
-                <button
-                  onClick={() => handleCheckout(plan.id)}
-                  disabled={authLoading || loadingPlanId === plan.id}
-                  className={`w-full h-12 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-                    plan.popular
-                      ? "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400"
-                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50"
-                  }`}
-                >
-                  {loadingPlanId === plan.id ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Loading...</span>
-                    </>
-                  ) : (
-                    t.pricing.getStarted
-                  )}
-                </button>
+                {currentSubscription?.plan_id === plan.id ? (
+                  <div className="text-center">
+                    <span className="inline-block px-4 py-2 rounded-lg bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 font-medium mb-2">
+                      ✓ Current Plan
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleCheckout(plan.id)}
+                    disabled={authLoading || loadingPlanId === plan.id}
+                    className={`w-full h-12 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                      plan.popular
+                        ? "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50"
+                    }`}
+                  >
+                    {loadingPlanId === plan.id ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Loading...</span>
+                      </>
+                    ) : currentSubscription ? (
+                      "Change Plan"
+                    ) : (
+                      t.pricing.getStarted
+                    )}
+                  </button>
+                )}
               </div>
             ))}
           </div>
