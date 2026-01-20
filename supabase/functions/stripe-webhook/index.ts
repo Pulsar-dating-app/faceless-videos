@@ -193,32 +193,108 @@ Deno.serve(async (req: Request) => {
       return statusPriority[newStatus] >= statusPriority[currentStatus];
     }
 
+    // Extrair períodos da subscription (tenta do objeto diretamente, depois de items.data[0])
+    function getSubscriptionPeriods(
+      subscription: stripe.Stripe.Subscription
+    ): { periodStart: number | null; periodEnd: number | null } {
+      // Tentar pegar diretamente do objeto subscription
+      if (
+        subscription.current_period_start &&
+        subscription.current_period_end
+      ) {
+        return {
+          periodStart: subscription.current_period_start,
+          periodEnd: subscription.current_period_end,
+        };
+      }
+
+      // Se não tiver, tentar pegar de items.data[0]
+      if (
+        subscription.items?.data &&
+        subscription.items.data.length > 0
+      ) {
+        const firstItem = subscription.items.data[0];
+        if (
+          firstItem.current_period_start &&
+          firstItem.current_period_end
+        ) {
+          return {
+            periodStart: firstItem.current_period_start,
+            periodEnd: firstItem.current_period_end,
+          };
+        }
+      }
+
+      // Se não encontrar em nenhum lugar, retornar null
+      return { periodStart: null, periodEnd: null };
+    }
+
     // Verificar se tokens já foram creditados para o período atual
+    // Usa last_credited_at e current_period_start da tabela subscriptions
     async function hasTokensBeenCreditedForPeriod(
       subscriptionId: string,
       periodStart: Date
     ): Promise<boolean> {
-      // Buscar subscription UUID pelo stripe_subscription_id
-      const { data: subData } = await supabaseClient
+      console.log(`🔍 [DEBUG] [HAS_CREDITED] Checking if tokens already credited for:`, {
+        subscriptionId,
+        periodStart: periodStart.toISOString(),
+      });
+
+      // Buscar subscription com last_credited_at e current_period_start
+      const { data: subData, error: subError } = await supabaseClient
         .from("subscriptions")
-        .select("id")
+        .select("id, last_credited_at, current_period_start")
         .eq("stripe_subscription_id", subscriptionId)
         .single();
 
-      if (!subData?.id) {
+      if (subError) {
+        console.log(`⚠️ [DEBUG] [HAS_CREDITED] Error fetching subscription:`, subError);
         return false;
       }
 
-      // Verificar se já existe crédito para este período
-      const { data: ledgerData } = await supabaseClient
-        .from("token_ledger")
-        .select("id")
-        .eq("subscription_id", subData.id)
-        .eq("reason", "subscription_cycle_credit")
-        .gte("created_at", periodStart.toISOString())
-        .limit(1);
+      if (!subData) {
+        console.log(`🔍 [DEBUG] [HAS_CREDITED] Subscription not found, returning false`);
+        return false;
+      }
 
-      return !!ledgerData && ledgerData.length > 0;
+      // Se nunca creditou, pode creditar
+      if (!subData.last_credited_at) {
+        console.log(`🔍 [DEBUG] [HAS_CREDITED] No last_credited_at found, can credit`);
+        return false;
+      }
+
+      // Se não tem current_period_start, pode creditar
+      if (!subData.current_period_start) {
+        console.log(`🔍 [DEBUG] [HAS_CREDITED] No current_period_start found, can credit`);
+        return false;
+      }
+
+      // Comparar se o período atual é o mesmo do último crédito
+      const lastCreditedDate = new Date(subData.last_credited_at);
+      const currentPeriodStartDate = new Date(subData.current_period_start);
+      const newPeriodStartDate = periodStart;
+
+      // Se o período mudou (renovação), pode creditar
+      const periodChanged = currentPeriodStartDate.getTime() !== newPeriodStartDate.getTime();
+      
+      // Se já creditou para este período (last_credited_at >= current_period_start)
+      const alreadyCreditedForThisPeriod = 
+        lastCreditedDate >= currentPeriodStartDate && 
+        !periodChanged;
+
+      console.log(`🔍 [DEBUG] [HAS_CREDITED] Validation result:`, {
+        lastCreditedAt: subData.last_credited_at,
+        currentPeriodStart: subData.current_period_start,
+        newPeriodStart: periodStart.toISOString(),
+        periodChanged,
+        alreadyCreditedForThisPeriod,
+      });
+
+      if (alreadyCreditedForThisPeriod) {
+        console.log(`ℹ️ [WEBHOOK] Tokens already credited for this period`);
+      }
+
+      return alreadyCreditedForThisPeriod;
     }
 
     // Creditar tokens ao usuário
@@ -229,12 +305,24 @@ Deno.serve(async (req: Request) => {
       periodStart: Date,
       periodEnd: Date
     ): Promise<void> {
+      console.log(`🔍 [DEBUG] [CREDIT_TOKENS] Starting creditTokensToUser with:`, {
+        userId,
+        subscriptionId,
+        planId,
+        periodStart: periodStart.toISOString(),
+        periodEnd: periodEnd.toISOString(),
+      });
+
       // Buscar tokens_per_cycle do plano
       const { data: planData, error: planError } = await supabaseClient
         .from("plans")
         .select("tokens_per_cycle")
         .eq("plan_id", planId)
         .single();
+
+      if (planError) {
+        console.log(`⚠️ [DEBUG] [CREDIT_TOKENS] Error fetching plan:`, planError);
+      }
 
       if (planError || !planData) {
         console.log(
@@ -243,12 +331,21 @@ Deno.serve(async (req: Request) => {
         return;
       }
 
+      console.log(`🔍 [DEBUG] [CREDIT_TOKENS] Plan found:`, {
+        planId,
+        tokens_per_cycle: planData.tokens_per_cycle,
+      });
+
       // Buscar subscription UUID pelo stripe_subscription_id
       const { data: subData, error: subError } = await supabaseClient
         .from("subscriptions")
-        .select("id")
+        .select("id, credits_balance")
         .eq("stripe_subscription_id", subscriptionId)
         .single();
+
+      if (subError) {
+        console.log(`⚠️ [DEBUG] [CREDIT_TOKENS] Error fetching subscription:`, subError);
+      }
 
       if (subError || !subData) {
         console.log(
@@ -257,7 +354,13 @@ Deno.serve(async (req: Request) => {
         return;
       }
 
-      // Verificar se já foi creditado para este período
+      console.log(`🔍 [DEBUG] [CREDIT_TOKENS] Subscription found:`, {
+        subscriptionId: subData.id,
+        currentCreditsBalance: subData.credits_balance,
+      });
+
+      // Verificar se já foi creditado para este período usando last_credited_at e current_period_start
+      console.log(`🔍 [DEBUG] [CREDIT_TOKENS] Checking if already credited for this period...`);
       const alreadyCredited = await hasTokensBeenCreditedForPeriod(
         subscriptionId,
         periodStart
@@ -270,30 +373,69 @@ Deno.serve(async (req: Request) => {
         return;
       }
 
-      // Inserir crédito no token_ledger
+      const tokensToCredit = planData.tokens_per_cycle;
+      const newBalance = (subData.credits_balance || 0) + tokensToCredit;
+      const now = new Date().toISOString();
+
+      console.log(`🔍 [DEBUG] [CREDIT_TOKENS] Preparing to credit:`, {
+        tokensToCredit,
+        currentBalance: subData.credits_balance || 0,
+        newBalance,
+      });
+
+      // Inserir crédito no token_ledger (apenas para histórico/auditoria)
+      const ledgerInsertData = {
+        user_id: userId,
+        subscription_id: subData.id,
+        amount: tokensToCredit,
+        reason: "subscription_cycle_credit",
+        meta: {
+          period_start: periodStart.toISOString(),
+          period_end: periodEnd.toISOString(),
+          plan_id: planId,
+        },
+      };
+
+      console.log(`🔍 [DEBUG] [CREDIT_TOKENS] Inserting into token_ledger (history only):`, ledgerInsertData);
+
       const { error: ledgerError } = await supabaseClient
         .from("token_ledger")
-        .insert({
-          user_id: userId,
-          subscription_id: subData.id,
-          amount: planData.tokens_per_cycle,
-          reason: "subscription_cycle_credit",
-          meta: {
-            period_start: periodStart.toISOString(),
-            period_end: periodEnd.toISOString(),
-            plan_id: planId,
-          },
-        });
+        .insert(ledgerInsertData);
 
       if (ledgerError) {
         console.log(
-          `⚠️ [WEBHOOK] Error crediting tokens:`,
+          `⚠️ [WEBHOOK] Error crediting tokens to ledger:`,
           ledgerError
+        );
+        return;
+      }
+
+      console.log(`✅ [DEBUG] [CREDIT_TOKENS] Successfully inserted into token_ledger`);
+
+      // Atualizar credits_balance e last_credited_at na tabela subscriptions
+      const updateData = {
+        credits_balance: newBalance,
+        last_credited_at: now,
+        updated_at: now,
+      };
+
+      console.log(`🔍 [DEBUG] [CREDIT_TOKENS] Updating subscription credits_balance:`, updateData);
+
+      const { error: updateError } = await supabaseClient
+        .from("subscriptions")
+        .update(updateData)
+        .eq("stripe_subscription_id", subscriptionId);
+
+      if (updateError) {
+        console.log(
+          `⚠️ [WEBHOOK] Error updating subscription credits_balance:`,
+          updateError
         );
       } else {
         console.log(
-          `✅ [WEBHOOK] Credited ${planData.tokens_per_cycle} tokens to user ${userId} for plan ${planId}`
+          `✅ [WEBHOOK] Credited ${tokensToCredit} tokens to user ${userId} for plan ${planId}. New balance: ${newBalance}`
         );
+        console.log(`✅ [DEBUG] [CREDIT_TOKENS] Successfully updated subscription credits_balance`);
       }
     }
 
@@ -353,6 +495,9 @@ Deno.serve(async (req: Request) => {
 
     let subscription: stripe.Stripe.Subscription | undefined;
     let status: SubscriptionStatus | null = null;
+
+    console.log(`🔍 [DEBUG] [EVENT_ROUTER] Processing event type: ${event.type}`);
+    console.log(`🔍 [DEBUG] [EVENT_ROUTER] Event ID: ${event.id}`);
 
     switch (event.type) {
       case "checkout.session.completed": {
@@ -431,11 +576,16 @@ Deno.serve(async (req: Request) => {
             .single();
 
           const now = new Date().toISOString();
-          const periodStart = fullSubscription.current_period_start
-            ? new Date(fullSubscription.current_period_start * 1000).toISOString()
+          
+          // Extrair períodos usando função helper
+          const { periodStart: periodStartUnix, periodEnd: periodEndUnix } =
+            getSubscriptionPeriods(fullSubscription);
+          
+          const periodStart = periodStartUnix
+            ? new Date(periodStartUnix * 1000).toISOString()
             : null;
-          const periodEnd = fullSubscription.current_period_end
-            ? new Date(fullSubscription.current_period_end * 1000).toISOString()
+          const periodEnd = periodEndUnix
+            ? new Date(periodEndUnix * 1000).toISOString()
             : null;
 
           if (existingSub) {
@@ -513,15 +663,15 @@ Deno.serve(async (req: Request) => {
               // Se status for active e for primeira assinatura, creditar tokens
               if (
                 mappedStatus === "active" &&
-                fullSubscription.current_period_start &&
-                fullSubscription.current_period_end
+                periodStartUnix &&
+                periodEndUnix
               ) {
                 await creditTokensToUser(
                   userId,
                   subscriptionId,
                   planId,
-                  new Date(fullSubscription.current_period_start * 1000),
-                  new Date(fullSubscription.current_period_end * 1000)
+                  new Date(periodStartUnix * 1000),
+                  new Date(periodEndUnix * 1000)
                 );
               }
             }
@@ -585,6 +735,10 @@ Deno.serve(async (req: Request) => {
           .single();
 
         const now = new Date().toISOString();
+        
+        // Extrair períodos usando função helper
+        const { periodStart: periodStartUnix, periodEnd: periodEndUnix } =
+          getSubscriptionPeriods(subscription);
 
         if (existingUserSub) {
           // Usuário já tem subscription - atualizar com nova subscription ID e plano
@@ -598,13 +752,11 @@ Deno.serve(async (req: Request) => {
               stripe_customer_id: customerId,
               stripe_subscription_id: subscription.id, // Nova subscription ID
               stripe_price_id: stripePriceId,
-              current_period_start: subscription.current_period_start
-                ? new Date(
-                    subscription.current_period_start * 1000
-                  ).toISOString()
+              current_period_start: periodStartUnix
+                ? new Date(periodStartUnix * 1000).toISOString()
                 : null,
-              current_period_end: subscription.current_period_end
-                ? new Date(subscription.current_period_end * 1000).toISOString()
+              current_period_end: periodEndUnix
+                ? new Date(periodEndUnix * 1000).toISOString()
                 : null,
               cancel_at_period_end: subscription.cancel_at_period_end || false,
               updated_at: now,
@@ -619,15 +771,15 @@ Deno.serve(async (req: Request) => {
             // Se status for active, creditar tokens
             if (
               status === "active" &&
-              subscription.current_period_start &&
-              subscription.current_period_end
+              periodStartUnix &&
+              periodEndUnix
             ) {
               await creditTokensToUser(
                 userId,
                 subscription.id,
                 planId,
-                new Date(subscription.current_period_start * 1000),
-                new Date(subscription.current_period_end * 1000)
+                new Date(periodStartUnix * 1000),
+                new Date(periodEndUnix * 1000)
               );
             }
           } else {
@@ -677,13 +829,11 @@ Deno.serve(async (req: Request) => {
               stripe_customer_id: customerId,
               stripe_subscription_id: subscription.id,
               stripe_price_id: stripePriceId,
-              current_period_start: subscription.current_period_start
-                ? new Date(
-                    subscription.current_period_start * 1000
-                  ).toISOString()
+              current_period_start: periodStartUnix
+                ? new Date(periodStartUnix * 1000).toISOString()
                 : null,
-              current_period_end: subscription.current_period_end
-                ? new Date(subscription.current_period_end * 1000).toISOString()
+              current_period_end: periodEndUnix
+                ? new Date(periodEndUnix * 1000).toISOString()
                 : null,
               cancel_at_period_end: subscription.cancel_at_period_end || false,
               updated_at: now,
@@ -726,15 +876,15 @@ Deno.serve(async (req: Request) => {
               
               if (
                 isFirstActivation &&
-                subscription.current_period_start &&
-                subscription.current_period_end
+                periodStartUnix &&
+                periodEndUnix
               ) {
                 await creditTokensToUser(
                   userId,
                   subscription.id,
                   planId,
-                  new Date(subscription.current_period_start * 1000),
-                  new Date(subscription.current_period_end * 1000)
+                  new Date(periodStartUnix * 1000),
+                  new Date(periodEndUnix * 1000)
                 );
               }
             } else {
@@ -749,13 +899,11 @@ Deno.serve(async (req: Request) => {
               stripe_customer_id: customerId,
               stripe_subscription_id: subscription.id,
               stripe_price_id: stripePriceId,
-              current_period_start: subscription.current_period_start
-                ? new Date(
-                    subscription.current_period_start * 1000
-                  ).toISOString()
+              current_period_start: periodStartUnix
+                ? new Date(periodStartUnix * 1000).toISOString()
                 : null,
-              current_period_end: subscription.current_period_end
-                ? new Date(subscription.current_period_end * 1000).toISOString()
+              current_period_end: periodEndUnix
+                ? new Date(periodEndUnix * 1000).toISOString()
                 : null,
               cancel_at_period_end: subscription.cancel_at_period_end || false,
               created_at: now,
@@ -768,15 +916,15 @@ Deno.serve(async (req: Request) => {
               // Se status for active, creditar tokens
               if (
                 status === "active" &&
-                subscription.current_period_start &&
-                subscription.current_period_end
+                periodStartUnix &&
+                periodEndUnix
               ) {
                 await creditTokensToUser(
                   userId,
                   subscription.id,
                   planId,
-                  new Date(subscription.current_period_start * 1000),
-                  new Date(subscription.current_period_end * 1000)
+                  new Date(periodStartUnix * 1000),
+                  new Date(periodEndUnix * 1000)
                 );
               }
             } else {
@@ -791,13 +939,11 @@ Deno.serve(async (req: Request) => {
                     stripe_customer_id: customerId,
                     stripe_subscription_id: subscription.id,
                     stripe_price_id: stripePriceId,
-                    current_period_start: subscription.current_period_start
-                      ? new Date(
-                          subscription.current_period_start * 1000
-                        ).toISOString()
+                    current_period_start: periodStartUnix
+                      ? new Date(periodStartUnix * 1000).toISOString()
                       : null,
-                    current_period_end: subscription.current_period_end
-                      ? new Date(subscription.current_period_end * 1000).toISOString()
+                    current_period_end: periodEndUnix
+                      ? new Date(periodEndUnix * 1000).toISOString()
                       : null,
                     cancel_at_period_end: subscription.cancel_at_period_end || false,
                     updated_at: now,
@@ -810,15 +956,15 @@ Deno.serve(async (req: Request) => {
                   // Se status for active, creditar tokens
                   if (
                     status === "active" &&
-                    subscription.current_period_start &&
-                    subscription.current_period_end
+                    periodStartUnix &&
+                    periodEndUnix
                   ) {
                     await creditTokensToUser(
                       userId,
                       subscription.id,
                       planId,
-                      new Date(subscription.current_period_start * 1000),
-                      new Date(subscription.current_period_end * 1000)
+                      new Date(periodStartUnix * 1000),
+                      new Date(periodEndUnix * 1000)
                     );
                   }
                 } else {
@@ -883,11 +1029,15 @@ Deno.serve(async (req: Request) => {
             ? subscription.customer
             : subscription.customer.id;
 
-        // Buscar subscription atual para verificar status anterior
+        // Extrair períodos usando função helper
+        const { periodStart: periodStartUnix, periodEnd: periodEndUnix } =
+          getSubscriptionPeriods(subscription);
+
+        // Buscar subscription atual para verificar status anterior e períodos
         // Buscar por stripe_subscription_id primeiro, depois por user_id como fallback
         const { data: currentSubBySubId } = await supabaseClient
           .from("subscriptions")
-          .select("status, plan_id, user_id")
+          .select("status, plan_id, user_id, current_period_start, current_period_end")
           .eq("stripe_subscription_id", subscription.id)
           .single();
 
@@ -896,7 +1046,7 @@ Deno.serve(async (req: Request) => {
         if (!currentSub) {
           const { data: currentSubByUserId } = await supabaseClient
             .from("subscriptions")
-            .select("status, plan_id, user_id, stripe_subscription_id")
+            .select("status, plan_id, user_id, stripe_subscription_id, current_period_start, current_period_end")
             .eq("user_id", userId)
             .single();
           
@@ -919,6 +1069,28 @@ Deno.serve(async (req: Request) => {
           console.log(`🔄 [ACTIVATION] Status changing from ${previousStatus} to ${status} - will credit tokens`);
         }
 
+        // Verificar se é uma renovação (períodos mudaram)
+        const isRenewal = currentSub && periodStartUnix && periodEndUnix && 
+          currentSub.current_period_start && currentSub.current_period_end;
+        
+        let periodsChanged = false;
+        if (isRenewal) {
+          const oldPeriodStart = new Date(currentSub.current_period_start).getTime();
+          const newPeriodStart = periodStartUnix * 1000;
+          const oldPeriodEnd = new Date(currentSub.current_period_end).getTime();
+          const newPeriodEnd = periodEndUnix * 1000;
+          
+          periodsChanged = (oldPeriodStart !== newPeriodStart) || (oldPeriodEnd !== newPeriodEnd);
+          
+          console.log(`🔍 [DEBUG] [RENEWAL_CHECK] Checking if periods changed:`, {
+            oldPeriodStart: currentSub.current_period_start,
+            newPeriodStart: new Date(periodStartUnix * 1000).toISOString(),
+            oldPeriodEnd: currentSub.current_period_end,
+            newPeriodEnd: new Date(periodEndUnix * 1000).toISOString(),
+            periodsChanged,
+          });
+        }
+
         // Se não encontrou subscription, criar uma nova (pode ter chegado antes do checkout.session.completed)
         if (!currentSub) {
           console.log(`⚠️ [WEBHOOK] Subscription not found in DB, creating new one from updated event`);
@@ -932,13 +1104,11 @@ Deno.serve(async (req: Request) => {
               stripe_customer_id: customerId,
               stripe_subscription_id: subscription.id,
               stripe_price_id: stripePriceId,
-              current_period_start: subscription.current_period_start
-                ? new Date(
-                    subscription.current_period_start * 1000
-                  ).toISOString()
+              current_period_start: periodStartUnix
+                ? new Date(periodStartUnix * 1000).toISOString()
                 : null,
-              current_period_end: subscription.current_period_end
-                ? new Date(subscription.current_period_end * 1000).toISOString()
+              current_period_end: periodEndUnix
+                ? new Date(periodEndUnix * 1000).toISOString()
                 : null,
               cancel_at_period_end: subscription.cancel_at_period_end || false,
               created_at: new Date().toISOString(),
@@ -951,15 +1121,15 @@ Deno.serve(async (req: Request) => {
             // Se status for active, creditar tokens
             if (
               status === "active" &&
-              subscription.current_period_start &&
-              subscription.current_period_end
+              periodStartUnix &&
+              periodEndUnix
             ) {
               await creditTokensToUser(
                 userId,
                 subscription.id,
                 planId,
-                new Date(subscription.current_period_start * 1000),
-                new Date(subscription.current_period_end * 1000)
+                new Date(periodStartUnix * 1000),
+                new Date(periodEndUnix * 1000)
               );
             }
           } else {
@@ -974,13 +1144,11 @@ Deno.serve(async (req: Request) => {
                   stripe_customer_id: customerId,
                   stripe_subscription_id: subscription.id,
                   stripe_price_id: stripePriceId,
-                  current_period_start: subscription.current_period_start
-                    ? new Date(
-                        subscription.current_period_start * 1000
-                      ).toISOString()
+                  current_period_start: periodStartUnix
+                    ? new Date(periodStartUnix * 1000).toISOString()
                     : null,
-                  current_period_end: subscription.current_period_end
-                    ? new Date(subscription.current_period_end * 1000).toISOString()
+                  current_period_end: periodEndUnix
+                    ? new Date(periodEndUnix * 1000).toISOString()
                     : null,
                   cancel_at_period_end: subscription.cancel_at_period_end || false,
                   updated_at: new Date().toISOString(),
@@ -1006,13 +1174,11 @@ Deno.serve(async (req: Request) => {
             status: status,
             plan_id: planId, // Update plan_id in case of change
             stripe_price_id: stripePriceId,
-            current_period_start: subscription.current_period_start
-              ? new Date(
-                  subscription.current_period_start * 1000
-                ).toISOString()
+            current_period_start: periodStartUnix
+              ? new Date(periodStartUnix * 1000).toISOString()
               : null,
-            current_period_end: subscription.current_period_end
-              ? new Date(subscription.current_period_end * 1000).toISOString()
+            current_period_end: periodEndUnix
+              ? new Date(periodEndUnix * 1000).toISOString()
               : null,
             cancel_at_period_end: subscription.cancel_at_period_end || false,
             updated_at: new Date().toISOString(),
@@ -1030,8 +1196,8 @@ Deno.serve(async (req: Request) => {
           // Se mudou para active e era incomplete/trialing, creditar tokens (primeira ativação)
           if (
             isFirstActivation &&
-            subscription.current_period_start &&
-            subscription.current_period_end
+            periodStartUnix &&
+            periodEndUnix
           ) {
             const { data: subData } = await supabaseClient
               .from("subscriptions")
@@ -1044,10 +1210,28 @@ Deno.serve(async (req: Request) => {
                 userId,
                 subscription.id,
                 subData.plan_id,
-                new Date(subscription.current_period_start * 1000),
-                new Date(subscription.current_period_end * 1000)
+                new Date(periodStartUnix * 1000),
+                new Date(periodEndUnix * 1000)
               );
             }
+          }
+          
+          // Se os períodos mudaram (renovação), creditar tokens
+          if (
+            periodsChanged &&
+            status === "active" &&
+            periodStartUnix &&
+            periodEndUnix &&
+            planId
+          ) {
+            console.log(`🔄 [RENEWAL] Periods changed - crediting tokens for renewal`);
+            await creditTokensToUser(
+              userId,
+              subscription.id,
+              planId,
+              new Date(periodStartUnix * 1000),
+              new Date(periodEndUnix * 1000)
+            );
           }
         } else {
           console.log(`⚠️ [WEBHOOK] Error updating subscription:`, error);
@@ -1087,8 +1271,10 @@ Deno.serve(async (req: Request) => {
       }
 
       case "invoice.paid": {
+        console.log(`🚨 [INVOICE_PAID] ========== INVOICE.PAID EVENT RECEIVED ==========`);
         const invoice = event.data.object as stripe.Stripe.Invoice;
         console.log(`✅ [WEBHOOK] Invoice paid: ${invoice.id}`);
+        console.log(`🔍 [DEBUG] [INVOICE_PAID] Starting invoice.paid event processing`);
 
         if (!invoice.subscription) {
           console.log(
@@ -1102,12 +1288,18 @@ Deno.serve(async (req: Request) => {
             ? invoice.subscription
             : invoice.subscription.id;
 
+        console.log(`🔍 [DEBUG] [INVOICE_PAID] Subscription ID from invoice: ${subscriptionId}`);
+
         // Buscar subscription do banco
-        const { data: subData } = await supabaseClient
+        const { data: subData, error: subDataError } = await supabaseClient
           .from("subscriptions")
           .select("id, user_id, plan_id, status, stripe_subscription_id")
           .eq("stripe_subscription_id", subscriptionId)
           .single();
+
+        if (subDataError) {
+          console.log(`⚠️ [DEBUG] [INVOICE_PAID] Error fetching subscription:`, subDataError);
+        }
 
         if (!subData) {
           console.log(
@@ -1116,6 +1308,13 @@ Deno.serve(async (req: Request) => {
           break;
         }
 
+        console.log(`🔍 [DEBUG] [INVOICE_PAID] Subscription found in DB:`, {
+          id: subData.id,
+          user_id: subData.user_id,
+          plan_id: subData.plan_id,
+          status: subData.status,
+        });
+
         // Buscar subscription completa do Stripe para obter períodos e status
         const fullSubscription =
           await stripeClient.subscriptions.retrieve(subscriptionId);
@@ -1123,24 +1322,48 @@ Deno.serve(async (req: Request) => {
         const subscriptionStatus = mapStripeStatusToEnum(fullSubscription.status);
         console.log(`📊 [STATUS] Invoice paid - Subscription status from Stripe: ${fullSubscription.status} -> ${subscriptionStatus}`);
 
-        if (
-          fullSubscription.current_period_start &&
-          fullSubscription.current_period_end
-        ) {
-          const periodStart = new Date(
-            fullSubscription.current_period_start * 1000
-          );
-          const periodEnd = new Date(
-            fullSubscription.current_period_end * 1000
-          );
+        // Extrair períodos usando função helper
+        const { periodStart: periodStartUnix, periodEnd: periodEndUnix } =
+          getSubscriptionPeriods(fullSubscription);
 
-          // Verificar se já creditou tokens para este período
+        console.log(`🔍 [DEBUG] [INVOICE_PAID] Periods extracted from Stripe:`, {
+          periodStartUnix,
+          periodEndUnix,
+          periodStartISO: periodStartUnix ? new Date(periodStartUnix * 1000).toISOString() : null,
+          periodEndISO: periodEndUnix ? new Date(periodEndUnix * 1000).toISOString() : null,
+          hasPeriods: !!(periodStartUnix && periodEndUnix),
+        });
+
+        if (periodStartUnix && periodEndUnix) {
+          const periodStart = new Date(periodStartUnix * 1000);
+          const periodEnd = new Date(periodEndUnix * 1000);
+
+          console.log(`🔍 [DEBUG] [INVOICE_PAID] Checking if tokens already credited for period:`, {
+            periodStart: periodStart.toISOString(),
+            periodEnd: periodEnd.toISOString(),
+          });
+
+          // Verificar se já creditou tokens para este período usando last_credited_at e current_period_start
           const alreadyCredited = await hasTokensBeenCreditedForPeriod(
             subscriptionId,
             periodStart
           );
 
+          console.log(`🔍 [DEBUG] [INVOICE_PAID] Already credited check result:`, {
+            alreadyCredited,
+            plan_id: subData.plan_id,
+            hasPlanId: !!subData.plan_id,
+            willCredit: !alreadyCredited && !!subData.plan_id,
+          });
+
           if (!alreadyCredited && subData.plan_id) {
+            console.log(`🔍 [DEBUG] [INVOICE_PAID] Calling creditTokensToUser with:`, {
+              userId: subData.user_id,
+              subscriptionId,
+              planId: subData.plan_id,
+              periodStart: periodStart.toISOString(),
+              periodEnd: periodEnd.toISOString(),
+            });
             // Creditar tokens
             await creditTokensToUser(
               subData.user_id,
@@ -1149,6 +1372,13 @@ Deno.serve(async (req: Request) => {
               periodStart,
               periodEnd
             );
+            console.log(`🔍 [DEBUG] [INVOICE_PAID] creditTokensToUser completed`);
+          } else {
+            console.log(`⚠️ [DEBUG] [INVOICE_PAID] NOT crediting tokens. Reason:`, {
+              alreadyCredited,
+              hasPlanId: !!subData.plan_id,
+              reason: alreadyCredited ? "Already credited for this period" : !subData.plan_id ? "plan_id is null" : "Unknown",
+            });
           }
 
           // Atualizar períodos e status da subscription
@@ -1169,10 +1399,24 @@ Deno.serve(async (req: Request) => {
             console.log(`🔄 [STATUS] Updating subscription status to: ${subscriptionStatus}`);
           }
 
-          await supabaseClient
+          console.log(`🔍 [DEBUG] [INVOICE_PAID] Updating subscription periods:`, updateData);
+          const { error: updateError } = await supabaseClient
             .from("subscriptions")
             .update(updateData)
             .eq("stripe_subscription_id", subscriptionId);
+
+          if (updateError) {
+            console.log(`⚠️ [DEBUG] [INVOICE_PAID] Error updating subscription periods:`, updateError);
+          } else {
+            console.log(`✅ [DEBUG] [INVOICE_PAID] Subscription periods updated successfully`);
+          }
+        } else {
+          console.log(`⚠️ [DEBUG] [INVOICE_PAID] Periods are null! Cannot proceed with token credit.`, {
+            periodStartUnix,
+            periodEndUnix,
+            fullSubscriptionCurrentPeriodStart: fullSubscription.current_period_start,
+            fullSubscriptionCurrentPeriodEnd: fullSubscription.current_period_end,
+          });
         }
         break;
       }
@@ -1242,6 +1486,7 @@ Deno.serve(async (req: Request) => {
 
       default:
         console.log(`⚠️ [WEBHOOK] Unhandled event type: ${event.type}`);
+        console.log(`🔍 [DEBUG] [EVENT_ROUTER] Event not handled: ${event.type} (ID: ${event.id})`);
     }
 
     // Salvar evento processado
