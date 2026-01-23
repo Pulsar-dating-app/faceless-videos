@@ -1,26 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
+import { createClient } from '@supabase/supabase-js';
 
-const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY || '';
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://bifacial-daniele-westerly.ngrok-free.dev';
-const REDIRECT_URI = `${APP_URL}/api/tiktok/callback`;
-
-// TikTok OAuth scopes - apenas o básico para começar
-const SCOPES = ['user.info.basic'].join(',');
-
-// Função para gerar code_verifier e code_challenge (PKCE)
-function generatePKCE() {
-  // Gerar code_verifier (string aleatória de 43-128 caracteres)
-  const code_verifier = crypto.randomBytes(32).toString('base64url');
-  
-  // Gerar code_challenge (SHA256 hash do code_verifier)
-  const code_challenge = crypto
-    .createHash('sha256')
-    .update(code_verifier)
-    .digest('base64url');
-  
-  return { code_verifier, code_challenge };
-}
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -30,43 +12,39 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
   }
 
-  if (!TIKTOK_CLIENT_KEY || TIKTOK_CLIENT_KEY.trim() === '') {
-    console.error('❌ TIKTOK_CLIENT_KEY não está configurado!');
-    return NextResponse.json({ 
-      error: 'TikTok Client Key not configured',
-      hint: 'Adicione TIKTOK_CLIENT_KEY ao arquivo .env.local e reinicie o servidor'
-    }, { status: 500 });
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Call the Supabase Edge Function
+    const { data, error } = await supabase.functions.invoke('tiktok-auth', {
+      body: { action: 'auth', userId },
+    });
+
+    if (error) {
+      console.error('❌ TikTok auth error:', error);
+      return NextResponse.json({ error: 'Failed to generate auth URL' }, { status: 500 });
+    }
+
+    if (!data?.authUrl || !data?.code_verifier) {
+      return NextResponse.json({ error: 'Invalid response from auth service' }, { status: 500 });
+    }
+
+    console.log('✅ TikTok OAuth URL generated');
+
+    // Redirect to TikTok OAuth and store code_verifier in cookie
+    const response = NextResponse.redirect(data.authUrl);
+    
+    response.cookies.set('tiktok_code_verifier', data.code_verifier, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 600, // 10 minutes
+      sameSite: 'lax',
+    });
+
+    return response;
+  } catch (error) {
+    console.error('❌ Error calling TikTok auth function:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-
-  // Gerar PKCE
-  const { code_verifier, code_challenge } = generatePKCE();
-
-  // Gerar state para CSRF protection
-  const state = `${userId}:${Math.random().toString(36).substring(7)}`;
-
-  // Construir URL de autorização do TikTok
-  const authUrl = new URL('https://www.tiktok.com/v2/auth/authorize/');
-  authUrl.searchParams.append('client_key', TIKTOK_CLIENT_KEY.trim());
-  authUrl.searchParams.append('scope', SCOPES);
-  authUrl.searchParams.append('response_type', 'code');
-  authUrl.searchParams.append('redirect_uri', REDIRECT_URI);
-  authUrl.searchParams.append('state', state);
-  authUrl.searchParams.append('code_challenge', code_challenge);
-  authUrl.searchParams.append('code_challenge_method', 'S256');
-
-  console.log('✅ OAuth URL gerada:', authUrl.toString());
-
-  // Criar resposta com cookie para armazenar code_verifier
-  const response = NextResponse.redirect(authUrl.toString());
-  
-  // Armazenar code_verifier em cookie (necessário para o callback)
-  response.cookies.set('tiktok_code_verifier', code_verifier, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 600, // 10 minutos
-    sameSite: 'lax',
-  });
-
-  return response;
 }
 

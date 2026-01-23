@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,9 +12,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    // Simplified: Just return success (no database)
-    console.log('YouTube disconnected for user:', userId);
-    
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Call the Supabase Edge Function
+    const { data, error } = await supabase.functions.invoke('youtube-auth', {
+      body: { action: 'disconnect', userId },
+    });
+
+    if (error) {
+      console.error('❌ YouTube disconnect error:', error);
+      return NextResponse.json({ error: 'Failed to disconnect' }, { status: 500 });
+    }
+
+    console.log('✅ YouTube disconnected for user:', userId);
     return NextResponse.json({ success: true });
 
   } catch (error) {
