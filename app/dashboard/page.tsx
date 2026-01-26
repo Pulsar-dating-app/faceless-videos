@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X, Info } from "lucide-react";
+import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X, Info, Share2, Send } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
@@ -124,6 +124,13 @@ export default function Dashboard() {
   const [mockPayload, setMockPayload] = useState<string>("");
   const [playingVoicePreview, setPlayingVoicePreview] = useState<string | null>(null);
   const [previewVideoType, setPreviewVideoType] = useState<"gameplay" | "ai-images" | null>(null);
+  
+  // Social media posting states
+  const [showPostPanel, setShowPostPanel] = useState(false);
+  const [postingTo, setPostingTo] = useState<string | null>(null);
+  const [postTitle, setPostTitle] = useState("");
+  const [postDescription, setPostDescription] = useState("");
+  const [postHashtags, setPostHashtags] = useState("#viral #fyp #trending");
   
   // Social media connection states
   const [tiktokConnected, setTiktokConnected] = useState(false);
@@ -681,6 +688,103 @@ export default function Dashboard() {
     setCurrentStep(1);
     setVideoUrl(null);
     setScript("");
+    setShowPostPanel(false);
+    setPostTitle("");
+    setPostDescription("");
+    setPostHashtags("#viral #fyp #trending");
+  };
+
+  const handlePostToSocial = async (platform: string) => {
+    if (!videoUrl) {
+      alert("No video to post");
+      return;
+    }
+
+    // Get connection data from localStorage
+    let connectionData;
+    let accessToken;
+    let refreshToken;
+
+    switch (platform) {
+      case 'tiktok':
+        connectionData = localStorage.getItem('tiktok_connection');
+        if (!connectionData) {
+          alert("Please connect your TikTok account first in the Social Media section");
+          return;
+        }
+        accessToken = JSON.parse(connectionData).access_token;
+        break;
+      case 'instagram':
+        connectionData = localStorage.getItem('instagram_connection');
+        if (!connectionData) {
+          alert("Please connect your Instagram account first in the Social Media section");
+          return;
+        }
+        accessToken = JSON.parse(connectionData).access_token;
+        break;
+      case 'youtube':
+        connectionData = localStorage.getItem('youtube_connection');
+        if (!connectionData) {
+          alert("Please connect your YouTube account first in the Social Media section");
+          return;
+        }
+        const youtubeData = JSON.parse(connectionData);
+        accessToken = youtubeData.access_token;
+        refreshToken = youtubeData.refresh_token;
+        break;
+      default:
+        alert("Platform not supported yet");
+        return;
+    }
+
+    setPostingTo(platform);
+
+    try {
+      // Convert video URL to absolute URL
+      const absoluteVideoUrl = videoUrl.startsWith('http') 
+        ? videoUrl 
+        : `${window.location.origin}${videoUrl}`;
+
+      const hashtags = postHashtags.split(' ').filter(tag => tag.trim());
+
+      const response = await fetch('/api/post-to-social', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          platform,
+          videoUrl: absoluteVideoUrl,
+          accessToken,
+          refreshToken,
+          title: postTitle || 'Amazing Viral Video',
+          description: postDescription,
+          hashtags,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to post');
+      }
+
+      const data = await response.json();
+      
+      if (platform === 'youtube' && data.url) {
+        alert(`✅ Successfully posted to YouTube!\n\nView at: ${data.url}`);
+      } else if (platform === 'tiktok') {
+        alert(`✅ Successfully posted to TikTok!\n\nYour video is being processed.`);
+      } else {
+        alert(`✅ Successfully posted to ${platform}!`);
+      }
+
+      setShowPostPanel(false);
+    } catch (error) {
+      console.error('Error posting to social media:', error);
+      alert(`Failed to post to ${platform}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setPostingTo(null);
+    }
   };
 
   // Show loading state while checking auth
@@ -1535,6 +1639,7 @@ export default function Dashboard() {
                   className="w-full h-full object-contain"
                 />
               </div>
+              
               <div className="flex gap-3">
                 <button 
                   onClick={resetWizard}
@@ -1550,6 +1655,183 @@ export default function Dashboard() {
                   {t.form.download}
                 </a>
               </div>
+
+              {/* Post to Social Media Button */}
+              <button
+                onClick={() => setShowPostPanel(!showPostPanel)}
+                className="w-full h-12 flex items-center justify-center gap-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium transition-all shadow-sm"
+              >
+                <Share2 className="w-5 h-5" />
+                Post to Social Media
+              </button>
+
+              {/* Social Media Post Panel */}
+              {showPostPanel && (
+                <div className="p-6 rounded-xl border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/10 space-y-4">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <Share2 className="w-5 h-5" />
+                    Share Your Video
+                  </h3>
+
+                  {/* Post Details Form */}
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium block mb-1.5">Title</label>
+                      <input
+                        type="text"
+                        value={postTitle}
+                        onChange={(e) => setPostTitle(e.target.value)}
+                        placeholder="Amazing viral video..."
+                        className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium block mb-1.5">Description (optional)</label>
+                      <textarea
+                        value={postDescription}
+                        onChange={(e) => setPostDescription(e.target.value)}
+                        placeholder="Add a description..."
+                        rows={2}
+                        className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium block mb-1.5">Hashtags</label>
+                      <input
+                        type="text"
+                        value={postHashtags}
+                        onChange={(e) => setPostHashtags(e.target.value)}
+                        placeholder="#viral #fyp #trending"
+                        className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Platform Buttons */}
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    {/* TikTok */}
+                    <button
+                      onClick={() => handlePostToSocial('tiktok')}
+                      disabled={!tiktokConnected || postingTo !== null}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        tiktokConnected
+                          ? 'border-zinc-300 dark:border-zinc-700 hover:border-black dark:hover:border-white hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                          : 'border-zinc-200 dark:border-zinc-800 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-black rounded-lg flex items-center justify-center flex-shrink-0">
+                          <span className="text-white font-bold text-sm">TT</span>
+                        </div>
+                        <div className="flex-1 text-left">
+                          <div className="font-semibold text-sm">TikTok</div>
+                          {tiktokConnected ? (
+                            postingTo === 'tiktok' ? (
+                              <div className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Posting...
+                              </div>
+                            ) : (
+                              <div className="text-xs text-green-600 dark:text-green-400">Connected</div>
+                            )
+                          ) : (
+                            <div className="text-xs text-zinc-500">Not connected</div>
+                          )}
+                        </div>
+                        {tiktokConnected && postingTo !== 'tiktok' && <Send className="w-4 h-4 text-zinc-400" />}
+                      </div>
+                    </button>
+
+                    {/* YouTube */}
+                    <button
+                      onClick={() => handlePostToSocial('youtube')}
+                      disabled={!youtubeConnected || postingTo !== null}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        youtubeConnected
+                          ? 'border-zinc-300 dark:border-zinc-700 hover:border-red-500 hover:bg-red-50 dark:hover:bg-red-900/10'
+                          : 'border-zinc-200 dark:border-zinc-800 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <span className="text-white font-bold text-sm">YT</span>
+                        </div>
+                        <div className="flex-1 text-left">
+                          <div className="font-semibold text-sm">YouTube</div>
+                          {youtubeConnected ? (
+                            postingTo === 'youtube' ? (
+                              <div className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Posting...
+                              </div>
+                            ) : (
+                              <div className="text-xs text-green-600 dark:text-green-400">Connected</div>
+                            )
+                          ) : (
+                            <div className="text-xs text-zinc-500">Not connected</div>
+                          )}
+                        </div>
+                        {youtubeConnected && postingTo !== 'youtube' && <Send className="w-4 h-4 text-zinc-400" />}
+                      </div>
+                    </button>
+
+                    {/* Instagram */}
+                    <button
+                      onClick={() => handlePostToSocial('instagram')}
+                      disabled={!instagramConnected || postingTo !== null}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        instagramConnected
+                          ? 'border-zinc-300 dark:border-zinc-700 hover:border-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/10'
+                          : 'border-zinc-200 dark:border-zinc-800 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-purple-600 via-pink-600 to-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <span className="text-white font-bold text-sm">IG</span>
+                        </div>
+                        <div className="flex-1 text-left">
+                          <div className="font-semibold text-sm">Instagram</div>
+                          {instagramConnected ? (
+                            postingTo === 'instagram' ? (
+                              <div className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Posting...
+                              </div>
+                            ) : (
+                              <div className="text-xs text-orange-600 dark:text-orange-400">Coming soon</div>
+                            )
+                          ) : (
+                            <div className="text-xs text-zinc-500">Not connected</div>
+                          )}
+                        </div>
+                        {instagramConnected && postingTo !== 'instagram' && <Send className="w-4 h-4 text-zinc-400 opacity-50" />}
+                      </div>
+                    </button>
+
+                    {/* Facebook - Coming Soon */}
+                    <button
+                      disabled={true}
+                      className="p-4 rounded-lg border-2 border-zinc-200 dark:border-zinc-800 opacity-50 cursor-not-allowed"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <span className="text-white font-bold text-sm">FB</span>
+                        </div>
+                        <div className="flex-1 text-left">
+                          <div className="font-semibold text-sm">Facebook</div>
+                          <div className="text-xs text-zinc-500">Coming soon</div>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center pt-2">
+                    Connect accounts in the Social Media section to post
+                  </p>
+                </div>
+              )}
             </div>
           )}
             </div>

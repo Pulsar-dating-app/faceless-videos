@@ -70,7 +70,7 @@ supabase secrets set APP_URL=https://your-production-domain.com
 
 ### 4. Deploy Edge Functions
 
-Deploy all three OAuth Edge Functions:
+Deploy all OAuth Edge Functions:
 
 ```bash
 # Deploy TikTok OAuth function
@@ -81,6 +81,9 @@ supabase functions deploy youtube-auth
 
 # Deploy Instagram OAuth function
 supabase functions deploy instagram-auth
+
+# Deploy Social Media Posting function
+supabase functions deploy post-to-social
 ```
 
 Or deploy all at once:
@@ -101,6 +104,7 @@ You should see:
 - `tiktok-auth`
 - `youtube-auth`
 - `instagram-auth`
+- `post-to-social`
 
 ## Environment Variables
 

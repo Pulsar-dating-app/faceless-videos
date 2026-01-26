@@ -87,6 +87,15 @@ fi
 echo "✓ instagram-auth deployed successfully"
 echo ""
 
+# Deploy Post to Social
+echo "→ Deploying post-to-social..."
+if ! supabase functions deploy post-to-social; then
+    echo "❌ Failed to deploy post-to-social"
+    exit 1
+fi
+echo "✓ post-to-social deployed successfully"
+echo ""
+
 # List deployed functions
 echo "📋 Deployed functions:"
 supabase functions list
