@@ -297,6 +297,176 @@ Deno.serve(async (req: Request) => {
       return alreadyCreditedForThisPeriod;
     }
 
+    // Verificar se é upgrade (newPlan > oldPlan) ou downgrade (newPlan < oldPlan)
+    async function isUpgrade(oldPlanId: string, newPlanId: string): Promise<boolean | null> {
+      if (oldPlanId === newPlanId) return null; // Mesmo plano
+
+      const { data: oldPlan } = await supabaseClient
+        .from("plans")
+        .select("tokens_per_cycle")
+        .eq("plan_id", oldPlanId)
+        .single();
+
+      const { data: newPlan } = await supabaseClient
+        .from("plans")
+        .select("tokens_per_cycle")
+        .eq("plan_id", newPlanId)
+        .single();
+
+      if (!oldPlan || !newPlan) return null;
+      
+      return newPlan.tokens_per_cycle > oldPlan.tokens_per_cycle;
+    }
+
+    // Creditar diferença de tokens durante upgrade de plano
+    async function creditUpgradeTokensDifference(
+      userId: string,
+      subscriptionId: string,
+      oldPlanId: string,
+      newPlanId: string
+    ): Promise<void> {
+      console.log(`🔍 [DEBUG] [UPGRADE_TOKENS] Starting creditUpgradeTokensDifference:`, {
+        userId,
+        subscriptionId,
+        oldPlanId,
+        newPlanId,
+      });
+
+      // Se os planos são iguais, não há o que compensar
+      if (oldPlanId === newPlanId) {
+        console.log(`ℹ️ [UPGRADE_TOKENS] Same plan, no compensation needed`);
+        return;
+      }
+
+      // Buscar tokens_per_cycle do plano antigo
+      const { data: oldPlanData, error: oldPlanError } = await supabaseClient
+        .from("plans")
+        .select("tokens_per_cycle")
+        .eq("plan_id", oldPlanId)
+        .single();
+
+      if (oldPlanError || !oldPlanData) {
+        console.log(`⚠️ [UPGRADE_TOKENS] Could not find old plan ${oldPlanId}:`, oldPlanError);
+        return;
+      }
+
+      // Buscar tokens_per_cycle do plano novo
+      const { data: newPlanData, error: newPlanError } = await supabaseClient
+        .from("plans")
+        .select("tokens_per_cycle")
+        .eq("plan_id", newPlanId)
+        .single();
+
+      if (newPlanError || !newPlanData) {
+        console.log(`⚠️ [UPGRADE_TOKENS] Could not find new plan ${newPlanId}:`, newPlanError);
+        return;
+      }
+
+      // Calcular diferença: tokens do novo plano - tokens do plano antigo
+      const tokensDifference = newPlanData.tokens_per_cycle - oldPlanData.tokens_per_cycle;
+
+      console.log(`🔍 [DEBUG] [UPGRADE_TOKENS] Token calculation:`, {
+        oldPlanTokens: oldPlanData.tokens_per_cycle,
+        newPlanTokens: newPlanData.tokens_per_cycle,
+        tokensDifference,
+      });
+
+      // Se a diferença for <= 0, é downgrade, não credita nada
+      if (tokensDifference <= 0) {
+        console.log(`ℹ️ [UPGRADE_TOKENS] Downgrade detected (diff: ${tokensDifference}), no tokens to credit`);
+        return;
+      }
+
+      // Buscar subscription UUID pelo stripe_subscription_id
+      const { data: subData, error: subError } = await supabaseClient
+        .from("subscriptions")
+        .select("id, credits_balance")
+        .eq("stripe_subscription_id", subscriptionId)
+        .single();
+
+      if (subError || !subData) {
+        console.log(`⚠️ [UPGRADE_TOKENS] Could not find subscription ${subscriptionId}:`, subError);
+        return;
+      }
+
+      // VALIDAÇÃO DE DUPLICAÇÃO: Verificar se já creditou upgrade para esta combinação de planos
+      const { data: existingUpgrade } = await supabaseClient
+        .from("token_ledger")
+        .select("id, created_at")
+        .eq("subscription_id", subData.id)
+        .eq("reason", "plan_upgrade_compensation")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (existingUpgrade) {
+        // Verificar se o último upgrade foi nos últimos 5 minutos (evitar duplicação de eventos rápidos)
+        const lastUpgradeTime = new Date(existingUpgrade.created_at).getTime();
+        const now = Date.now();
+        const fiveMinutesAgo = now - (5 * 60 * 1000);
+        
+        if (lastUpgradeTime > fiveMinutesAgo) {
+          console.log(`ℹ️ [UPGRADE_TOKENS] Upgrade compensation already credited recently (${new Date(lastUpgradeTime).toISOString()}), skipping to prevent duplicate`);
+          return;
+        }
+      }
+
+      const newBalance = (subData.credits_balance || 0) + tokensDifference;
+      const nowISO = new Date().toISOString();
+
+      console.log(`🔍 [DEBUG] [UPGRADE_TOKENS] Preparing to credit upgrade difference:`, {
+        tokensDifference,
+        currentBalance: subData.credits_balance || 0,
+        newBalance,
+      });
+
+      // Inserir crédito no token_ledger (histórico)
+      const ledgerInsertData = {
+        user_id: userId,
+        subscription_id: subData.id,
+        amount: tokensDifference,
+        reason: "plan_upgrade_compensation" as const,
+        meta: {
+          old_plan_id: oldPlanId,
+          new_plan_id: newPlanId,
+          old_plan_tokens: oldPlanData.tokens_per_cycle,
+          new_plan_tokens: newPlanData.tokens_per_cycle,
+        },
+      };
+
+      console.log(`🔍 [DEBUG] [UPGRADE_TOKENS] Inserting into token_ledger:`, ledgerInsertData);
+
+      const { error: ledgerError } = await supabaseClient
+        .from("token_ledger")
+        .insert(ledgerInsertData);
+
+      if (ledgerError) {
+        console.log(`⚠️ [UPGRADE_TOKENS] Error inserting to token_ledger:`, ledgerError);
+        return;
+      }
+
+      // Atualizar credits_balance na tabela subscriptions
+      // NOTA: O trigger do banco (trigger_validate_credits_balance_limit) valida o limite
+      const { error: updateError } = await supabaseClient
+        .from("subscriptions")
+        .update({
+          credits_balance: newBalance,
+          updated_at: nowISO,
+        })
+        .eq("stripe_subscription_id", subscriptionId);
+
+      if (updateError) {
+        console.log(`⚠️ [UPGRADE_TOKENS] Error updating credits_balance:`, updateError);
+      } else {
+        console.log(
+          `✅ [UPGRADE_TOKENS] Credited ${tokensDifference} upgrade tokens to user ${userId}. ` +
+          `Old plan: ${oldPlanId} (${oldPlanData.tokens_per_cycle}), ` +
+          `New plan: ${newPlanId} (${newPlanData.tokens_per_cycle}). ` +
+          `New balance: ${newBalance}`
+        );
+      }
+    }
+
     // Creditar tokens ao usuário
     async function creditTokensToUser(
       userId: string,
@@ -413,6 +583,8 @@ Deno.serve(async (req: Request) => {
       console.log(`✅ [DEBUG] [CREDIT_TOKENS] Successfully inserted into token_ledger`);
 
       // Atualizar credits_balance e last_credited_at na tabela subscriptions
+      // NOTA: O trigger do banco (trigger_validate_credits_balance_limit) automaticamente
+      // valida e limita o credits_balance ao max_tokens_balance do plano relacionado
       const updateData = {
         credits_balance: newBalance,
         last_credited_at: now,
@@ -730,7 +902,7 @@ Deno.serve(async (req: Request) => {
         // Verificar se já existe subscription para este user_id (troca de plano)
         const { data: existingUserSub } = await supabaseClient
           .from("subscriptions")
-          .select("id, stripe_subscription_id")
+          .select("id, stripe_subscription_id, plan_id")
           .eq("user_id", userId)
           .single();
 
@@ -742,45 +914,83 @@ Deno.serve(async (req: Request) => {
 
         if (existingUserSub) {
           // Usuário já tem subscription - atualizar com nova subscription ID e plano
-          console.log("🔄 [UPGRADE] Updating existing subscription for user (plan change)");
+          const oldPlanId = existingUserSub.plan_id;
+          const isPlanChange = oldPlanId && oldPlanId !== planId;
+          
+          // Verificar se é upgrade ou downgrade
+          let isUpgradeChange = false;
+          let isDowngradeChange = false;
+          if (isPlanChange) {
+            const upgradeResult = await isUpgrade(oldPlanId, planId);
+            isUpgradeChange = upgradeResult === true;
+            isDowngradeChange = upgradeResult === false;
+          }
+          
+          console.log("🔄 [PLAN_CHANGE] Updating existing subscription for user", {
+            oldPlanId,
+            newPlanId: planId,
+            isPlanChange,
+            isUpgrade: isUpgradeChange,
+            isDowngrade: isDowngradeChange,
+          });
+          
+          // Preparar dados para update
+          // Se for DOWNGRADE, NÃO atualizar o plan_id (manter plano atual até o período acabar)
+          const updateData: {
+            plan_id?: string;
+            status: SubscriptionStatus;
+            stripe_customer_id: string;
+            stripe_subscription_id: string;
+            stripe_price_id?: string;
+            current_period_start: string | null;
+            current_period_end: string | null;
+            cancel_at_period_end: boolean;
+            updated_at: string;
+          } = {
+            status: status,
+            stripe_customer_id: customerId,
+            stripe_subscription_id: subscription.id,
+            current_period_start: periodStartUnix
+              ? new Date(periodStartUnix * 1000).toISOString()
+              : null,
+            current_period_end: periodEndUnix
+              ? new Date(periodEndUnix * 1000).toISOString()
+              : null,
+            cancel_at_period_end: subscription.cancel_at_period_end || false,
+            updated_at: now,
+          };
+
+          // Só atualizar plan_id se NÃO for downgrade
+          if (!isDowngradeChange) {
+            updateData.plan_id = planId;
+            updateData.stripe_price_id = stripePriceId;
+          } else {
+            console.log(`ℹ️ [DOWNGRADE] Keeping current plan_id (${oldPlanId}) until period ends. Scheduled plan: ${planId}`);
+          }
           
           const { error } = await supabaseClient
             .from("subscriptions")
-            .update({
-              plan_id: planId,
-              status: status,
-              stripe_customer_id: customerId,
-              stripe_subscription_id: subscription.id, // Nova subscription ID
-              stripe_price_id: stripePriceId,
-              current_period_start: periodStartUnix
-                ? new Date(periodStartUnix * 1000).toISOString()
-                : null,
-              current_period_end: periodEndUnix
-                ? new Date(periodEndUnix * 1000).toISOString()
-                : null,
-              cancel_at_period_end: subscription.cancel_at_period_end || false,
-              updated_at: now,
-            })
+            .update(updateData)
             .eq("user_id", userId);
 
           if (!error) {
-            console.log(
-              `✅ [WEBHOOK] Subscription updated (upgrade/downgrade) for plan: ${planId}`
-            );
-
-            // Se status for active, creditar tokens
-            if (
-              status === "active" &&
-              periodStartUnix &&
-              periodEndUnix
-            ) {
-              await creditTokensToUser(
-                userId,
-                subscription.id,
-                planId,
-                new Date(periodStartUnix * 1000),
-                new Date(periodEndUnix * 1000)
-              );
+            if (isUpgradeChange) {
+              console.log(`✅ [WEBHOOK] UPGRADE: Subscription updated for plan: ${planId}`);
+              
+              // Se status for active e houve UPGRADE, creditar diferença de tokens
+              if (status === "active" && oldPlanId) {
+                console.log(`🔄 [UPGRADE] Plan changed from ${oldPlanId} to ${planId}, calculating token difference...`);
+                await creditUpgradeTokensDifference(
+                  userId,
+                  subscription.id,
+                  oldPlanId,
+                  planId
+                );
+              }
+            } else if (isDowngradeChange) {
+              console.log(`✅ [WEBHOOK] DOWNGRADE scheduled: ${oldPlanId} → ${planId} (will apply at period end)`);
+            } else {
+              console.log(`✅ [WEBHOOK] Subscription updated for plan: ${planId}`);
             }
           } else {
             console.log(`⚠️ [WEBHOOK] Error updating subscription:`, error);
@@ -1167,35 +1377,91 @@ Deno.serve(async (req: Request) => {
           break;
         }
 
+        // Verificar se houve troca de plano e se é upgrade ou downgrade
+        const oldPlanId = currentSub?.plan_id;
+        const isPlanChange = oldPlanId && planId && oldPlanId !== planId;
+        let isUpgradeChange = false;
+        let isDowngradeChange = false;
+
+        if (isPlanChange) {
+          const upgradeResult = await isUpgrade(oldPlanId, planId);
+          isUpgradeChange = upgradeResult === true;
+          isDowngradeChange = upgradeResult === false;
+          
+          console.log(`🔍 [DEBUG] [PLAN_CHANGE] Detected plan change:`, {
+            oldPlanId,
+            newPlanId: planId,
+            isUpgrade: isUpgradeChange,
+            isDowngrade: isDowngradeChange,
+          });
+        }
+
+        // Preparar dados para update
+        // IMPORTANTE: Se for DOWNGRADE, NÃO atualizar o plan_id (manter plano atual até o período acabar)
+        const updateData: {
+          status: SubscriptionStatus;
+          plan_id?: string;
+          stripe_price_id?: string;
+          current_period_start: string | null;
+          current_period_end: string | null;
+          cancel_at_period_end: boolean;
+          updated_at: string;
+        } = {
+          status: status,
+          current_period_start: periodStartUnix
+            ? new Date(periodStartUnix * 1000).toISOString()
+            : null,
+          current_period_end: periodEndUnix
+            ? new Date(periodEndUnix * 1000).toISOString()
+            : null,
+          cancel_at_period_end: subscription.cancel_at_period_end || false,
+          updated_at: new Date().toISOString(),
+        };
+
+        // Só atualizar plan_id se for UPGRADE ou se NÃO for troca de plano
+        // Downgrade: manter plano atual até período acabar
+        if (!isDowngradeChange) {
+          updateData.plan_id = planId;
+          updateData.stripe_price_id = stripePriceId;
+        } else {
+          console.log(`ℹ️ [DOWNGRADE] Keeping current plan_id (${oldPlanId}) until period ends. Scheduled plan: ${planId}`);
+        }
+
         // Update subscription status (já existe)
         const { error } = await supabaseClient
           .from("subscriptions")
-          .update({
-            status: status,
-            plan_id: planId, // Update plan_id in case of change
-            stripe_price_id: stripePriceId,
-            current_period_start: periodStartUnix
-              ? new Date(periodStartUnix * 1000).toISOString()
-              : null,
-            current_period_end: periodEndUnix
-              ? new Date(periodEndUnix * 1000).toISOString()
-              : null,
-            cancel_at_period_end: subscription.cancel_at_period_end || false,
-            updated_at: new Date().toISOString(),
-          })
+          .update(updateData)
           .eq("stripe_subscription_id", subscription.id);
 
         if (!error) {
           console.log(
             `✅ [WEBHOOK] Subscription status updated to: ${status}`
           );
-          if (planId && currentSub?.plan_id !== planId) {
-            console.log(`🔄 [WEBHOOK] Plan changed from ${currentSub?.plan_id} to ${planId}`);
+          
+          if (isPlanChange) {
+            if (isUpgradeChange) {
+              console.log(`🔄 [WEBHOOK] UPGRADE: Plan changed from ${oldPlanId} to ${planId}`);
+              
+              // Se status for active e houve UPGRADE, creditar diferença de tokens
+              if (status === "active") {
+                console.log(`🔄 [UPGRADE] Calculating token difference for plan change...`);
+                await creditUpgradeTokensDifference(
+                  userId,
+                  subscription.id,
+                  oldPlanId,
+                  planId
+                );
+              }
+            } else if (isDowngradeChange) {
+              console.log(`🔄 [WEBHOOK] DOWNGRADE scheduled: ${oldPlanId} → ${planId} (will apply at period end)`);
+            }
           }
 
           // Se mudou para active e era incomplete/trialing, creditar tokens (primeira ativação)
+          // Só credita tokens completos se NÃO for troca de plano (upgrade já creditou a diferença)
           if (
             isFirstActivation &&
+            !isPlanChange &&
             periodStartUnix &&
             periodEndUnix
           ) {
@@ -1216,7 +1482,7 @@ Deno.serve(async (req: Request) => {
             }
           }
           
-          // Se os períodos mudaram (renovação), creditar tokens
+          // Se os períodos mudaram (renovação), tratar tokens
           if (
             periodsChanged &&
             status === "active" &&
@@ -1224,14 +1490,36 @@ Deno.serve(async (req: Request) => {
             periodEndUnix &&
             planId
           ) {
-            console.log(`🔄 [RENEWAL] Periods changed - crediting tokens for renewal`);
-            await creditTokensToUser(
-              userId,
-              subscription.id,
-              planId,
-              new Date(periodStartUnix * 1000),
-              new Date(periodEndUnix * 1000)
-            );
+            // Se é um downgrade que estava pendente, agora é hora de aplicar
+            if (isDowngradeChange) {
+              console.log(`🔄 [RENEWAL] Period changed - applying scheduled downgrade: ${oldPlanId} → ${planId}`);
+              
+              // Atualizar plan_id agora que o período mudou
+              await supabaseClient
+                .from("subscriptions")
+                .update({
+                  plan_id: planId,
+                  stripe_price_id: stripePriceId,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("stripe_subscription_id", subscription.id);
+              
+              console.log(`✅ [RENEWAL] Plan updated to ${planId} after period change`);
+            }
+            
+            // Creditar tokens do plano atual (após downgrade se aplicável)
+            // Não creditar se for upgrade (já creditou diferença)
+            if (!isUpgradeChange) {
+              const actualPlanId = isDowngradeChange ? planId : (currentSub?.plan_id || planId);
+              console.log(`🔄 [RENEWAL] Periods changed - crediting tokens for renewal (plan: ${actualPlanId})`);
+              await creditTokensToUser(
+                userId,
+                subscription.id,
+                actualPlanId,
+                new Date(periodStartUnix * 1000),
+                new Date(periodEndUnix * 1000)
+              );
+            }
           }
         } else {
           console.log(`⚠️ [WEBHOOK] Error updating subscription:`, error);
@@ -1356,7 +1644,24 @@ Deno.serve(async (req: Request) => {
             willCredit: !alreadyCredited && !!subData.plan_id,
           });
 
-          if (!alreadyCredited && subData.plan_id) {
+          // Verificar se houve upgrade recente (nos últimos 5 minutos)
+          // Isso evita creditar tokens completos quando o upgrade já creditou a diferença
+          const { data: recentUpgrade } = await supabaseClient
+            .from("token_ledger")
+            .select("id, created_at")
+            .eq("subscription_id", subData.id)
+            .eq("reason", "plan_upgrade_compensation")
+            .gte("created_at", new Date(Date.now() - 5 * 60 * 1000).toISOString())
+            .limit(1)
+            .single();
+
+          const hasRecentUpgrade = !!recentUpgrade;
+          
+          if (hasRecentUpgrade) {
+            console.log(`ℹ️ [INVOICE_PAID] Recent upgrade detected (${recentUpgrade.created_at}), skipping full token credit to prevent duplicate`);
+          }
+
+          if (!alreadyCredited && !hasRecentUpgrade && subData.plan_id) {
             console.log(`🔍 [DEBUG] [INVOICE_PAID] Calling creditTokensToUser with:`, {
               userId: subData.user_id,
               subscriptionId,
@@ -1374,10 +1679,16 @@ Deno.serve(async (req: Request) => {
             );
             console.log(`🔍 [DEBUG] [INVOICE_PAID] creditTokensToUser completed`);
           } else {
+            let reason = "Unknown";
+            if (alreadyCredited) reason = "Already credited for this period";
+            else if (hasRecentUpgrade) reason = "Recent upgrade already credited tokens";
+            else if (!subData.plan_id) reason = "plan_id is null";
+            
             console.log(`⚠️ [DEBUG] [INVOICE_PAID] NOT crediting tokens. Reason:`, {
               alreadyCredited,
+              hasRecentUpgrade,
               hasPlanId: !!subData.plan_id,
-              reason: alreadyCredited ? "Already credited for this period" : !subData.plan_id ? "plan_id is null" : "Unknown",
+              reason,
             });
           }
 

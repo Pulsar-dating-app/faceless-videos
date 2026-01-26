@@ -1,9 +1,12 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 // Access API Keys from environment variables
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 const FLUX_API_KEY = Deno.env.get("FLUX_API_KEY");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,6 +32,68 @@ interface GeneratedImage {
   imageUrl: string;
 }
 
+// Validate user has enough credits and deduct 1 token
+async function validateAndDeductCredits(
+  authHeader: string
+): Promise<{ success: boolean; error?: string; userId?: string }> {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    return { success: false, error: "Supabase environment variables are not set" };
+  }
+
+  // Create client with user's auth token (RLS will use user_id automatically)
+  const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: {
+      headers: { Authorization: authHeader },
+    },
+  });
+
+  // Validate token and get user
+  const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+
+  if (authError || !user) {
+    return { success: false, error: "Invalid or expired token" };
+  }
+
+  // Check user's credits_balance in subscriptions table (RLS filters by user_id)
+  const { data: subscription, error: subError } = await supabaseClient
+    .from("subscriptions")
+    .select("id, credits_balance, status")
+    .eq("user_id", user.id)
+    .single();
+
+  if (subError || !subscription) {
+    console.log(`❌ [CREDITS] No subscription found for user ${user.id}`);
+    return { success: false, error: "No active subscription found. Please subscribe to generate videos." };
+  }
+
+  // Check if subscription is active
+  if (subscription.status !== "active") {
+    console.log(`❌ [CREDITS] Subscription not active for user ${user.id}. Status: ${subscription.status}`);
+    return { success: false, error: "Your subscription is not active. Please renew to generate videos." };
+  }
+
+  // Check if user has enough credits
+  if (subscription.credits_balance < 1) {
+    console.log(`❌ [CREDITS] Insufficient credits for user ${user.id}. Balance: ${subscription.credits_balance}`);
+    return { success: false, error: "Insufficient credits. Please wait for your next billing cycle or upgrade your plan." };
+  }
+
+  // Deduct 1 credit (RLS ensures user can only update their own subscription)
+  const newBalance = subscription.credits_balance - 1;
+  const { error: updateError } = await supabaseClient
+    .from("subscriptions")
+    .update({ credits_balance: newBalance })
+    .eq("id", subscription.id);
+
+  if (updateError) {
+    console.log(`❌ [CREDITS] Failed to deduct credit for user ${user.id}:`, updateError);
+    return { success: false, error: "Failed to process credits. Please try again." };
+  }
+
+  console.log(`✅ [CREDITS] Deducted 1 credit for user ${user.id}. New balance: ${newBalance}`);
+  return { success: true, userId: user.id };
+}
+
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight request
   if (req.method === "OPTIONS") {
@@ -36,6 +101,35 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // Get authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Missing authorization header" }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 401,
+        }
+      );
+    }
+
+    // Validate credits and deduct 1 token before proceeding
+    const creditsResult = await validateAndDeductCredits(authHeader);
+    if (!creditsResult.success) {
+      return new Response(
+        JSON.stringify({ 
+          error: creditsResult.error,
+          code: "INSUFFICIENT_CREDITS"
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 402, // Payment Required
+        }
+      );
+    }
+
+    console.log(`🎬 [GENERATE-AI-VIDEO] Starting video generation for user ${creditsResult.userId}`);
+
     const { text, voice, artStyle }: RequestBody = await req.json();
 
     if (!OPENAI_API_KEY) {
