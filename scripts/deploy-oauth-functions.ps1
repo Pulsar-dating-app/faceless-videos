@@ -87,6 +87,16 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "✓ instagram-auth deployed successfully" -ForegroundColor Green
 Write-Host ""
 
+# Deploy Post to Social
+Write-Host "→ Deploying post-to-social..." -ForegroundColor Yellow
+supabase functions deploy post-to-social
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Failed to deploy post-to-social" -ForegroundColor Red
+    exit 1
+}
+Write-Host "✓ post-to-social deployed successfully" -ForegroundColor Green
+Write-Host ""
+
 # List deployed functions
 Write-Host "📋 Deployed functions:" -ForegroundColor Cyan
 supabase functions list
