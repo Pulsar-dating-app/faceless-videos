@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowRight, Sparkles, Loader2, UserX, DollarSign, Clock, TrendingUp, Star } from "lucide-react";
+import { ArrowRight, Sparkles, Loader2, UserX, DollarSign, Clock, TrendingUp, Star, ChevronDown } from "lucide-react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/lib/auth-context";
@@ -61,6 +62,7 @@ export default function Home() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
   const { t, formatMessage } = useI18n();
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
   const handleGenerateVideo = () => {
     if (user) {
@@ -78,7 +80,7 @@ export default function Home() {
       <Navbar onLogoClick={() => {}} />
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center justify-center text-center px-4 py-12 sm:py-20">
+      <main className="flex-1 flex flex-col items-center justify-center text-center px-4 py-8 sm:py-12">
         {/* Hero Section */}
         <div className="max-w-3xl space-y-8">
           {/* Badge */}
@@ -122,7 +124,7 @@ export default function Home() {
         </div>
 
         {/* Video Carousel */}
-        <div className="w-full mt-20 sm:mt-32 overflow-hidden relative" style={{ maxWidth: CAROUSEL_MAX_WIDTH, marginLeft: 'auto', marginRight: 'auto' }}>
+        <div className="w-full mt-12 sm:mt-16 overflow-hidden relative" style={{ maxWidth: CAROUSEL_MAX_WIDTH, marginLeft: 'auto', marginRight: 'auto' }}>
           {/* Left fade gradient */}
           <div className="absolute left-0 top-0 bottom-0 w-32 sm:w-48 z-10 bg-gradient-to-r from-background via-background/80 to-transparent pointer-events-none" />
           
@@ -269,13 +271,63 @@ export default function Home() {
 
                   {/* Comment */}
                   <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-4">
-                    "{review.comment}"
+                    &quot;{review.comment}&quot;
                   </p>
 
                   {/* Name */}
                   <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                     — {review.name}
                   </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* FAQ Section */}
+        <section className="w-full mt-0 px-4 py-16 sm:py-24">
+          <div className="max-w-4xl mx-auto">
+            {/* Section Header */}
+            <div className="text-center mb-12 sm:mb-16">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight mb-4">
+                {t.faq.title}
+              </h2>
+              <p className="text-lg sm:text-xl text-zinc-600 dark:text-zinc-400">
+                {t.faq.subtitle}
+              </p>
+            </div>
+
+            {/* FAQ Items */}
+            <div className="space-y-4">
+              {t.faq.questions.map((item, index) => (
+                <div
+                  key={index}
+                  className="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 overflow-hidden transition-all duration-300 hover:border-blue-300 dark:hover:border-blue-700"
+                >
+                  <button
+                    onClick={() => setOpenFaqIndex(openFaqIndex === index ? null : index)}
+                    className="w-full px-6 py-5 sm:px-8 sm:py-6 flex items-center justify-between text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                  >
+                    <span className="text-lg sm:text-xl font-bold text-zinc-900 dark:text-zinc-100 pr-8">
+                      {item.question}
+                    </span>
+                    <ChevronDown
+                      className={`w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 transition-transform duration-300 ${
+                        openFaqIndex === index ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                  <div
+                    className={`overflow-hidden transition-all duration-300 ${
+                      openFaqIndex === index ? "max-h-96" : "max-h-0"
+                    }`}
+                  >
+                    <div className="px-6 pb-5 sm:px-8 sm:pb-6 pt-2">
+                      <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                        {item.answer}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>

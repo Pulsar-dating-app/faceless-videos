@@ -162,6 +162,42 @@ export const translations = {
       title: "What Our Users Say",
       subtitle: "Join thousands of creators building passive income with AI-powered videos",
     },
+    // AI Providers Section
+    aiProviders: {
+      title: "Powered by the best AI providers",
+      subtitle: "Leveraging cutting-edge AI technology from industry leaders",
+    },
+    // FAQ Section
+    faq: {
+      title: "Frequently Asked Questions",
+      subtitle: "Everything you need to know about our platform",
+      questions: [
+        {
+          question: "How does the AI video generation work?",
+          answer: "Our platform uses advanced AI models to generate scripts, create visuals, and produce natural-sounding voiceovers. Simply choose your settings, and our AI handles the entire video creation process automatically.",
+        },
+        {
+          question: "Do I need any video editing experience?",
+          answer: "Not at all! Our platform is designed for everyone, regardless of technical skills. The AI handles all the complex editing, so you can focus on creating content and growing your audience.",
+        },
+        {
+          question: "Can I monetize the videos I create?",
+          answer: "Yes! All videos created with our platform are yours to use commercially. You can monetize them on TikTok, YouTube, Instagram, and any other platform you choose.",
+        },
+        {
+          question: "How long does it take to generate a video?",
+          answer: "Most videos are generated in 3-5 minutes, depending on the length and complexity.",
+        },
+        {
+          question: "What languages are supported?",
+          answer: "We support 25+ languages including English, Spanish, French, German, Portuguese, and many more. You can create content for global audiences with natural-sounding voiceovers in each language.",
+        },
+        {
+          question: "Can I cancel my subscription anytime?",
+          answer: "Yes, you can cancel your subscription at any time. There are no long-term commitments or cancellation fees. Your subscription will remain active until the end of your billing period.",
+        },
+      ],
+    },
     // Language Names
     languages: {
       en: "English",
@@ -367,6 +403,40 @@ export const translations = {
       title: "Lo Que Dicen Nuestros Usuarios",
       subtitle: "Únete a miles de creadores construyendo ingresos pasivos con videos impulsados por IA",
     },
+    aiProviders: {
+      title: "Impulsado por los mejores proveedores de IA",
+      subtitle: "Aprovechando tecnología de IA de vanguardia de líderes de la industria",
+    },
+    faq: {
+      title: "Preguntas Frecuentes",
+      subtitle: "Todo lo que necesitas saber sobre nuestra plataforma",
+      questions: [
+        {
+          question: "¿Cómo funciona la generación de videos con IA?",
+          answer: "Nuestra plataforma utiliza modelos de IA avanzados para generar guiones, crear visuales y producir voces naturales. Simplemente elige tus configuraciones y nuestra IA maneja todo el proceso de creación de video automáticamente.",
+        },
+        {
+          question: "¿Necesito experiencia en edición de video?",
+          answer: "¡Para nada! Nuestra plataforma está diseñada para todos, sin importar las habilidades técnicas. La IA maneja toda la edición compleja, para que puedas enfocarte en crear contenido y hacer crecer tu audiencia.",
+        },
+        {
+          question: "¿Puedo monetizar los videos que creo?",
+          answer: "¡Sí! Todos los videos creados con nuestra plataforma son tuyos para usar comercialmente. Puedes monetizarlos en TikTok, YouTube, Instagram y cualquier otra plataforma que elijas.",
+        },
+        {
+          question: "¿Cuánto tiempo tarda en generarse un video?",
+          answer: "La mayoría de los videos se generan en 3-5 minutos, dependiendo de la duración y complejidad.",
+        },
+        {
+          question: "¿Qué idiomas están soportados?",
+          answer: "Soportamos más de 25 idiomas incluyendo inglés, español, francés, alemán, portugués y muchos más. Puedes crear contenido para audiencias globales con voces naturales en cada idioma.",
+        },
+        {
+          question: "¿Puedo cancelar mi suscripción en cualquier momento?",
+          answer: "Sí, puedes cancelar tu suscripción en cualquier momento. No hay compromisos a largo plazo ni tarifas de cancelación. Tu suscripción permanecerá activa hasta el final de tu período de facturación.",
+        },
+      ],
+    },
     languages: {
       en: "Inglés",
       es: "Español",
@@ -568,6 +638,40 @@ export const translations = {
     reviews: {
       title: "Ce Que Disent Nos Utilisateurs",
       subtitle: "Rejoignez des milliers de créateurs qui construisent des revenus passifs avec des vidéos alimentées par l'IA",
+    },
+    aiProviders: {
+      title: "Propulsé par les meilleurs fournisseurs d'IA",
+      subtitle: "Tirant parti de la technologie d'IA de pointe des leaders de l'industrie",
+    },
+    faq: {
+      title: "Questions Fréquemment Posées",
+      subtitle: "Tout ce que vous devez savoir sur notre plateforme",
+      questions: [
+        {
+          question: "Comment fonctionne la génération de vidéos par IA?",
+          answer: "Notre plateforme utilise des modèles d'IA avancés pour générer des scripts, créer des visuels et produire des voix naturelles. Choisissez simplement vos paramètres et notre IA gère tout le processus de création vidéo automatiquement.",
+        },
+        {
+          question: "Ai-je besoin d'expérience en montage vidéo?",
+          answer: "Pas du tout! Notre plateforme est conçue pour tout le monde, peu importe les compétences techniques. L'IA gère tout le montage complexe, vous pouvez donc vous concentrer sur la création de contenu et la croissance de votre audience.",
+        },
+        {
+          question: "Puis-je monétiser les vidéos que je crée?",
+          answer: "Oui! Toutes les vidéos créées avec notre plateforme sont les vôtres à utiliser commercialement. Vous pouvez les monétiser sur TikTok, YouTube, Instagram et toute autre plateforme de votre choix.",
+        },
+        {
+          question: "Combien de temps faut-il pour générer une vidéo?",
+          answer: "La plupart des vidéos sont générées en 3-5 minutes, selon la durée et la complexité.",
+        },
+        {
+          question: "Quelles langues sont prises en charge?",
+          answer: "Nous prenons en charge plus de 25 langues dont l'anglais, l'espagnol, le français, l'allemand, le portugais et bien d'autres. Vous pouvez créer du contenu pour des audiences mondiales avec des voix naturelles dans chaque langue.",
+        },
+        {
+          question: "Puis-je annuler mon abonnement à tout moment?",
+          answer: "Oui, vous pouvez annuler votre abonnement à tout moment. Il n'y a pas d'engagement à long terme ni de frais d'annulation. Votre abonnement restera actif jusqu'à la fin de votre période de facturation.",
+        },
+      ],
     },
     languages: {
       en: "Anglais",
@@ -771,6 +875,40 @@ export const translations = {
       title: "O Que Nossos Usuários Dizem",
       subtitle: "Junte-se a milhares de criadores construindo renda passiva com vídeos alimentados por IA",
     },
+    aiProviders: {
+      title: "Alimentado pelos melhores provedores de IA",
+      subtitle: "Aproveitando tecnologia de IA de ponta dos líderes da indústria",
+    },
+    faq: {
+      title: "Perguntas Frequentes",
+      subtitle: "Tudo o que você precisa saber sobre nossa plataforma",
+      questions: [
+        {
+          question: "Como funciona a geração de vídeos com IA?",
+          answer: "Nossa plataforma usa modelos de IA avançados para gerar roteiros, criar visuais e produzir vozes naturais. Simplesmente escolha suas configurações e nossa IA cuida de todo o processo de criação de vídeo automaticamente.",
+        },
+        {
+          question: "Preciso de experiência em edição de vídeo?",
+          answer: "De jeito nenhum! Nossa plataforma é projetada para todos, independentemente das habilidades técnicas. A IA cuida de toda a edição complexa, para que você possa focar em criar conteúdo e aumentar sua audiência.",
+        },
+        {
+          question: "Posso monetizar os vídeos que crio?",
+          answer: "Sim! Todos os vídeos criados com nossa plataforma são seus para usar comercialmente. Você pode monetizá-los no TikTok, YouTube, Instagram e qualquer outra plataforma que escolher.",
+        },
+        {
+          question: "Quanto tempo leva para gerar um vídeo?",
+          answer: "A maioria dos vídeos é gerada em 3-5 minutos, dependendo da duração e complexidade.",
+        },
+        {
+          question: "Quais idiomas são suportados?",
+          answer: "Suportamos mais de 25 idiomas incluindo inglês, espanhol, francês, alemão, português e muitos mais. Você pode criar conteúdo para audiências globais com vozes naturais em cada idioma.",
+        },
+        {
+          question: "Posso cancelar minha assinatura a qualquer momento?",
+          answer: "Sim, você pode cancelar sua assinatura a qualquer momento. Não há compromissos de longo prazo nem taxas de cancelamento. Sua assinatura permanecerá ativa até o final do seu período de cobrança.",
+        },
+      ],
+    },
     languages: {
       en: "Inglês",
       es: "Espanhol",
@@ -972,6 +1110,40 @@ export const translations = {
     reviews: {
       title: "Was Unsere Benutzer Sagen",
       subtitle: "Schließen Sie sich Tausenden von Creators an, die passives Einkommen mit KI-gestützten Videos aufbauen",
+    },
+    aiProviders: {
+      title: "Unterstützt von den besten KI-Anbietern",
+      subtitle: "Nutzung modernster KI-Technologie von Branchenführern",
+    },
+    faq: {
+      title: "Häufig Gestellte Fragen",
+      subtitle: "Alles, was Sie über unsere Plattform wissen müssen",
+      questions: [
+        {
+          question: "Wie funktioniert die KI-Videogenerierung?",
+          answer: "Unsere Plattform verwendet fortschrittliche KI-Modelle, um Skripte zu generieren, Visuals zu erstellen und natürlich klingende Voiceovers zu produzieren. Wählen Sie einfach Ihre Einstellungen und unsere KI übernimmt den gesamten Videoerstellungsprozess automatisch.",
+        },
+        {
+          question: "Benötige ich Videobearbeitungserfahrung?",
+          answer: "Überhaupt nicht! Unsere Plattform ist für jeden konzipiert, unabhängig von technischen Fähigkeiten. Die KI übernimmt die gesamte komplexe Bearbeitung, sodass Sie sich auf die Erstellung von Inhalten und das Wachstum Ihrer Zielgruppe konzentrieren können.",
+        },
+        {
+          question: "Kann ich die erstellten Videos monetarisieren?",
+          answer: "Ja! Alle mit unserer Plattform erstellten Videos gehören Ihnen zur kommerziellen Nutzung. Sie können sie auf TikTok, YouTube, Instagram und jeder anderen Plattform Ihrer Wahl monetarisieren.",
+        },
+        {
+          question: "Wie lange dauert es, ein Video zu generieren?",
+          answer: "Die meisten Videos werden in 3-5 Minuten generiert, abhängig von Länge und Komplexität.",
+        },
+        {
+          question: "Welche Sprachen werden unterstützt?",
+          answer: "Wir unterstützen über 25 Sprachen, darunter Englisch, Spanisch, Französisch, Deutsch, Portugiesisch und viele mehr. Sie können Inhalte für globale Zielgruppen mit natürlich klingenden Voiceovers in jeder Sprache erstellen.",
+        },
+        {
+          question: "Kann ich mein Abonnement jederzeit kündigen?",
+          answer: "Ja, Sie können Ihr Abonnement jederzeit kündigen. Es gibt keine langfristigen Verpflichtungen oder Kündigungsgebühren. Ihr Abonnement bleibt bis zum Ende Ihres Abrechnungszeitraums aktiv.",
+        },
+      ],
     },
     languages: {
       en: "Englisch",

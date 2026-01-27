@@ -89,3 +89,14 @@ select:focus {
 .animate-scroll:hover {
   animation-play-state: paused;
 }
+
+/* Slower scrolling animation for providers section */
+.animate-scroll-slow {
+  animation: scroll 60s linear infinite;
+  display: flex;
+  width: fit-content;
+}
+
+.animate-scroll-slow:hover {
+  animation-play-state: paused;
+}
