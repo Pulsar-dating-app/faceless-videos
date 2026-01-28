@@ -48,6 +48,10 @@ export const translations = {
       mockPlaceholder: '{"audioUrl": "...", "subtitles": "...", "generatedImages": [...], ...}',
       clearMock: "Clear Mock Data",
       pasteJson: "Paste Edge Function response JSON here:",
+      close: "Close",
+      upgradePlan: "Upgrade Plan",
+      customPrompt: "Custom Prompt (optional)",
+      customPromptPlaceholder: "Add specific details for your video...",
     },
     // Steps
     steps: {
@@ -232,6 +236,17 @@ export const translations = {
       scriptRequired: "Please generate or write a script first!",
       voicePreviewError: 'Voice preview for "{{voice}}" in {{language}} not found. Please generate voice samples first.',
     },
+    // Errors
+    errors: {
+      insufficientCredits: {
+        title: "Insufficient Credits",
+        message: "You don't have enough credits to generate this video. Please upgrade your plan or wait for your credits to refresh.",
+      },
+      generic: {
+        title: "Something went wrong",
+        message: "An error occurred while generating your video. Please try again.",
+      },
+    },
     // Dashboard
     dashboard: {
       menu: {
@@ -297,6 +312,10 @@ export const translations = {
       mockPlaceholder: '{"audioUrl": "...", "subtitles": "...", "generatedImages": [...], ...}',
       clearMock: "Limpiar Datos de Prueba",
       pasteJson: "Pega aquí la respuesta JSON de Edge Function:",
+      close: "Cerrar",
+      upgradePlan: "Mejorar Plan",
+      customPrompt: "Indicación personalizada (opcional)",
+      customPromptPlaceholder: "Agrega detalles específicos para tu video...",
     },
     steps: {
       videoType: "Tipo de Video",
@@ -469,6 +488,16 @@ export const translations = {
       scriptRequired: "¡Por favor genera o escribe un guión primero!",
       voicePreviewError: 'Vista previa de voz para "{{voice}}" en {{language}} no encontrada. Por favor genera muestras de voz primero.',
     },
+    errors: {
+      insufficientCredits: {
+        title: "Créditos Insuficientes",
+        message: "No tienes suficientes créditos para generar este video. Por favor actualiza tu plan o espera a que se renueven tus créditos.",
+      },
+      generic: {
+        title: "Algo salió mal",
+        message: "Ocurrió un error al generar tu video. Por favor intenta de nuevo.",
+      },
+    },
     dashboard: {
       menu: {
         videoCreation: "Creación de Videos",
@@ -533,6 +562,10 @@ export const translations = {
       mockPlaceholder: '{"audioUrl": "...", "subtitles": "...", "generatedImages": [...], ...}',
       clearMock: "Effacer les Données de Test",
       pasteJson: "Collez ici la réponse JSON de Edge Function:",
+      close: "Fermer",
+      upgradePlan: "Mettre à Niveau",
+      customPrompt: "Invite personnalisée (facultatif)",
+      customPromptPlaceholder: "Ajoutez des détails spécifiques pour votre vidéo...",
     },
     steps: {
       videoType: "Type de Vidéo",
@@ -705,6 +738,16 @@ export const translations = {
       scriptRequired: "Veuillez générer ou écrire un script d'abord!",
       voicePreviewError: 'Aperçu vocal pour "{{voice}}" en {{language}} introuvable. Veuillez générer des échantillons vocaux d\'abord.',
     },
+    errors: {
+      insufficientCredits: {
+        title: "Crédits Insuffisants",
+        message: "Vous n'avez pas assez de crédits pour générer cette vidéo. Veuillez mettre à niveau votre forfait ou attendre le renouvellement de vos crédits.",
+      },
+      generic: {
+        title: "Une erreur s'est produite",
+        message: "Une erreur s'est produite lors de la génération de votre vidéo. Veuillez réessayer.",
+      },
+    },
     dashboard: {
       menu: {
         videoCreation: "Création de Vidéos",
@@ -769,6 +812,10 @@ export const translations = {
       mockPlaceholder: '{"audioUrl": "...", "subtitles": "...", "generatedImages": [...], ...}',
       clearMock: "Limpar Dados de Teste",
       pasteJson: "Cole aqui a resposta JSON da Edge Function:",
+      close: "Fechar",
+      upgradePlan: "Atualizar Plano",
+      customPrompt: "Prompt personalizado (opcional)",
+      customPromptPlaceholder: "Adicione detalhes específicos para o seu vídeo...",
     },
     steps: {
       videoType: "Tipo de Vídeo",
@@ -941,6 +988,16 @@ export const translations = {
       scriptRequired: "Por favor, gere ou escreva um roteiro primeiro!",
       voicePreviewError: 'Prévia de voz para "{{voice}}" em {{language}} não encontrada. Por favor, gere amostras de voz primeiro.',
     },
+    errors: {
+      insufficientCredits: {
+        title: "Créditos Insuficientes",
+        message: "Você não tem créditos suficientes para gerar este vídeo. Por favor, atualize seu plano ou aguarde a renovação dos seus créditos.",
+      },
+      generic: {
+        title: "Algo deu errado",
+        message: "Ocorreu um erro ao gerar seu vídeo. Por favor, tente novamente.",
+      },
+    },
     dashboard: {
       menu: {
         videoCreation: "Criação de Vídeos",
@@ -1005,6 +1062,10 @@ export const translations = {
       mockPlaceholder: '{"audioUrl": "...", "subtitles": "...", "generatedImages": [...], ...}',
       clearMock: "Testdaten Löschen",
       pasteJson: "JSON-Antwort der Edge-Funktion hier einfügen:",
+      close: "Schließen",
+      upgradePlan: "Plan Upgraden",
+      customPrompt: "Benutzerdefinierte Anweisung (optional)",
+      customPromptPlaceholder: "Füge spezifische Details für dein Video hinzu...",
     },
     steps: {
       videoType: "Videotyp",
@@ -1176,6 +1237,16 @@ export const translations = {
       signInRequired: "Bitte melde dich an, um Videos zu generieren!",
       scriptRequired: "Bitte generiere oder schreibe zuerst ein Skript!",
       voicePreviewError: 'Sprachvorschau für "{{voice}}" in {{language}} nicht gefunden. Bitte generiere zuerst Sprachproben.',
+    },
+    errors: {
+      insufficientCredits: {
+        title: "Unzureichende Credits",
+        message: "Du hast nicht genügend Credits, um dieses Video zu generieren. Bitte aktualisiere deinen Plan oder warte auf die Erneuerung deiner Credits.",
+      },
+      generic: {
+        title: "Etwas ist schief gelaufen",
+        message: "Beim Generieren deines Videos ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+      },
     },
     dashboard: {
       menu: {

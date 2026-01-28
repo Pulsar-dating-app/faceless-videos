@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X, Info, Share2, Send } from "lucide-react";
+import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X, Info, Share2, Send, AlertCircle, CreditCard } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
@@ -102,7 +102,6 @@ export default function Dashboard() {
   const [activeSection, setActiveSection] = useState<DashboardSection>("video-creation");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   
   // Step state (1-4 for gameplay, 1-5 for AI images)
   const [currentStep, setCurrentStep] = useState(1);
@@ -151,6 +150,14 @@ export default function Dashboard() {
   const [youtubeThumbnail, setYoutubeThumbnail] = useState<string | null>(null);
   const [isConnectingYoutube, setIsConnectingYoutube] = useState(false);
   const [isDisconnectingYoutube, setIsDisconnectingYoutube] = useState(false);
+
+  // Error dialog state
+  const [errorDialog, setErrorDialog] = useState<{
+    isOpen: boolean;
+    type: "credits" | "error";
+    title: string;
+    message: string;
+  } | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const voicePreviewRef = useRef<HTMLAudioElement | null>(null);
@@ -441,7 +448,7 @@ export default function Dashboard() {
   };
 
   // Calculate total steps based on video type
-  const totalSteps = 5; // Both gameplay and AI images have 5 steps now
+  const totalSteps = 4; // Both gameplay and AI images have 4 steps now (script auto-generated)
   
   // Step labels
   const getStepLabel = (step: number) => {
@@ -451,7 +458,6 @@ export default function Dashboard() {
         case 2: return t.steps.categoryDuration;
         case 3: return t.steps.voiceSettings;
         case 4: return t.steps.artStyle;
-        case 5: return t.steps.script;
         default: return "";
       }
     } else {
@@ -460,7 +466,6 @@ export default function Dashboard() {
         case 2: return t.steps.categoryDuration;
         case 3: return t.steps.voiceSettings;
         case 4: return "Background Video";
-        case 5: return t.steps.script;
         default: return "";
       }
     }
@@ -473,27 +478,6 @@ export default function Dashboard() {
       setMockPayload(savedMock);
     }
   }, []);
-
-  const handleGenerateScript = async () => {
-    setIsGeneratingScript(true);
-    try {
-      // Call Supabase Edge Function
-      const { data, error } = await supabase.functions.invoke("generate-script", {
-        body: { category, prompt: customPrompt, duration, language },
-      });
-
-      if (error) throw error;
-      
-      if (data?.script) {
-        setScript(data.script);
-      }
-    } catch (error) {
-      console.error("Error generating script:", error);
-      alert("Failed to generate script. Please check console for details.");
-    } finally {
-      setIsGeneratingScript(false);
-    }
-  };
 
   const playVoicePreview = (voiceName: string) => {
     // Stop currently playing preview if any
@@ -531,11 +515,6 @@ export default function Dashboard() {
       router.push("/login");
       return;
     }
-
-    if (!script) {
-      alert(t.messages.scriptRequired);
-      return;
-    }
     
     setIsGenerating(true);
     setVideoUrl(null);
@@ -544,6 +523,7 @@ export default function Dashboard() {
       if (videoType === "ai-images") {
         // AI Images flow
         let aiData: {
+          script: string;
           audioUrl: string;
           subtitles: string;
           generatedImages: string[];
@@ -559,12 +539,23 @@ export default function Dashboard() {
             throw new Error("Invalid mock payload JSON");
           }
         } else {
-          // 1. Generate Audio + Subtitles + Image Prompts via Supabase Edge Function
+          // 1. Generate Script + Audio + Subtitles + Image Prompts via Supabase Edge Function
           const { data, error: aiError } = await supabase.functions.invoke("generate-ai-video", {
-            body: { text: script, voice, artStyle, language },
+            body: { category, prompt: customPrompt, duration, language, voice, artStyle },
           });
 
-          if (aiError) throw aiError;
+          // Check for insufficient credits error in response data
+          if (data?.code === "INSUFFICIENT_CREDITS" || data?.error?.includes("credits") || data?.error?.includes("subscription")) {
+            throw new Error("INSUFFICIENT_CREDITS");
+          }
+          
+          if (aiError) {
+            // Check if it's a credits-related error
+            if (aiError.message?.includes("402") || aiError.message?.includes("non-2xx")) {
+              throw new Error("INSUFFICIENT_CREDITS");
+            }
+            throw aiError;
+          }
           aiData = data;
         }
 
@@ -577,6 +568,11 @@ export default function Dashboard() {
         const generatedImages = aiData.generatedImages || [];
         const audioDuration = aiData.audioDuration || 0;
         setAudioUrl(currentAudioUrl);
+        
+        // Store the generated script for display if needed
+        if (aiData.script) {
+          setScript(aiData.script);
+        }
 
         console.log("Generated images:", generatedImages.length);
         console.log("Audio duration:", audioDuration, "seconds");
@@ -614,12 +610,23 @@ export default function Dashboard() {
         
       } else {
         // Gameplay video flow (existing logic)
-        // 1. Generate Audio + Subtitles via Supabase Edge Function
+        // 1. Generate Script + Audio + Subtitles via Supabase Edge Function
         const { data: audioData, error: audioError } = await supabase.functions.invoke("generate-video", {
-          body: { text: script, voice, language },
+          body: { category, prompt: customPrompt, duration, language, voice },
         });
 
-        if (audioError) throw audioError;
+        // Check for insufficient credits error in response data
+        if (audioData?.code === "INSUFFICIENT_CREDITS" || audioData?.error?.includes("credits") || audioData?.error?.includes("subscription")) {
+          throw new Error("INSUFFICIENT_CREDITS");
+        }
+        
+        if (audioError) {
+          // Check if it's a credits-related error
+          if (audioError.message?.includes("402") || audioError.message?.includes("non-2xx")) {
+            throw new Error("INSUFFICIENT_CREDITS");
+          }
+          throw audioError;
+        }
         if (!audioData?.audioUrl) {
           throw new Error("Failed to generate audio");
         }
@@ -627,6 +634,11 @@ export default function Dashboard() {
         const currentAudioUrl = audioData.audioUrl;
         const subtitles = audioData.subtitles || "";
         setAudioUrl(currentAudioUrl);
+        
+        // Store the generated script for display if needed
+        if (audioData.script) {
+          setScript(audioData.script);
+        }
 
         // 2. Merge Video using local API (FFmpeg requires server)
         const selectedBackgroundVideo = BACKGROUND_VIDEOS.find(bg => bg.value === backgroundVideo);
@@ -656,9 +668,33 @@ export default function Dashboard() {
           throw new Error("No video URL returned");
         }
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error generating video:", error);
-      alert("Something went wrong while generating the video.");
+      
+      // Check for insufficient credits error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isCreditsError = errorMessage === "INSUFFICIENT_CREDITS" ||
+                            errorMessage.includes("Insufficient credits") || 
+                            errorMessage.includes("No active subscription") ||
+                            errorMessage.includes("not active") ||
+                            errorMessage.includes("402") ||
+                            errorMessage.includes("non-2xx");
+      
+      if (isCreditsError) {
+        setErrorDialog({
+          isOpen: true,
+          type: "credits",
+          title: t.errors?.insufficientCredits?.title || "Insufficient Credits",
+          message: t.errors?.insufficientCredits?.message || "You don't have enough credits to generate this video. Please upgrade your plan or wait for your credits to refresh.",
+        });
+      } else {
+        setErrorDialog({
+          isOpen: true,
+          type: "error",
+          title: t.errors?.generic?.title || "Something went wrong",
+          message: t.errors?.generic?.message || "An error occurred while generating your video. Please try again.",
+        });
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -1090,6 +1126,17 @@ export default function Dashboard() {
                   </button>
                 ))}
               </div>
+              
+              {/* Optional Custom Prompt */}
+              <div className="space-y-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                <label className="text-sm font-medium">{t.form.customPrompt || "Custom Prompt (optional)"}</label>
+                <textarea 
+                  value={customPrompt}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  placeholder={t.form.customPromptPlaceholder || "Add specific details for your video..."}
+                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[80px] resize-none text-sm"
+                />
+              </div>
             </div>
           );
         } else {
@@ -1138,92 +1185,26 @@ export default function Dashboard() {
                   </button>
                 ))}
               </div>
+              
+              {/* Optional Custom Prompt */}
+              <div className="space-y-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                <label className="text-sm font-medium">{t.form.customPrompt || "Custom Prompt (optional)"}</label>
+                <textarea 
+                  value={customPrompt}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  placeholder={t.form.customPromptPlaceholder || "Add specific details for your video..."}
+                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[80px] resize-none text-sm"
+                />
+              </div>
             </div>
           );
         }
-
-      case 5:
-        // Script step for both Gameplay and AI Images
-        return renderScriptStep();
 
       default:
         return null;
     }
   };
 
-  const renderScriptStep = () => (
-    <div className="space-y-6">
-      <div className="text-center space-y-2 mb-8">
-        <h3 className="text-xl font-semibold">{t.steps.writeScript}</h3>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">{t.steps.writeScriptDesc}</p>
-      </div>
-      
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium">{t.form.script}</label>
-            <button
-              onClick={handleGenerateScript}
-              disabled={isGeneratingScript}
-              className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
-            >
-              {isGeneratingScript ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
-              {t.form.generateAI}
-            </button>
-          </div>
-          <textarea 
-            value={script}
-            onChange={(e) => setScript(e.target.value)}
-            placeholder={t.form.scriptPlaceholder}
-            className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[200px] resize-none font-mono text-sm"
-          />
-        </div>
-
-        {/* Mock Mode Toggle (only for AI Images) */}
-        {videoType === "ai-images" && (
-          <div className="space-y-3 p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="mockMode"
-                checked={useMockData}
-                onChange={(e) => setUseMockData(e.target.checked)}
-                className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600"
-              />
-              <label htmlFor="mockMode" className="text-sm font-medium cursor-pointer">
-                {t.form.mockMode}
-              </label>
-            </div>
-            {useMockData && (
-              <div className="space-y-2">
-                <label className="text-xs text-zinc-600 dark:text-zinc-400">
-                  {t.form.pasteJson}
-                </label>
-                <textarea
-                  value={mockPayload}
-                  onChange={(e) => {
-                    setMockPayload(e.target.value);
-                    localStorage.setItem("ai-video-mock-payload", e.target.value);
-                  }}
-                  placeholder={t.form.mockPlaceholder}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[100px] resize-none font-mono"
-                />
-                <button
-                  onClick={() => {
-                    setMockPayload("");
-                    localStorage.removeItem("ai-video-mock-payload");
-                  }}
-                  className="text-xs text-red-600 hover:text-red-700"
-                >
-                  {t.form.clearMock}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
 
   const renderSocialMediaPage = () => (
     <div className="max-w-4xl w-full">
@@ -1601,7 +1582,7 @@ export default function Dashboard() {
                 ) : (
                   <button 
                     onClick={handleGenerate}
-                    disabled={isGenerating || !script}
+                    disabled={isGenerating}
                     className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
                     {isGenerating ? (
@@ -1876,6 +1857,74 @@ export default function Dashboard() {
                 loop
                 className="max-h-[calc(90vh-80px)] w-auto"
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Dialog */}
+      {errorDialog?.isOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => setErrorDialog(null)}
+        >
+          <div 
+            className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden max-w-md w-full animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                  errorDialog.type === "credits" 
+                    ? "bg-amber-100 dark:bg-amber-900/30" 
+                    : "bg-red-100 dark:bg-red-900/30"
+                }`}>
+                  {errorDialog.type === "credits" ? (
+                    <CreditCard className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  )}
+                </div>
+                <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                  {errorDialog.title}
+                </h3>
+              </div>
+              <button
+                onClick={() => setErrorDialog(null)}
+                className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <X className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
+                {errorDialog.message}
+              </p>
+
+              {/* Actions */}
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setErrorDialog(null)}
+                  className="flex-1 px-4 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  {t.form?.close || "Close"}
+                </button>
+                {errorDialog.type === "credits" && (
+                  <button
+                    onClick={() => {
+                      setErrorDialog(null);
+                      router.push("/pricing");
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    {t.form?.upgradePlan || "Upgrade Plan"}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
