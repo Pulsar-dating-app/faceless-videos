@@ -269,7 +269,7 @@ export default function PricingPage() {
       }
     } catch (error: unknown) {
       console.error("Checkout error:", error);
-      alert(error.message || "Failed to start checkout. Please try again.");
+      alert("Failed to start checkout. Please try again.");
       setLoadingPlanId(null);
     }
   };
