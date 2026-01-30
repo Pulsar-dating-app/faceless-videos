@@ -13,6 +13,18 @@ interface PriceData {
   amount: number;
 }
 
+/** Headers with user JWT for Edge Functions (required when deploying without --no-verify-jwt) */
+async function getAuthHeaders(): Promise<HeadersInit> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error("Not authenticated");
+  }
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${session.access_token}`,
+  };
+}
+
 export default function PricingPage() {
   const { t, formatMessage, language } = useI18n();
   const { session, isLoading: authLoading } = useAuth();
@@ -153,19 +165,11 @@ export default function PricingPage() {
     setLoadingPlanId(planId);
 
     try {
-      // Get Supabase session token
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      
-      if (!currentSession) {
-        window.location.href = "/login";
-        return;
-      }
+      // Headers with user JWT (required for Edge Functions without --no-verify-jwt)
+      const headers = await getAuthHeaders();
 
       // Get Supabase project URL from environment
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      console.log("🔵 [DEBUG] Supabase URL:", supabaseUrl);
-      console.log("🔵 [DEBUG] User token:", currentSession.access_token ? "✅ Present" : "❌ Missing");
-      
       if (!supabaseUrl) {
         throw new Error("NEXT_PUBLIC_SUPABASE_URL is not configured");
       }
@@ -188,10 +192,7 @@ export default function PricingPage() {
           `${supabaseUrl}/functions/v1/create-portal-session`,
           {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${currentSession.access_token}`,
-            },
+            headers,
             body: JSON.stringify({
               locale: stripeLocale,
             }),
@@ -234,15 +235,12 @@ export default function PricingPage() {
         language,
       });
 
-      // Call Edge Function to create checkout session
+      // Call Edge Function to create checkout session (headers include user JWT)
       const response = await fetch(
         functionUrl,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${currentSession.access_token}`,
-          },
+          headers,
           body: JSON.stringify({ 
             planId,
             planName: selectedPlan?.name, // Translated plan name
@@ -268,6 +266,10 @@ export default function PricingPage() {
         throw new Error("No checkout URL returned");
       }
     } catch (error: unknown) {
+      if (error instanceof Error && error.message === "Not authenticated") {
+        window.location.href = "/login";
+        return;
+      }
       console.error("Checkout error:", error);
       alert("Failed to start checkout. Please try again.");
       setLoadingPlanId(null);
