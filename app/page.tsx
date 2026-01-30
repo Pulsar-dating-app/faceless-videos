@@ -12,13 +12,12 @@ const CAROUSEL_MAX_WIDTH = "1300px"; // Easy to configure - max width of the car
 
 // Sample video URLs - replace with your actual video URLs
 const CAROUSEL_VIDEOS = [
-  "/videos/minecraft_1.mp4",
-  "/videos/category_examples/preview_background.mp4",
-  "/videos/category_examples/preview_full_ai.mp4",
-  "/videos/category_examples/preview_full_ai.mp4",
-  "/videos/category_examples/preview_full_ai.mp4",
-  "/videos/category_examples/preview_full_ai.mp4",
-  "/videos/category_examples/preview_full_ai.mp4",
+  "https://tzkasbfuhnhfhyvhcjnf.supabase.co/storage/v1/object/public/showcases/preview_background.mp4",
+  "https://tzkasbfuhnhfhyvhcjnf.supabase.co/storage/v1/object/public/showcases/preview_full_ai.mp4",
+  "https://tzkasbfuhnhfhyvhcjnf.supabase.co/storage/v1/object/public/showcases/preview_full_ai.mp4",
+  "https://tzkasbfuhnhfhyvhcjnf.supabase.co/storage/v1/object/public/showcases/preview_full_ai.mp4",
+  "https://tzkasbfuhnhfhyvhcjnf.supabase.co/storage/v1/object/public/showcases/preview_full_ai.mp4",
+  "https://tzkasbfuhnhfhyvhcjnf.supabase.co/storage/v1/object/public/showcases/preview_full_ai.mp4",
   // Add more video URLs here as you create them
   // "/videos/example2.mp4",
   // "/videos/example3.mp4",
@@ -144,6 +143,7 @@ export default function Home() {
                     loop
                     muted
                     playsInline
+                    preload="none"
                     className="w-full h-full object-cover"
                     style={{ aspectRatio: '9/16' }}
                   />
