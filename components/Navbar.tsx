@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n, Language } from "@/lib/i18n-context";
 import { useRouter, usePathname } from "next/navigation";
@@ -62,9 +63,13 @@ export function Navbar({ onLogoClick }: NavbarProps) {
         onClick={handleLogoClick}
         className="flex items-center gap-2 font-bold text-xl cursor-pointer z-50"
       >
-        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-          <span className="text-white text-lg">V</span>
-        </div>
+        <Image 
+          src="/images/logo22.png" 
+          alt="Viral Faceless Reels" 
+          width={32} 
+          height={32}
+          className="w-16 h-16 rounded-lg"
+        />
         <span>Viral Faceless Reels</span>
       </Link>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, Sparkles } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { useI18n } from "@/lib/i18n-context";
 import { useAuth } from "@/lib/auth-context";
@@ -35,6 +35,32 @@ export default function PricingPage() {
     plan_id: string;
     status: string;
   } | null>(null);
+
+  // === PROMOTION CONFIG - Edit these values ===
+  const PROMO_END_DATE = new Date("2026-03-31T23:59:59");
+  const ORIGINAL_PRICE = 49.99;
+  const DISCOUNT_PERCENT = 50;
+  // ============================================
+
+  // Countdown state
+  const [countdown, setCountdown] = useState({ d: 0, h: 0, m: 0, s: 0 });
+
+  useEffect(() => {
+    const tick = () => {
+      const diff = PROMO_END_DATE.getTime() - Date.now();
+      if (diff > 0) {
+        setCountdown({
+          d: Math.floor(diff / 86400000),
+          h: Math.floor((diff % 86400000) / 3600000),
+          m: Math.floor((diff % 3600000) / 60000),
+          s: Math.floor((diff % 60000) / 1000),
+        });
+      }
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Fetch prices from database
   useEffect(() => {
@@ -121,6 +147,7 @@ export default function PricingPage() {
         t.pricing.starter.feature4,
       ],
       popular: false,
+      promo: false,
     },
     {
       id: "professional",
@@ -135,6 +162,7 @@ export default function PricingPage() {
         t.pricing.professional.feature5,
       ],
       popular: true,
+      promo: true,
     },
     {
       id: "elite",
@@ -151,6 +179,7 @@ export default function PricingPage() {
         t.pricing.elite.feature7,
       ],
       popular: false,
+      promo: false,
     },
   ];
 
@@ -297,82 +326,110 @@ export default function PricingPage() {
             {pricingPlans.map((plan) => (
               <div
                 key={plan.id}
-                className={`relative flex flex-col rounded-2xl border ${
+                className={`relative flex flex-col rounded-2xl border overflow-hidden ${
                   plan.popular
                     ? "border-blue-500 dark:border-blue-500 shadow-2xl scale-105"
                     : "border-zinc-200 dark:border-zinc-800 shadow-xl"
-                } bg-white dark:bg-zinc-900 p-8 transition-all hover:shadow-2xl`}
+                } bg-white dark:bg-zinc-900 transition-all hover:shadow-2xl`}
               >
-                {/* Popular Badge */}
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                {/* Promo Banner */}
+                {plan.promo ? (
+                  <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2.5 px-4 text-center text-sm font-semibold flex items-center justify-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    <span>{DISCOUNT_PERCENT}% OFF – {language === "pt" ? "Tempo Limitado" : language === "es" ? "Tiempo Limitado" : language === "fr" ? "Temps Limité" : language === "de" ? "Begrenzte Zeit" : "Limited Time"}</span>
+                  </div>
+                ) : (
+                  /* Spacer for non-promo cards to align */
+                  plan.popular ? null : <div className="h-0" />
+                )}
+
+                {/* Popular Badge - only if not promo */}
+                {plan.popular && !plan.promo && (
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
                     <span className="bg-blue-600 text-white text-xs font-semibold px-4 py-1 rounded-full">
                       {t.pricing.mostPopular}
                     </span>
                   </div>
                 )}
 
-                {/* Plan Header */}
-                <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-                    {plan.description}
-                  </p>
-                  <div className="flex items-baseline justify-center gap-1">
+                <div className="p-8 flex flex-col flex-1">
+                  {/* Plan Header */}
+                  <div className="text-center mb-8">
+                    <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+                      {plan.description}
+                    </p>
+
+                    {/* Price Display */}
                     {isLoadingPrices ? (
-                      <Loader2 className="w-8 h-8 animate-spin text-zinc-400" />
+                      <Loader2 className="w-8 h-8 animate-spin text-zinc-400 mx-auto" />
+                    ) : plan.promo ? (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-xl text-zinc-400 line-through">${ORIGINAL_PRICE}</span>
+                          <span className="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded">-{DISCOUNT_PERCENT}%</span>
+                        </div>
+                        <div className="flex items-baseline justify-center gap-1">
+                          <span className="text-4xl font-extrabold text-blue-600 dark:text-blue-400">
+                            {formatPrice(plan.price)}
+                          </span>
+                          <span className="text-zinc-500 dark:text-zinc-400">{t.pricing.perMonth}</span>
+                        </div>
+                      </div>
                     ) : (
-                      <>
+                      <div className="flex items-baseline justify-center gap-1">
                         <span className="text-4xl font-extrabold">
                           {formatPrice(plan.price)}
                         </span>
                         <span className="text-zinc-500 dark:text-zinc-400">{t.pricing.perMonth}</span>
-                      </>
+                      </div>
                     )}
                   </div>
-                </div>
 
-                {/* Features List */}
-                <ul className="flex-1 space-y-4 mb-8">
-                  {plan.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-start gap-3">
-                      <Check className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm text-zinc-700 dark:text-zinc-300">
-                        {feature}
+                  {/* Features List */}
+                  <ul className="flex-1 space-y-4 mb-8">
+                    {plan.features.map((feature, featureIndex) => (
+                      <li key={featureIndex} className="flex items-start gap-3">
+                        <Check className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                        <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                          {feature}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* CTA Button */}
+                  {currentSubscription?.plan_id === plan.id ? (
+                    <div className="text-center">
+                      <span className="inline-block px-4 py-2 rounded-lg bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 font-medium">
+                        ✓ Current Plan
                       </span>
-                    </li>
-                  ))}
-                </ul>
-
-                {/* CTA Button */}
-                {currentSubscription?.plan_id === plan.id ? (
-                  <div className="text-center">
-                    <span className="inline-block px-4 py-2 rounded-lg bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 font-medium mb-2">
-                      ✓ Current Plan
-                    </span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => handleCheckout(plan.id)}
-                    disabled={authLoading || loadingPlanId === plan.id}
-                    className={`w-full h-12 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-                      plan.popular
-                        ? "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400"
-                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50"
-                    }`}
-                  >
-                    {loadingPlanId === plan.id ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Loading...</span>
-                      </>
-                    ) : currentSubscription ? (
-                      "Change Plan"
-                    ) : (
-                      t.pricing.getStarted
-                    )}
-                  </button>
-                )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleCheckout(plan.id)}
+                      disabled={authLoading || loadingPlanId === plan.id}
+                      className={`w-full h-12 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                        plan.popular
+                          ? "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400"
+                          : "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50"
+                      }`}
+                    >
+                      {loadingPlanId === plan.id ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Loading...</span>
+                        </>
+                      ) : currentSubscription ? (
+                        "Change Plan"
+                      ) : plan.promo ? (
+                        <>{language === "pt" ? "Aproveitar Oferta" : language === "es" ? "Aprovechar Oferta" : language === "fr" ? "Profiter de l'Offre" : language === "de" ? "Angebot Sichern" : "Claim Offer"}</>
+                      ) : (
+                        t.pricing.getStarted
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
