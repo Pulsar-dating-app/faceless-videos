@@ -10,16 +10,29 @@ const execAsync = promisify(exec);
 
 interface GeneratedImage {
   order: number;
-  prompt: string;
-  timestamp: string;
-  imageUrl: string; // base64 data URL
+  imageUrl: string; // FLUX CDN URL or base64 data URL (for backward compatibility)
 }
 
 interface RequestBody {
-  audioUrl: string; // base64 data URL
+  audioUrl: string; // base64 data URL (audio is still base64, it's small)
   subtitles: string; // SRT content
   generatedImages: GeneratedImage[];
   audioDuration: number;
+}
+
+// Helper function to check if a string is a base64 data URL
+function isBase64DataUrl(str: string): boolean {
+  return str.startsWith("data:");
+}
+
+// Helper function to download a file from URL
+async function downloadFile(url: string, destPath: string): Promise<void> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to download ${url}: ${response.statusText}`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  fs.writeFileSync(destPath, Buffer.from(arrayBuffer));
 }
 
 export async function POST(request: Request) {
@@ -64,21 +77,27 @@ export async function POST(request: Request) {
       console.log("Subtitles saved to:", srtPath);
     }
 
-    // 3. Save each image to a temp file
+    // 3. Save each image to a temp file (download from FLUX CDN URLs or handle base64)
     const imagePaths: string[] = [];
     const sortedImages = [...generatedImages].sort((a, b) => a.order - b.order);
     
-    for (let i = 0; i < sortedImages.length; i++) {
-      const image = sortedImages[i];
+    // Download images in parallel for better performance
+    await Promise.all(sortedImages.map(async (image, i) => {
       const imagePath = path.join(imagesDir, `image_${String(i + 1).padStart(3, "0")}.png`);
       
-      // Extract base64 data from data URL
-      const base64Data = image.imageUrl.split(",")[1];
-      const imageBuffer = Buffer.from(base64Data, "base64");
-      fs.writeFileSync(imagePath, imageBuffer);
-      imagePaths.push(imagePath);
+      if (isBase64DataUrl(image.imageUrl)) {
+        // Legacy base64 format (for backward compatibility)
+        const base64Data = image.imageUrl.split(",")[1];
+        const imageBuffer = Buffer.from(base64Data, "base64");
+        fs.writeFileSync(imagePath, imageBuffer);
+      } else {
+        // New format: download from FLUX CDN URL
+        await downloadFile(image.imageUrl, imagePath);
+      }
+      
+      imagePaths[i] = imagePath;
       console.log(`Image ${i + 1} saved to:`, imagePath);
-    }
+    }));
 
     // 4. Calculate durations
     const numImages = sortedImages.length;

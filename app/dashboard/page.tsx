@@ -526,7 +526,7 @@ export default function Dashboard() {
           script: string;
           audioUrl: string;
           subtitles: string;
-          generatedImages: string[];
+          generatedImages: { order: number; imageUrl: string }[];
           audioDuration: number;
         };
         
