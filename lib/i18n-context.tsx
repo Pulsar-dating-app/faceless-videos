@@ -138,7 +138,7 @@ export const translations = {
     },
     // Footer
     footer: {
-      copyright: "© {{year}} ViralGen. All rights reserved.",
+      copyright: "© {{year}} Viral Faceless Reels. All rights reserved.",
     },
     // Why Choose Us Section
     whyChooseUs: {
@@ -396,7 +396,7 @@ export const translations = {
       "70": "Largo",
     },
     footer: {
-      copyright: "© {{year}} ViralGen. Todos los derechos reservados.",
+      copyright: "© {{year}} Viral Faceless Reels. Todos los derechos reservados.",
     },
     whyChooseUs: {
       title: "¿Por Qué Elegirnos?",
@@ -646,7 +646,7 @@ export const translations = {
       "70": "Long",
     },
     footer: {
-      copyright: "© {{year}} ViralGen. Tous droits réservés.",
+      copyright: "© {{year}} Viral Faceless Reels. Tous droits réservés.",
     },
     whyChooseUs: {
       title: "Pourquoi Nous Choisir?",
@@ -896,7 +896,7 @@ export const translations = {
       "70": "Longo",
     },
     footer: {
-      copyright: "© {{year}} ViralGen. Todos os direitos reservados.",
+      copyright: "© {{year}} Viral Faceless Reels. Todos os direitos reservados.",
     },
     whyChooseUs: {
       title: "Por Que Nos Escolher?",
@@ -1146,7 +1146,7 @@ export const translations = {
       "70": "Lang",
     },
     footer: {
-      copyright: "© {{year}} ViralGen. Alle Rechte vorbehalten.",
+      copyright: "© {{year}} Viral Faceless Reels. Alle Rechte vorbehalten.",
     },
     whyChooseUs: {
       title: "Warum Uns Wählen?",

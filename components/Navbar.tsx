@@ -65,7 +65,7 @@ export function Navbar({ onLogoClick }: NavbarProps) {
         <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
           <span className="text-white text-lg">V</span>
         </div>
-        <span>ViralGen</span>
+        <span>Viral Faceless Reels</span>
       </Link>
 
       {/* Mobile Menu Button */}

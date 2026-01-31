@@ -137,7 +137,7 @@ export default function LoginPage() {
 
       {/* Footer */}
       <footer className="w-full py-6 text-center text-sm text-zinc-500 dark:text-zinc-600">
-        <p>© {new Date().getFullYear()} ViralGen. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} Viral Faceless Reels. All rights reserved.</p>
       </footer>
     </div>
   );
