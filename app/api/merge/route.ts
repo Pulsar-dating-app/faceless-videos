@@ -64,15 +64,32 @@ export async function POST(request: Request) {
 
     // 3. Get audio duration to cut video accordingly
     let audioDuration = 0;
-    await new Promise<void>((resolve) => {
-      ffmpeg.ffprobe(audioPath, (err, metadata) => {
-        if (!err) {
-          audioDuration = metadata.format.duration || 0;
-          console.log(`Audio duration: ${audioDuration}s`);
-        }
-        resolve();
-      });
-    });
+    console.log("Getting audio duration from:", audioPath);
+    
+    try {
+      await Promise.race([
+        new Promise<void>((resolve) => {
+          ffmpeg.ffprobe(audioPath, (err, metadata) => {
+            if (err) {
+              console.error("FFprobe error:", err);
+            } else {
+              audioDuration = metadata.format?.duration || 0;
+              console.log(`Audio duration: ${audioDuration}s`);
+            }
+            resolve();
+          });
+        }),
+        new Promise<void>((resolve) => {
+          setTimeout(() => {
+            console.warn("FFprobe timed out after 10 seconds, continuing without duration");
+            resolve();
+          }, 10000);
+        })
+      ]);
+    } catch (probeError) {
+      console.error("Error getting audio duration:", probeError);
+      // Continue without duration - will use -shortest option
+    }
 
     // 4. Save subtitles if provided
     let srtPath: string | null = null;
@@ -83,7 +100,26 @@ export async function POST(request: Request) {
     }
 
     // 5. Merge video + audio + subtitles with FFmpeg
+    console.log("Starting FFmpeg merge...");
+    console.log("Video path:", videoPath);
+    console.log("Audio path:", audioPath);
+    console.log("Output path:", outputPath);
+    console.log("SRT path:", srtPath);
+    
+    // Verify files exist
+    if (!fs.existsSync(videoPath)) {
+      throw new Error(`Video file not found: ${videoPath}`);
+    }
+    if (!fs.existsSync(audioPath)) {
+      throw new Error(`Audio file not found: ${audioPath}`);
+    }
+
     await new Promise((resolve, reject) => {
+      // Set timeout (5 minutes max)
+      const timeout = setTimeout(() => {
+        reject(new Error("FFmpeg operation timed out after 5 minutes"));
+      }, 5 * 60 * 1000);
+
       let command = ffmpeg()
         .input(videoPath)
         .input(audioPath);
@@ -92,8 +128,10 @@ export async function POST(request: Request) {
       if (audioDuration > 0) {
         const durationWithBuffer = audioDuration + 0.1;
         command = command.outputOptions([`-t ${durationWithBuffer}`]);
+        console.log(`Using duration limit: ${durationWithBuffer}s`);
       } else {
         command = command.outputOptions(['-shortest']);
+        console.log("Using -shortest option (no duration limit)");
       }
 
       const outputOptions = [
@@ -106,17 +144,34 @@ export async function POST(request: Request) {
 
       // Add subtitles filter if we have them
       if (srtPath) {
+        // Escape the SRT path for FFmpeg (handle special characters)
+        const escapedSrtPath = srtPath.replace(/\\/g, "/").replace(/'/g, "'\\''");
         const style = "FontName=Arial,FontSize=14,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H80000000,Bold=1,Italic=0,Alignment=10,BorderStyle=1,Outline=1,Shadow=1,MarginL=10,MarginR=10,MarginV=10";
-        outputOptions.push(`-vf subtitles='${srtPath}':force_style='${style}'`);
+        outputOptions.push(`-vf subtitles='${escapedSrtPath}':force_style='${style}'`);
+        console.log("Adding subtitles filter");
       }
+
+      console.log("FFmpeg output options:", outputOptions);
 
       command
         .outputOptions(outputOptions)
         .save(outputPath)
-        .on('end', resolve)
+        .on('start', (commandLine) => {
+          console.log("FFmpeg command:", commandLine);
+        })
+        .on('progress', (progress) => {
+          console.log("FFmpeg progress:", progress.percent, "%");
+        })
+        .on('end', () => {
+          clearTimeout(timeout);
+          console.log("FFmpeg merge completed successfully");
+          resolve(undefined);
+        })
         .on('error', (err) => {
-            console.error("FFmpeg error:", err);
-            reject(err);
+          clearTimeout(timeout);
+          console.error("FFmpeg error:", err);
+          console.error("FFmpeg error message:", err.message);
+          reject(err);
         });
     });
 
