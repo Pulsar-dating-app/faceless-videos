@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
 
 // Default background video URL (hosted on GitHub)
 const DEFAULT_BACKGROUND_VIDEO_URL = "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.1/minecraft_1.mp4";
@@ -9,12 +8,6 @@ export async function POST(req: Request) {
   const videoUrl = backgroundVideoUrl || DEFAULT_BACKGROUND_VIDEO_URL;
 
   const jobId = crypto.randomUUID();
-
-  // save job in DB (Supabase)
-  await supabase.from("jobs").insert({
-    id: jobId,
-    status: "processing"
-  });
 
   // tell worker to start
   await fetch("https://video-worker-faceless.fly.dev/process", {
