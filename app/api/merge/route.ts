@@ -21,6 +21,10 @@ if (ffmpegStatic) {
 const isProduction = process.env.VERCEL === "1";
 console.log(`Running in ${isProduction ? "production" : "development"} mode`);
 
+// Configure route for longer execution time (Vercel)
+export const maxDuration = 60; // 60 seconds (requires Pro plan, otherwise 10s for Hobby)
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
     const { audioUrl, subtitles, backgroundVideoUrl } = await request.json();
@@ -85,7 +89,14 @@ export async function POST(request: Request) {
     }
 
     // 5. Merge video + audio + subtitles with FFmpeg
-    await new Promise((resolve, reject) => {
+    console.log("Starting FFmpeg processing...");
+    console.log("Video path:", videoPath);
+    console.log("Audio path:", audioPath);
+    console.log("Output path:", outputPath);
+    console.log("Audio duration:", audioDuration);
+    
+    // Create a timeout wrapper to prevent hanging
+    const ffmpegPromise = new Promise((resolve, reject) => {
       let command = ffmpeg()
         .input(videoPath)
         .input(audioPath);
@@ -102,25 +113,60 @@ export async function POST(request: Request) {
         '-map 0:v',
         '-map 1:a',
         '-c:v libx264',
+        '-preset veryfast', // Use fast preset for serverless (reduces processing time)
+        '-crf 23', // Good quality/size balance
         '-c:a aac',
-        '-pix_fmt yuv420p'
+        '-pix_fmt yuv420p',
+        '-movflags', '+faststart' // Optimize for streaming
       ];
 
       // Add subtitles filter if we have them
-      if (srtPath) {
-        const style = "FontName=Arial,FontSize=14,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H80000000,Bold=1,Italic=0,Alignment=10,BorderStyle=1,Outline=1,Shadow=1,MarginL=10,MarginR=10,MarginV=10";
-        outputOptions.push(`-vf subtitles='${srtPath}':force_style='${style}'`);
+      // Note: Subtitle rendering may not work in serverless due to missing fontconfig
+      if (srtPath && !isProduction) {
+        // Only use subtitle filter in development (requires fontconfig)
+        const normalizedPath = srtPath.replace(/\\/g, '/');
+        const escapedSrtPath = normalizedPath.replace(/'/g, "'\\''");
+        
+        const style = "FontName=Arial,FontSize=14,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,BackColour=&H80000000,Bold=1,Alignment=10,Outline=2,Shadow=1,MarginV=40";
+        outputOptions.push(`-vf subtitles='${escapedSrtPath}':force_style='${style}'`);
+        console.log("Subtitles will be burned into video");
+      } else if (srtPath && isProduction) {
+        // In production, subtitles filter often fails due to missing fonts/fontconfig
+        // Skip subtitles for now - client can add them in post-processing
+        console.log("Skipping subtitle burn-in in production (fontconfig not available)");
+        console.log("Subtitles will need to be added client-side or use alternative method");
       }
 
       command
         .outputOptions(outputOptions)
-        .save(outputPath)
-        .on('end', resolve)
-        .on('error', (err) => {
-            console.error("FFmpeg error:", err);
-            reject(err);
-        });
+        .on('start', (commandLine) => {
+          console.log('FFmpeg command:', commandLine);
+        })
+        .on('progress', (progress) => {
+          if (progress.percent) {
+            console.log(`Processing: ${Math.round(progress.percent)}% done`);
+          } else if (progress.timemark) {
+            console.log(`Processing: ${progress.timemark}`);
+          }
+        })
+        .on('end', () => {
+          console.log('FFmpeg processing completed successfully');
+          resolve(null);
+        })
+        .on('error', (err, stdout, stderr) => {
+          console.error("FFmpeg error:", err.message);
+          console.error("FFmpeg stderr:", stderr);
+          reject(err);
+        })
+        .save(outputPath);
     });
+    
+    // Add timeout (50 seconds to leave buffer for upload)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('FFmpeg processing timeout after 50 seconds')), 50000);
+    });
+    
+    await Promise.race([ffmpegPromise, timeoutPromise]);
 
     // 6. Cleanup temp files (keep output video)
     try {

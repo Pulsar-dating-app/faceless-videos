@@ -13,6 +13,10 @@ const execAsync = promisify(exec);
 const isProduction = process.env.VERCEL === "1";
 console.log(`Running in ${isProduction ? "production" : "development"} mode`);
 
+// Configure route for longer execution time (Vercel)
+export const maxDuration = 60; // 60 seconds (requires Pro plan, otherwise 10s for Hobby)
+export const dynamic = 'force-dynamic';
+
 interface GeneratedImage {
   order: number;
   imageUrl: string; // FLUX CDN URL or base64 data URL (for backward compatibility)
