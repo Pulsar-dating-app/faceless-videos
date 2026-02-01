@@ -5,8 +5,13 @@ import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import ffmpegStatic from "ffmpeg-static";
+import { supabase } from "@/lib/supabase";
 
 const execAsync = promisify(exec);
+
+// Determine if we're in production (Vercel) or local development
+const isProduction = process.env.VERCEL === "1";
+console.log(`Running in ${isProduction ? "production" : "development"} mode`);
 
 interface GeneratedImage {
   order: number;
@@ -48,7 +53,11 @@ export async function POST(request: Request) {
 
     const ffmpegPath = ffmpegStatic || "ffmpeg";
     const tempId = uuidv4();
-    const tempDir = path.join(process.cwd(), "public", "temp");
+    
+    // Use /tmp for production (Vercel) or public/temp for local development
+    const tempDir = isProduction 
+      ? path.join("/tmp", tempId)
+      : path.join(process.cwd(), "public", "temp");
     
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
@@ -208,8 +217,49 @@ export async function POST(request: Request) {
       console.error("Error cleaning up temp files:", e);
     }
 
-    // 8. Return the public URL for the new video
-    const publicVideoUrl = `/temp/${tempId}.mp4`;
+    // 8. Upload video to Supabase Storage in production, or return local path in development
+    let publicVideoUrl: string;
+    
+    if (isProduction) {
+      // Upload to Supabase Storage
+      console.log("Uploading video to Supabase Storage...");
+      const videoBuffer = fs.readFileSync(outputPath);
+      const fileName = `${tempId}.mp4`;
+      const storagePath = `generated-videos/${fileName}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from("videos")
+        .upload(storagePath, videoBuffer, {
+          contentType: "video/mp4",
+          cacheControl: "3600",
+          upsert: false
+        });
+      
+      if (uploadError) {
+        console.error("Error uploading to Supabase Storage:", uploadError);
+        throw new Error(`Failed to upload video: ${uploadError.message}`);
+      }
+      
+      // Get public URL
+      const { data } = supabase.storage
+        .from("videos")
+        .getPublicUrl(storagePath);
+      
+      publicVideoUrl = data.publicUrl;
+      console.log("Video uploaded successfully:", publicVideoUrl);
+      
+      // Clean up the output file
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+      
+      // Clean up temp directory in production
+      if (fs.existsSync(tempDir)) {
+        fs.rmdirSync(tempDir, { recursive: true });
+      }
+    } else {
+      // Return local path for development
+      publicVideoUrl = `/temp/${tempId}.mp4`;
+      console.log("Video saved locally:", publicVideoUrl);
+    }
 
     return NextResponse.json({ url: publicVideoUrl });
 
