@@ -22,12 +22,10 @@ export async function POST(req: Request) {
   });
 
   const data = await response.json();
-  console.log(data);
-  console.log(JSON.stringify(data));
 
   return NextResponse.json({
     jobId,
     success: data.success,
-    videoUrl: data.url || null
+    url: data.url || null
   });
 }
