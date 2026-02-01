@@ -2,11 +2,21 @@ import { NextResponse } from "next/server";
 import ffmpeg from "fluent-ffmpeg";
 import fs from "fs";
 import path from "path";
+import os from "os";
 import { v4 as uuidv4 } from "uuid";
 import ffmpegStatic from "ffmpeg-static";
+import { createClient } from "@supabase/supabase-js";
 
 // Default background video URL (hosted on GitHub)
 const DEFAULT_BACKGROUND_VIDEO_URL = "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.1/minecraft_1.mp4";
+
+// Initialize Supabase client for storage uploads
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+// Storage bucket for generated videos
+const VIDEO_STORAGE_BUCKET = "generated-videos";
 
 // Tell fluent-ffmpeg where to find the ffmpeg binary
 if (ffmpegStatic) {
@@ -33,11 +43,8 @@ export async function POST(request: Request) {
     // 1. Save the audio (which is base64) to a temp file
     const audioBuffer = Buffer.from(audioUrl.split(",")[1], "base64");
     const tempId = uuidv4();
-    const tempDir = path.join(process.cwd(), "public", "temp");
-    
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
+    // Use OS temp directory (works on Vercel where filesystem is read-only)
+    const tempDir = os.tmpdir();
 
     const audioPath = path.join(tempDir, `${tempId}.mp3`);
     const outputPath = path.join(tempDir, `${tempId}.mp4`);
@@ -113,18 +120,41 @@ export async function POST(request: Request) {
         });
     });
 
-    // 6. Cleanup temp files (keep output video)
+    // 6. Upload video to Supabase Storage
+    const finalVideoBuffer = fs.readFileSync(outputPath);
+    const storagePath = `videos/${tempId}.mp4`;
+    
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from(VIDEO_STORAGE_BUCKET)
+      .upload(storagePath, finalVideoBuffer, {
+        contentType: "video/mp4",
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error("Failed to upload video to storage:", uploadError);
+      throw new Error("Failed to upload video to storage");
+    }
+
+    // Get public URL
+    const { data: urlData } = supabaseAdmin.storage
+      .from(VIDEO_STORAGE_BUCKET)
+      .getPublicUrl(storagePath);
+
+    const publicVideoUrl = urlData.publicUrl;
+    console.log("Video uploaded to storage:", publicVideoUrl);
+
+    // 7. Cleanup ALL temp files (including output video since it's now in storage)
     try {
       if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
       if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
       if (srtPath && fs.existsSync(srtPath)) fs.unlinkSync(srtPath);
     } catch (e) {
       console.error("Error cleaning up temp files:", e);
     }
 
-    // 7. Return the public URL for the new video
-    const publicVideoUrl = `/temp/${tempId}.mp4`;
-
+    // 8. Return the Supabase Storage URL
     return NextResponse.json({ url: publicVideoUrl });
 
   } catch (error: any) {

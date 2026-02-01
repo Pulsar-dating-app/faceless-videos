@@ -3,10 +3,20 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import fs from "fs";
 import path from "path";
+import os from "os";
 import { v4 as uuidv4 } from "uuid";
 import ffmpegStatic from "ffmpeg-static";
+import { createClient } from "@supabase/supabase-js";
 
 const execAsync = promisify(exec);
+
+// Initialize Supabase client for storage uploads
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+// Storage bucket for generated videos
+const VIDEO_STORAGE_BUCKET = "generated-videos";
 
 interface GeneratedImage {
   order: number;
@@ -48,21 +58,16 @@ export async function POST(request: Request) {
 
     const ffmpegPath = ffmpegStatic || "ffmpeg";
     const tempId = uuidv4();
-    const tempDir = path.join(process.cwd(), "public", "temp");
-    
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
+    // Use OS temp directory (works on Vercel where filesystem is read-only)
+    const tempDir = os.tmpdir();
 
     const audioPath = path.join(tempDir, `${tempId}.mp3`);
     const srtPath = path.join(tempDir, `${tempId}.srt`);
     const outputPath = path.join(tempDir, `${tempId}.mp4`);
     const imagesDir = path.join(tempDir, `${tempId}_images`);
 
-    // Create images directory
-    if (!fs.existsSync(imagesDir)) {
-      fs.mkdirSync(imagesDir, { recursive: true });
-    }
+    // Create images directory in temp folder
+    fs.mkdirSync(imagesDir, { recursive: true });
 
     // 1. Save the audio to a temp file
     const audioBuffer = Buffer.from(audioUrl.split(",")[1], "base64");
@@ -194,23 +199,46 @@ export async function POST(request: Request) {
     
     console.log("Video created successfully:", outputPath);
 
-    // 7. Cleanup temp files (keep the output video)
+    // 7. Upload video to Supabase Storage
+    const videoBuffer = fs.readFileSync(outputPath);
+    const storagePath = `videos/${tempId}.mp4`;
+    
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from(VIDEO_STORAGE_BUCKET)
+      .upload(storagePath, videoBuffer, {
+        contentType: "video/mp4",
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error("Failed to upload video to storage:", uploadError);
+      throw new Error("Failed to upload video to storage");
+    }
+
+    // Get public URL
+    const { data: urlData } = supabaseAdmin.storage
+      .from(VIDEO_STORAGE_BUCKET)
+      .getPublicUrl(storagePath);
+
+    const publicVideoUrl = urlData.publicUrl;
+    console.log("Video uploaded to storage:", publicVideoUrl);
+
+    // 8. Cleanup ALL temp files (including the output video since it's now in storage)
     try {
       if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
       if (srtPath && fs.existsSync(srtPath)) fs.unlinkSync(srtPath);
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
       
       // Remove images directory
-      for (const imagePath of imagePaths) {
-        if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+      for (const imgPath of imagePaths) {
+        if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
       }
       if (fs.existsSync(imagesDir)) fs.rmdirSync(imagesDir);
     } catch (e) {
       console.error("Error cleaning up temp files:", e);
     }
 
-    // 8. Return the public URL for the new video
-    const publicVideoUrl = `/temp/${tempId}.mp4`;
-
+    // 9. Return the Supabase Storage URL
     return NextResponse.json({ url: publicVideoUrl });
 
   } catch (error: any) {
