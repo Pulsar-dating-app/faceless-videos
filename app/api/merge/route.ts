@@ -4,17 +4,25 @@ import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import ffmpegStatic from "ffmpeg-static";
+import ffprobeStatic from "ffprobe-static";
 import { supabase } from "@/lib/supabase";
 
 // Default background video URL (hosted on GitHub)
 const DEFAULT_BACKGROUND_VIDEO_URL = "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.1/minecraft_1.mp4";
 
-// Tell fluent-ffmpeg where to find the ffmpeg binary
+// Tell fluent-ffmpeg where to find the ffmpeg and ffprobe binaries
 if (ffmpegStatic) {
   console.log("ffmpeg-static path:", ffmpegStatic);
   ffmpeg.setFfmpegPath(ffmpegStatic);
 } else {
   console.warn("ffmpeg-static not found, relying on system ffmpeg");
+}
+
+if (ffprobeStatic.path) {
+  console.log("ffprobe-static path:", ffprobeStatic.path);
+  ffmpeg.setFfprobePath(ffprobeStatic.path);
+} else {
+  console.warn("ffprobe-static not found, relying on system ffprobe");
 }
 
 // Determine if we're in production (Vercel) or local development
@@ -72,13 +80,35 @@ export async function POST(request: Request) {
     let audioDuration = 0;
     await new Promise<void>((resolve) => {
       ffmpeg.ffprobe(audioPath, (err, metadata) => {
-        if (!err) {
+        if (err) {
+          console.error("ffprobe error:", err);
+          // Don't reject, just log and continue with 0 duration
+          resolve();
+        } else {
           audioDuration = metadata.format.duration || 0;
-          console.log(`Audio duration: ${audioDuration}s`);
+          console.log(`Audio duration detected: ${audioDuration}s`);
+          resolve();
         }
-        resolve();
       });
     });
+
+    // If we couldn't get the duration, try to calculate from file size
+    // MP3 bitrate is typically around 128kbps
+    if (audioDuration === 0) {
+      try {
+        const audioStats = fs.statSync(audioPath);
+        const fileSizeInBytes = audioStats.size;
+        // Rough estimate: assuming 128kbps MP3
+        const estimatedDuration = (fileSizeInBytes * 8) / (128 * 1024);
+        audioDuration = estimatedDuration;
+        console.log(`Audio duration estimated from file size: ${audioDuration}s`);
+      } catch (e) {
+        console.error("Failed to estimate audio duration:", e);
+        // Set a reasonable default maximum (5 minutes)
+        audioDuration = 300;
+        console.log(`Using default maximum duration: ${audioDuration}s`);
+      }
+    }
 
     // 4. Save subtitles if provided
     let srtPath: string | null = null;
@@ -101,12 +131,16 @@ export async function POST(request: Request) {
         .input(videoPath)
         .input(audioPath);
 
-      // If we successfully got the duration, use it to limit the video
+      // Always use explicit duration - never rely on -shortest alone
+      // This prevents FFmpeg from processing the entire background video
       if (audioDuration > 0) {
         const durationWithBuffer = audioDuration + 0.1;
         command = command.outputOptions([`-t ${durationWithBuffer}`]);
+        console.log(`Setting output duration to: ${durationWithBuffer}s`);
       } else {
-        command = command.outputOptions(['-shortest']);
+        // Fallback: if we couldn't detect duration, limit to 5 minutes max
+        console.warn("Could not detect audio duration, limiting to 5 minutes");
+        command = command.outputOptions(['-t 300', '-shortest']);
       }
 
       const outputOptions = [
@@ -223,10 +257,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url: publicVideoUrl });
 
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Failed to generate final video";
     console.error("Error generating final video:", error);
     return NextResponse.json(
-      { error: error?.message || "Failed to generate final video" },
+      { error: errorMessage },
       { status: 500 }
     );
   }

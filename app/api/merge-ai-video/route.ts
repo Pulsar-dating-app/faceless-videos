@@ -267,10 +267,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url: publicVideoUrl });
 
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Failed to generate AI video";
     console.error("Error generating AI video:", error);
     return NextResponse.json(
-      { error: error?.message || "Failed to generate AI video" },
+      { error: errorMessage },
       { status: 500 }
     );
   }
