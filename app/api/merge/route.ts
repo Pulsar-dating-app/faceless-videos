@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
-import ffmpeg from "fluent-ffmpeg";
+import { exec } from "child_process";
+import { promisify } from "util";
 import fs from "fs";
 import path from "path";
 import os from "os";
 import { v4 as uuidv4 } from "uuid";
 import ffmpegStatic from "ffmpeg-static";
 import { createClient } from "@supabase/supabase-js";
+
+const execAsync = promisify(exec);
 
 // Default background video URL (hosted on GitHub)
 const DEFAULT_BACKGROUND_VIDEO_URL = "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.1/minecraft_1.mp4";
@@ -17,14 +20,6 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 // Storage bucket for generated videos
 const VIDEO_STORAGE_BUCKET = "generated-videos";
-
-// Tell fluent-ffmpeg where to find the ffmpeg binary
-if (ffmpegStatic) {
-  console.log("ffmpeg-static path:", ffmpegStatic);
-  ffmpeg.setFfmpegPath(ffmpegStatic);
-} else {
-  console.warn("ffmpeg-static not found, relying on system ffmpeg");
-}
 
 export async function POST(request: Request) {
   try {
@@ -62,32 +57,35 @@ export async function POST(request: Request) {
     fs.writeFileSync(videoPath, videoBuffer);
     console.log("Background video downloaded.");
 
-    // 3. Get audio duration to cut video accordingly
+    // 3. Get audio duration using ffmpeg (since ffprobe isn't available)
     let audioDuration = 0;
     console.log("Getting audio duration from:", audioPath);
     
     try {
-      await Promise.race([
-        new Promise<void>((resolve) => {
-          ffmpeg.ffprobe(audioPath, (err, metadata) => {
-            if (err) {
-              console.error("FFprobe error:", err);
-            } else {
-              audioDuration = metadata.format?.duration || 0;
-              console.log(`Audio duration: ${audioDuration}s`);
-            }
-            resolve();
-          });
-        }),
-        new Promise<void>((resolve) => {
-          setTimeout(() => {
-            console.warn("FFprobe timed out after 10 seconds, continuing without duration");
-            resolve();
-          }, 10000);
-        })
-      ]);
-    } catch (probeError) {
-      console.error("Error getting audio duration:", probeError);
+      const ffmpegPath = ffmpegStatic || "ffmpeg";
+      // Use ffmpeg to probe file - it outputs duration to stderr and exits with code 1
+      // We catch the error to get stderr which contains the duration info
+      try {
+        await execAsync(`"${ffmpegPath}" -i "${audioPath}" 2>&1`, { maxBuffer: 10 * 1024 * 1024 });
+      } catch (error: any) {
+        // ffmpeg exits with code 1 when probing, but stderr contains the info we need
+        const output = error.stderr || error.stdout || error.message || "";
+        
+        // Parse duration from output: Duration: 00:00:30.00, start: 0.000000, bitrate: 128 kb/s
+        const durationMatch = output.match(/Duration: (\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
+        if (durationMatch) {
+          const hours = parseInt(durationMatch[1]);
+          const minutes = parseInt(durationMatch[2]);
+          const seconds = parseInt(durationMatch[3]);
+          const centiseconds = parseInt(durationMatch[4]);
+          audioDuration = hours * 3600 + minutes * 60 + seconds + centiseconds / 100;
+          console.log(`Audio duration: ${audioDuration}s`);
+        } else {
+          console.warn("Could not parse audio duration from ffmpeg output, will use -shortest option");
+        }
+      }
+    } catch (probeError: any) {
+      console.error("Error getting audio duration:", probeError.message || probeError);
       // Continue without duration - will use -shortest option
     }
 
@@ -99,7 +97,7 @@ export async function POST(request: Request) {
       console.log("Subtitles saved.");
     }
 
-    // 5. Merge video + audio + subtitles with FFmpeg
+    // 5. Merge video + audio + subtitles with FFmpeg using exec (more reliable than fluent-ffmpeg)
     console.log("Starting FFmpeg merge...");
     console.log("Video path:", videoPath);
     console.log("Audio path:", audioPath);
@@ -114,66 +112,50 @@ export async function POST(request: Request) {
       throw new Error(`Audio file not found: ${audioPath}`);
     }
 
-    await new Promise((resolve, reject) => {
-      // Set timeout (5 minutes max)
-      const timeout = setTimeout(() => {
-        reject(new Error("FFmpeg operation timed out after 5 minutes"));
-      }, 5 * 60 * 1000);
-
-      let command = ffmpeg()
-        .input(videoPath)
-        .input(audioPath);
-
-      // If we successfully got the duration, use it to limit the video
-      if (audioDuration > 0) {
-        const durationWithBuffer = audioDuration + 0.1;
-        command = command.outputOptions([`-t ${durationWithBuffer}`]);
-        console.log(`Using duration limit: ${durationWithBuffer}s`);
-      } else {
-        command = command.outputOptions(['-shortest']);
-        console.log("Using -shortest option (no duration limit)");
-      }
-
-      const outputOptions = [
-        '-map 0:v',
-        '-map 1:a',
-        '-c:v libx264',
-        '-c:a aac',
-        '-pix_fmt yuv420p'
-      ];
-
-      // Add subtitles filter if we have them
-      if (srtPath) {
-        // Escape the SRT path for FFmpeg (handle special characters)
-        const escapedSrtPath = srtPath.replace(/\\/g, "/").replace(/'/g, "'\\''");
-        const style = "FontName=Arial,FontSize=14,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H80000000,Bold=1,Italic=0,Alignment=10,BorderStyle=1,Outline=1,Shadow=1,MarginL=10,MarginR=10,MarginV=10";
-        outputOptions.push(`-vf subtitles='${escapedSrtPath}':force_style='${style}'`);
-        console.log("Adding subtitles filter");
-      }
-
-      console.log("FFmpeg output options:", outputOptions);
-
-      command
-        .outputOptions(outputOptions)
-        .save(outputPath)
-        .on('start', (commandLine) => {
-          console.log("FFmpeg command:", commandLine);
-        })
-        .on('progress', (progress) => {
-          console.log("FFmpeg progress:", progress.percent, "%");
-        })
-        .on('end', () => {
-          clearTimeout(timeout);
-          console.log("FFmpeg merge completed successfully");
-          resolve(undefined);
-        })
-        .on('error', (err) => {
-          clearTimeout(timeout);
-          console.error("FFmpeg error:", err);
-          console.error("FFmpeg error message:", err.message);
-          reject(err);
-        });
-    });
+    const ffmpegPath = ffmpegStatic || "ffmpeg";
+    
+    // Build FFmpeg command
+    const escapedVideoPath = videoPath.replace(/\\/g, "/").replace(/'/g, "'\\''");
+    const escapedAudioPath = audioPath.replace(/\\/g, "/").replace(/'/g, "'\\''");
+    const escapedOutputPath = outputPath.replace(/\\/g, "/").replace(/'/g, "'\\''");
+    
+    let ffmpegCommand = `"${ffmpegPath}" -i "${escapedVideoPath}" -i "${escapedAudioPath}"`;
+    
+    // Add duration limit or shortest option
+    if (audioDuration > 0) {
+      const durationWithBuffer = audioDuration + 0.1;
+      ffmpegCommand += ` -t ${durationWithBuffer}`;
+      console.log(`Using duration limit: ${durationWithBuffer}s`);
+    } else {
+      ffmpegCommand += ` -shortest`;
+      console.log("Using -shortest option (no duration limit)");
+    }
+    
+    // Add mapping and codec options
+    ffmpegCommand += ` -map 0:v -map 1:a -c:v libx264 -c:a aac -pix_fmt yuv420p`;
+    
+    // Add subtitles filter if we have them
+    if (srtPath) {
+      const absoluteSrtPath = path.resolve(srtPath).replace(/\\/g, "/").replace(/'/g, "'\\''");
+      const style = "FontName=Arial,FontSize=14,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H80000000,Bold=1,Italic=0,Alignment=10,BorderStyle=1,Outline=1,Shadow=1,MarginL=10,MarginR=10,MarginV=10";
+      ffmpegCommand += ` -vf subtitles='${absoluteSrtPath}':force_style='${style}'`;
+      console.log("Adding subtitles filter");
+    }
+    
+    // Add output file
+    ffmpegCommand += ` -y "${escapedOutputPath}"`;
+    
+    console.log("Executing FFmpeg command...");
+    console.log(ffmpegCommand);
+    
+    try {
+      await execAsync(ffmpegCommand, { maxBuffer: 50 * 1024 * 1024 });
+      console.log("FFmpeg merge completed successfully");
+    } catch (error: any) {
+      console.error("FFmpeg error:", error);
+      console.error("FFmpeg stderr:", error.stderr);
+      throw new Error(`FFmpeg failed: ${error.message || error.stderr || "Unknown error"}`);
+    }
 
     // 6. Upload video to Supabase Storage
     const finalVideoBuffer = fs.readFileSync(outputPath);
