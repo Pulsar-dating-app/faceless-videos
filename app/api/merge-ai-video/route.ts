@@ -14,7 +14,7 @@ const isProduction = process.env.VERCEL === "1";
 console.log(`Running in ${isProduction ? "production" : "development"} mode`);
 
 // Configure route for longer execution time (Vercel)
-export const maxDuration = 60; // 60 seconds (requires Pro plan, otherwise 10s for Hobby)
+export const maxDuration = 300; // 5 minutes (requires Pro plan or higher)
 export const dynamic = 'force-dynamic';
 
 interface GeneratedImage {
@@ -198,9 +198,14 @@ export async function POST(request: Request) {
     }
 
     // 6. Build and execute FFmpeg command
-    const ffmpegCommand = `"${ffmpegPath}"${inputs} -i "${audioPath}" -filter_complex "${filterComplex}" -map "[final]" -map ${imagePaths.length}:a -c:v libx264 -preset fast -crf 23 -c:a aac -b:a 128k -pix_fmt yuv420p -t ${audioDuration + 0.1} -y "${outputPath}"`;
+    // Use ultrafast preset in production for faster encoding
+    const preset = isProduction ? 'ultrafast' : 'fast';
+    const crf = isProduction ? '28' : '23'; // Lower quality in production for speed
+    
+    const ffmpegCommand = `"${ffmpegPath}"${inputs} -i "${audioPath}" -filter_complex "${filterComplex}" -map "[final]" -map ${imagePaths.length}:a -c:v libx264 -preset ${preset} -crf ${crf} -c:a aac -b:a 128k -pix_fmt yuv420p -threads 2 -t ${audioDuration + 0.1} -y "${outputPath}"`;
     
     console.log("Executing FFmpeg command...");
+    console.log(`Using preset: ${preset}, CRF: ${crf}`);
     console.log(ffmpegCommand);
     
     await execAsync(ffmpegCommand, { maxBuffer: 50 * 1024 * 1024 });

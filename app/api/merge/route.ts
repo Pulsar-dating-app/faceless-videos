@@ -30,7 +30,7 @@ const isProduction = process.env.VERCEL === "1";
 console.log(`Running in ${isProduction ? "production" : "development"} mode`);
 
 // Configure route for longer execution time (Vercel)
-export const maxDuration = 60; // 60 seconds (requires Pro plan, otherwise 10s for Hobby)
+export const maxDuration = 300; // 5 minutes (requires Pro plan or higher)
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
@@ -147,12 +147,21 @@ export async function POST(request: Request) {
         '-map 0:v',
         '-map 1:a',
         '-c:v libx264',
-        '-preset veryfast', // Use fast preset for serverless (reduces processing time)
-        '-crf 23', // Good quality/size balance
+        '-preset ultrafast', // Fastest preset for serverless (encoding speed priority)
+        '-crf 28', // Lower quality but much faster encoding
         '-c:a aac',
+        '-b:a 128k', // Explicit audio bitrate
         '-pix_fmt yuv420p',
-        '-movflags', '+faststart' // Optimize for streaming
+        '-movflags', '+faststart', // Optimize for streaming
+        '-threads 2', // Limit threads for serverless (prevents excessive CPU usage)
       ];
+
+      // In production, scale down to 720p to speed up encoding dramatically
+      // This reduces encoding time by ~4x compared to 1080p
+      if (isProduction) {
+        outputOptions.push('-vf', 'scale=-2:720'); // Scale to 720p, maintain aspect ratio
+        console.log("Scaling video to 720p for faster processing in production");
+      }
 
       // Add subtitles filter if we have them
       // Note: Subtitle rendering may not work in serverless due to missing fontconfig
@@ -195,9 +204,9 @@ export async function POST(request: Request) {
         .save(outputPath);
     });
     
-    // Add timeout (50 seconds to leave buffer for upload)
+    // Add timeout (4.5 minutes to leave buffer for upload)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('FFmpeg processing timeout after 50 seconds')), 50000);
+      setTimeout(() => reject(new Error('FFmpeg processing timeout after 270 seconds')), 270000);
     });
     
     await Promise.race([ffmpegPromise, timeoutPromise]);
