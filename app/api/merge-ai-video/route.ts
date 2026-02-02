@@ -12,6 +12,12 @@ export async function POST(req: Request) {
       audioDuration
     } = await req.json();
 
+    console.log("audioUrl", audioUrl);
+    console.log("subtitles", subtitles);
+    console.log("generatedImages", generatedImages);
+    console.log("audioDuration", audioDuration);
+    console.log("request", req);
+
     if (!audioUrl || !generatedImages || generatedImages.length === 0) {
       return NextResponse.json(
         { error: "Missing required parameters" },
