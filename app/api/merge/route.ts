@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 const DEFAULT_BACKGROUND_VIDEO_URL = "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.1/minecraft_1.mp4";
 
 export async function POST(req: Request) {
-  const { audioUrl, backgroundVideoUrl } = await req.json();
+  const { audioUrl, subtitles, backgroundVideoUrl } = await req.json();
   const videoUrl = backgroundVideoUrl || DEFAULT_BACKGROUND_VIDEO_URL;
 
   const jobId = crypto.randomUUID();
@@ -15,6 +15,7 @@ export async function POST(req: Request) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       audioUrl,
+      subtitles,
       backgroundUrl: videoUrl,
       outputPath: `/tmp/${jobId}.mp4`,
       duration: 60
