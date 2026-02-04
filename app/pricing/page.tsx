@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Check, Loader2, Sparkles } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 import { useI18n } from "@/lib/i18n-context";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
@@ -436,10 +437,7 @@ export default function PricingPage() {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="w-full py-6 text-center text-sm text-zinc-500 dark:text-zinc-600">
-        <p>{formatMessage(t.footer.copyright, { year: new Date().getFullYear() })}</p>
-      </footer>
+      <Footer />
     </div>
   );
 }

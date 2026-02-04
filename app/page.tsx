@@ -4,6 +4,7 @@ import { ArrowRight, Sparkles, Loader2, UserX, DollarSign, Clock, TrendingUp, St
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 
@@ -335,10 +336,7 @@ export default function Home() {
         </section>
       </main>
 
-      {/* Simple Footer */}
-      <footer className="w-full py-6 text-center text-sm text-zinc-500 dark:text-zinc-600">
-        <p>{formatMessage(t.footer.copyright, { year: new Date().getFullYear() })}</p>
-      </footer>
+      <Footer />
     </div>
   );
 }
