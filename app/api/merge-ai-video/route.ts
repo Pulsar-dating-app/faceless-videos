@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     }
 
     const response = await fetch(
-      "https://video-worker-faceless.fly.dev/process-images",
+      "http://167.235.140.200:3000/process-images",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   const jobId = crypto.randomUUID();
 
   // tell worker to start
-  const response = await fetch("https://video-worker-faceless.fly.dev/process", {
+  const response = await fetch("http://167.235.140.200:3000/process", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
