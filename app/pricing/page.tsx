@@ -39,8 +39,14 @@ export default function PricingPage() {
 
   // === PROMOTION CONFIG - Edit these values ===
   const PROMO_END_DATE = new Date("2026-03-31T23:59:59");
-  const ORIGINAL_PRICE = 49.99;
-  const DISCOUNT_PERCENT = 50;
+  
+  // Professional plan promo
+  const PROFESSIONAL_ORIGINAL_PRICE = 49.99;
+  const PROFESSIONAL_DISCOUNT_PERCENT = 50;
+  
+  // Elite plan promo
+  const ELITE_ORIGINAL_PRICE = 89.99;
+  const ELITE_DISCOUNT_PERCENT = 50;
   // ============================================
 
   // Countdown state
@@ -142,10 +148,11 @@ export default function PricingPage() {
       price: getPrice("starter"),
       description: t.pricing.starter.description,
       features: [
+        t.pricing.common.feature1,
+        t.pricing.common.feature2,
+        t.pricing.common.feature3,
+        t.pricing.common.feature4,
         t.pricing.starter.feature1,
-        t.pricing.starter.feature2,
-        t.pricing.starter.feature3,
-        t.pricing.starter.feature4,
       ],
       popular: false,
       promo: false,
@@ -156,11 +163,11 @@ export default function PricingPage() {
       price: getPrice("professional"),
       description: t.pricing.professional.description,
       features: [
+        t.pricing.common.feature1,
+        t.pricing.common.feature2,
+        t.pricing.common.feature3,
+        t.pricing.common.feature4,
         t.pricing.professional.feature1,
-        t.pricing.professional.feature2,
-        t.pricing.professional.feature3,
-        t.pricing.professional.feature4,
-        t.pricing.professional.feature5,
       ],
       popular: true,
       promo: true,
@@ -171,16 +178,14 @@ export default function PricingPage() {
       price: getPrice("elite"),
       description: t.pricing.elite.description,
       features: [
+        t.pricing.common.feature1,
+        t.pricing.common.feature2,
+        t.pricing.common.feature3,
+        t.pricing.common.feature4,
         t.pricing.elite.feature1,
-        t.pricing.elite.feature2,
-        t.pricing.elite.feature3,
-        t.pricing.elite.feature4,
-        t.pricing.elite.feature5,
-        t.pricing.elite.feature6,
-        t.pricing.elite.feature7,
       ],
       popular: false,
-      promo: false,
+      promo: true,
     },
   ];
 
@@ -337,7 +342,9 @@ export default function PricingPage() {
                 {plan.promo ? (
                   <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2.5 px-4 text-center text-sm font-semibold flex items-center justify-center gap-2">
                     <Sparkles className="w-4 h-4" />
-                    <span>{DISCOUNT_PERCENT}% OFF – {language === "pt" ? "Tempo Limitado" : language === "es" ? "Tiempo Limitado" : language === "fr" ? "Temps Limité" : language === "de" ? "Begrenzte Zeit" : "Limited Time"}</span>
+                    <span>
+                      {plan.id === "professional" ? PROFESSIONAL_DISCOUNT_PERCENT : ELITE_DISCOUNT_PERCENT}% OFF – {language === "pt" ? "Tempo Limitado" : language === "es" ? "Tiempo Limitado" : language === "fr" ? "Temps Limité" : language === "de" ? "Begrenzte Zeit" : "Limited Time"}
+                    </span>
                   </div>
                 ) : (
                   /* Spacer for non-promo cards to align */
@@ -367,8 +374,12 @@ export default function PricingPage() {
                     ) : plan.promo ? (
                       <div className="space-y-1">
                         <div className="flex items-center justify-center gap-2">
-                          <span className="text-xl text-zinc-400 line-through">${ORIGINAL_PRICE}</span>
-                          <span className="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded">-{DISCOUNT_PERCENT}%</span>
+                          <span className="text-xl text-zinc-400 line-through">
+                            ${plan.id === "professional" ? PROFESSIONAL_ORIGINAL_PRICE : ELITE_ORIGINAL_PRICE}
+                          </span>
+                          <span className="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded">
+                            -{plan.id === "professional" ? PROFESSIONAL_DISCOUNT_PERCENT : ELITE_DISCOUNT_PERCENT}%
+                          </span>
                         </div>
                         <div className="flex items-baseline justify-center gap-1">
                           <span className="text-4xl font-extrabold text-blue-600 dark:text-blue-400">
