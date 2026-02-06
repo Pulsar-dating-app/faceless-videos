@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X, Info, Share2, Send, AlertCircle, CreditCard } from "lucide-react";
+import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X, Info, Share2, Send, AlertCircle, CreditCard, List, Edit, Power } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
@@ -93,7 +93,7 @@ const DURATION_OPTIONS = [
   { value: "70", label: "65-75s", monetizable: true },
 ];
 
-type DashboardSection = "video-creation" | "social-media";
+type DashboardSection = "video-creation" | "social-media" | "series-management";
 
 export default function Dashboard() {
   const { user, isLoading } = useAuth();
@@ -151,6 +151,20 @@ export default function Dashboard() {
   const [isConnectingYoutube, setIsConnectingYoutube] = useState(false);
   const [isDisconnectingYoutube, setIsDisconnectingYoutube] = useState(false);
 
+  // Selected social media platforms for publishing
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+  
+  // Series configuration
+  const [seriesName, setSeriesName] = useState("");
+  const [publishTime, setPublishTime] = useState("09:00"); // Default 9 AM
+
+  // Series management state
+  const [seriesList, setSeriesList] = useState<any[]>([]);
+  const [isLoadingSeries, setIsLoadingSeries] = useState(false);
+  const [editingSeries, setEditingSeries] = useState<any | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isUpdatingSeries, setIsUpdatingSeries] = useState(false);
+
   // Error dialog state
   const [errorDialog, setErrorDialog] = useState<{
     isOpen: boolean;
@@ -182,6 +196,7 @@ export default function Dashboard() {
     const connected = params.get('connected');
     const error = params.get('error');
     const section = params.get('section');
+    const step = params.get('step');
 
     if (connected === 'tiktok') {
       // Get TikTok data from URL
@@ -205,6 +220,12 @@ export default function Dashboard() {
       // Switch to social media section if specified
       if (section === 'social-media') {
         setActiveSection('social-media');
+      }
+      
+      // Return to step 5 if connecting from step 5
+      if (step === '5') {
+        setActiveSection('video-creation');
+        setCurrentStep(5);
       }
       
       // Clean up URL
@@ -235,6 +256,12 @@ export default function Dashboard() {
         setActiveSection('social-media');
       }
       
+      // Return to step 5 if connecting from step 5
+      if (step === '5') {
+        setActiveSection('video-creation');
+        setCurrentStep(5);
+      }
+      
       // Clean up URL
       window.history.replaceState({}, '', '/dashboard');
     }
@@ -261,6 +288,12 @@ export default function Dashboard() {
       // Switch to social media section if specified
       if (section === 'social-media') {
         setActiveSection('social-media');
+      }
+      
+      // Return to step 5 if connecting from step 5
+      if (step === '5') {
+        setActiveSection('video-creation');
+        setCurrentStep(5);
       }
       
       // Clean up URL
@@ -356,24 +389,27 @@ export default function Dashboard() {
     if (!user) return;
     
     setIsConnectingTiktok(true);
-    // Redirect to TikTok OAuth
-    window.location.href = `/api/tiktok/auth?user_id=${user.id}`;
+    // Redirect to TikTok OAuth, include step parameter if on step 5
+    const stepParam = currentStep === 5 ? '&step=5' : '';
+    window.location.href = `/api/tiktok/auth?user_id=${user.id}${stepParam}`;
   };
 
   const handleConnectInstagram = () => {
     if (!user) return;
     
     setIsConnectingInstagram(true);
-    // Redirect to Instagram OAuth
-    window.location.href = `/api/instagram/auth?user_id=${user.id}`;
+    // Redirect to Instagram OAuth, include step parameter if on step 5
+    const stepParam = currentStep === 5 ? '&step=5' : '';
+    window.location.href = `/api/instagram/auth?user_id=${user.id}${stepParam}`;
   };
 
   const handleConnectYoutube = () => {
     if (!user) return;
     
     setIsConnectingYoutube(true);
-    // Redirect to YouTube OAuth
-    window.location.href = `/api/youtube/auth?user_id=${user.id}`;
+    // Redirect to YouTube OAuth, include step parameter if on step 5
+    const stepParam = currentStep === 5 ? '&step=5' : '';
+    window.location.href = `/api/youtube/auth?user_id=${user.id}${stepParam}`;
   };
 
   const handleDisconnectTiktok = async () => {
@@ -448,7 +484,7 @@ export default function Dashboard() {
   };
 
   // Calculate total steps based on video type
-  const totalSteps = 4; // Both gameplay and AI images have 4 steps now (script auto-generated)
+  const totalSteps = 6; // 4 original steps + 2 new steps (social media selection + placeholder)
   
   // Step labels
   const getStepLabel = (step: number) => {
@@ -458,6 +494,8 @@ export default function Dashboard() {
         case 2: return t.steps.categoryDuration;
         case 3: return t.steps.voiceSettings;
         case 4: return t.steps.artStyle;
+        case 5: return "Publishing Platforms";
+        case 6: return "Series Configuration";
         default: return "";
       }
     } else {
@@ -466,6 +504,8 @@ export default function Dashboard() {
         case 2: return t.steps.categoryDuration;
         case 3: return t.steps.voiceSettings;
         case 4: return "Background Video";
+        case 5: return "Publishing Platforms";
+        case 6: return "Series Configuration";
         default: return "";
       }
     }
@@ -478,6 +518,86 @@ export default function Dashboard() {
       setMockPayload(savedMock);
     }
   }, []);
+
+  // Fetch series when series-management section is active
+  useEffect(() => {
+    if (activeSection === "series-management" && user && !isLoadingSeries) {
+      fetchSeries();
+    }
+  }, [activeSection, user]);
+
+  const fetchSeries = async () => {
+    if (!user) return;
+    
+    setIsLoadingSeries(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("list-series");
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      setSeriesList(data?.series || []);
+    } catch (error: unknown) {
+      console.error("Error fetching series:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setErrorDialog({
+        isOpen: true,
+        type: "error",
+        title: "Failed to Load Series",
+        message: errorMessage || "An error occurred while loading your series. Please try again.",
+      });
+    } finally {
+      setIsLoadingSeries(false);
+    }
+  };
+
+  const handleUpdateSeries = async (updatedData: any) => {
+    if (!editingSeries || !user) return;
+
+    setIsUpdatingSeries(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("update-series", {
+        body: {
+          seriesId: editingSeries.id,
+          ...updatedData,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      // Refresh series list
+      await fetchSeries();
+      
+      // Close modal
+      setIsEditModalOpen(false);
+      setEditingSeries(null);
+
+      // Show success message
+      alert(t.dashboard.seriesManagement.updateSuccess);
+    } catch (error: unknown) {
+      console.error("Error updating series:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setErrorDialog({
+        isOpen: true,
+        type: "error",
+        title: t.dashboard.seriesManagement.updateError,
+        message: errorMessage || "An error occurred while updating the series. Please try again.",
+      });
+    } finally {
+      setIsUpdatingSeries(false);
+    }
+  };
 
   const playVoicePreview = (voiceName: string) => {
     // Stop currently playing preview if any
@@ -515,188 +635,63 @@ export default function Dashboard() {
       router.push("/login");
       return;
     }
-    
-    setIsGenerating(true);
-    setVideoUrl(null);
 
-    try {
-      if (videoType === "ai-images") {
-        // AI Images flow
-        let aiData: {
-          script: string;
-          audioUrl: string;
-          subtitles: string;
-          generatedImages: { order: number; imageUrl: string }[];
-          audioDuration: number;
-        };
-        
-        // Check if we should use mock data
-        if (useMockData && mockPayload) {
-          console.log("Using mock data instead of calling Edge Function");
-          try {
-            aiData = JSON.parse(mockPayload);
-          } catch (e) {
-            throw new Error("Invalid mock payload JSON");
-          }
-        } else {
-          // 1. Generate Script + Audio + Subtitles + Image Prompts via Supabase Edge Function
-          const { data, error: aiError } = await supabase.functions.invoke("generate-ai-video", {
-            body: { category, prompt: customPrompt, duration, language, voice, artStyle },
-          });
-
-          // Check for insufficient credits error in response data
-          if (data?.code === "INSUFFICIENT_CREDITS" || data?.error?.includes("credits") || data?.error?.includes("subscription")) {
-            throw new Error("INSUFFICIENT_CREDITS");
-          }
-          
-          if (aiError) {
-            // Check if it's a credits-related error
-            if (aiError.message?.includes("402") || aiError.message?.includes("non-2xx")) {
-              throw new Error("INSUFFICIENT_CREDITS");
-            }
-            throw aiError;
-          }
-          aiData = data;
-        }
-
-        if (!aiData?.audioUrl) {
-          throw new Error("Failed to generate audio");
-        }
-
-        const currentAudioUrl = aiData.audioUrl;
-        const subtitles = aiData.subtitles || "";
-        const generatedImages = aiData.generatedImages || [];
-        const audioDuration = aiData.audioDuration || 0;
-        setAudioUrl(currentAudioUrl);
-        
-        // Store the generated script for display if needed
-        if (aiData.script) {
-          setScript(aiData.script);
-        }
-
-        console.log("Generated images:", generatedImages.length);
-        console.log("Audio duration:", audioDuration, "seconds");
-
-        if (generatedImages.length === 0) {
-          throw new Error("No images were generated");
-        }
-
-        // 2. Merge images + audio into video using local API (FFmpeg)
-        const mergeResponse = await fetch("/api/merge-ai-video", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            audioUrl: currentAudioUrl,
-            subtitles: subtitles,
-            generatedImages: generatedImages,
-            audioDuration: audioDuration,
-          }),
-        });
-
-        if (!mergeResponse.ok) {
-          const errorData = await mergeResponse.json();
-          throw new Error(errorData.error || "Failed to merge AI video");
-        }
-
-        const mergeData = await mergeResponse.json();
-        
-        if (mergeData.url) {
-          setVideoUrl(mergeData.url);
-        } else {
-          throw new Error("No video URL returned from merge");
-        }
-        
-      } else {
-        // Gameplay video flow (existing logic)
-        // 1. Generate Script + Audio + Subtitles via Supabase Edge Function
-        const { data: audioData, error: audioError } = await supabase.functions.invoke("generate-video", {
-          body: { category, prompt: customPrompt, duration, language, voice },
-        });
-
-        // Check for insufficient credits error in response data
-        if (audioData?.code === "INSUFFICIENT_CREDITS" || audioData?.error?.includes("credits") || audioData?.error?.includes("subscription")) {
-          throw new Error("INSUFFICIENT_CREDITS");
-        }
-        
-        if (audioError) {
-          // Check if it's a credits-related error
-          if (audioError.message?.includes("402") || audioError.message?.includes("non-2xx")) {
-            throw new Error("INSUFFICIENT_CREDITS");
-          }
-          throw audioError;
-        }
-        if (!audioData?.audioUrl) {
-          throw new Error("Failed to generate audio");
-        }
-        
-        const currentAudioUrl = audioData.audioUrl;
-        const subtitles = audioData.subtitles || "";
-        setAudioUrl(currentAudioUrl);
-        
-        // Store the generated script for display if needed
-        if (audioData.script) {
-          setScript(audioData.script);
-        }
-
-        // 2. Merge Video using local API (FFmpeg requires server)
-        const selectedBackgroundVideo = BACKGROUND_VIDEOS.find(bg => bg.value === backgroundVideo);
-        const backgroundVideoUrl = selectedBackgroundVideo?.url || BACKGROUND_VIDEOS[0].url;
-        
-        const response = await fetch("/api/merge", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            audioUrl: currentAudioUrl,
-            subtitles: subtitles,
-            backgroundVideoUrl: backgroundVideoUrl,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to generate video");
-        }
-
-        const data = await response.json();
-        
-        if (data.url) {
-          setVideoUrl(data.url);
-        } else {
-          throw new Error("No video URL returned");
-        }
+    // Validate step 6 requirements
+    if (currentStep === 6) {
+      if (!seriesName.trim()) {
+        alert("Please enter a series name");
+        return;
       }
-    } catch (error: unknown) {
-      console.error("Error generating video:", error);
+      if (selectedPlatforms.length === 0) {
+        alert("Please select at least one publishing platform");
+        return;
+      }
+
+      // Create series instead of generating video
+      setIsGenerating(true);
       
-      // Check for insufficient credits error
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const isCreditsError = errorMessage === "INSUFFICIENT_CREDITS" ||
-                            errorMessage.includes("Insufficient credits") || 
-                            errorMessage.includes("No active subscription") ||
-                            errorMessage.includes("not active") ||
-                            errorMessage.includes("402") ||
-                            errorMessage.includes("non-2xx");
-      
-      if (isCreditsError) {
-        setErrorDialog({
-          isOpen: true,
-          type: "credits",
-          title: t.errors?.insufficientCredits?.title || "Insufficient Credits",
-          message: t.errors?.insufficientCredits?.message || "You don't have enough credits to generate this video. Please upgrade your plan or wait for your credits to refresh.",
+      try {
+        const { data, error } = await supabase.functions.invoke("create-series", {
+          body: {
+            seriesName: seriesName.trim(),
+            category: category,
+            publishTime: publishTime,
+            selectedPlatforms: selectedPlatforms,
+            videoType: videoType,
+            artStyle: videoType === "ai-images" ? artStyle : undefined,
+            backgroundVideo: videoType === "gameplay" ? backgroundVideo : undefined,
+            language: language,
+            voice: voice,
+            duration: duration,
+          },
         });
-      } else {
+
+        if (error) {
+          throw error;
+        }
+
+        if (data?.error) {
+          throw new Error(data.error);
+        }
+
+        // Success - show message and reset
+        alert(`Series "${seriesName}" created successfully!`);
+        resetWizard();
+        
+      } catch (error: unknown) {
+        console.error("Error creating series:", error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         setErrorDialog({
           isOpen: true,
           type: "error",
-          title: t.errors?.generic?.title || "Something went wrong",
-          message: t.errors?.generic?.message || "An error occurred while generating your video. Please try again.",
+          title: "Failed to Create Series",
+          message: errorMessage || "An error occurred while creating your series. Please try again.",
         });
+      } finally {
+        setIsGenerating(false);
       }
-    } finally {
-      setIsGenerating(false);
+      
+      return;
     }
   };
 
@@ -728,6 +723,9 @@ export default function Dashboard() {
     setPostTitle("");
     setPostDescription("");
     setPostHashtags("#viral #fyp #trending");
+    setSelectedPlatforms([]);
+    setSeriesName("");
+    setPublishTime("09:00");
   };
 
   const handlePostToSocial = async (platform: string) => {
@@ -1200,6 +1198,345 @@ export default function Dashboard() {
           );
         }
 
+      case 5:
+        return (
+          <div className="space-y-6">
+            <div className="text-center space-y-2 mb-8">
+              <h3 className="text-xl font-semibold">Choose Publishing Platforms</h3>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Select which social media platforms you want to publish your series to
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* TikTok */}
+              <div className={`p-6 rounded-xl border-2 transition-all ${
+                selectedPlatforms.includes('tiktok')
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                  : tiktokConnected
+                    ? "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+                    : "border-zinc-200 dark:border-zinc-700 opacity-60"
+              }`}>
+                <div className="flex items-center gap-4 mb-4">
+                  {tiktokAvatar ? (
+                    <NextImage 
+                      src={tiktokAvatar} 
+                      alt="TikTok Avatar"
+                      width={48}
+                      height={48}
+                      className="w-12 h-12 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
+                      <span className="text-white font-bold text-lg">TT</span>
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg">TikTok</h3>
+                    {tiktokConnected ? (
+                      <div className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                          @{tiktokUsername}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                        Not connected
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {tiktokConnected ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedPlatforms.includes('tiktok')) {
+                        setSelectedPlatforms(selectedPlatforms.filter(p => p !== 'tiktok'));
+                      } else {
+                        setSelectedPlatforms([...selectedPlatforms, 'tiktok']);
+                      }
+                    }}
+                    className={`w-full px-4 py-2 rounded-lg font-medium transition-colors ${
+                      selectedPlatforms.includes('tiktok')
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    }`}
+                  >
+                    {selectedPlatforms.includes('tiktok') ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Check className="w-4 h-4" />
+                        Selected
+                      </span>
+                    ) : (
+                      "Select"
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleConnectTiktok()}
+                    disabled={isConnectingTiktok}
+                    className="w-full px-4 py-2 rounded-lg bg-black text-white font-medium hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                  >
+                    {isConnectingTiktok ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Connecting...
+                      </span>
+                    ) : (
+                      "Connect TikTok"
+                    )}
+                  </button>
+                )}
+              </div>
+
+              {/* Instagram */}
+              <div className={`p-6 rounded-xl border-2 transition-all ${
+                selectedPlatforms.includes('instagram')
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                  : instagramConnected
+                    ? "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+                    : "border-zinc-200 dark:border-zinc-700 opacity-60"
+              }`}>
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-600 via-pink-600 to-orange-500 rounded-lg flex items-center justify-center shadow-lg">
+                    <span className="text-white font-bold text-lg">IG</span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg">Instagram</h3>
+                    {instagramConnected ? (
+                      <div className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                          @{instagramUsername}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                        Not connected
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {instagramConnected ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedPlatforms.includes('instagram')) {
+                        setSelectedPlatforms(selectedPlatforms.filter(p => p !== 'instagram'));
+                      } else {
+                        setSelectedPlatforms([...selectedPlatforms, 'instagram']);
+                      }
+                    }}
+                    className={`w-full px-4 py-2 rounded-lg font-medium transition-colors ${
+                      selectedPlatforms.includes('instagram')
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    }`}
+                  >
+                    {selectedPlatforms.includes('instagram') ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Check className="w-4 h-4" />
+                        Selected
+                      </span>
+                    ) : (
+                      "Select"
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleConnectInstagram()}
+                    disabled={isConnectingInstagram}
+                    className="w-full px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white font-medium hover:from-purple-700 hover:to-pink-700 transition-colors disabled:opacity-50"
+                  >
+                    {isConnectingInstagram ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Connecting...
+                      </span>
+                    ) : (
+                      "Connect Instagram"
+                    )}
+                  </button>
+                )}
+              </div>
+
+              {/* YouTube */}
+              <div className={`p-6 rounded-xl border-2 transition-all ${
+                selectedPlatforms.includes('youtube')
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                  : youtubeConnected
+                    ? "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+                    : "border-zinc-200 dark:border-zinc-700 opacity-60"
+              }`}>
+                <div className="flex items-center gap-4 mb-4">
+                  {youtubeThumbnail ? (
+                    <NextImage 
+                      src={youtubeThumbnail} 
+                      alt="YouTube Channel"
+                      width={48}
+                      height={48}
+                      className="w-12 h-12 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center">
+                      <span className="text-white font-bold text-lg">YT</span>
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg">YouTube</h3>
+                    {youtubeConnected ? (
+                      <div className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                          {youtubeChannelTitle}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                        Not connected
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {youtubeConnected ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedPlatforms.includes('youtube')) {
+                        setSelectedPlatforms(selectedPlatforms.filter(p => p !== 'youtube'));
+                      } else {
+                        setSelectedPlatforms([...selectedPlatforms, 'youtube']);
+                      }
+                    }}
+                    className={`w-full px-4 py-2 rounded-lg font-medium transition-colors ${
+                      selectedPlatforms.includes('youtube')
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    }`}
+                  >
+                    {selectedPlatforms.includes('youtube') ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Check className="w-4 h-4" />
+                        Selected
+                      </span>
+                    ) : (
+                      "Select"
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleConnectYoutube()}
+                    disabled={isConnectingYoutube}
+                    className="w-full px-4 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+                  >
+                    {isConnectingYoutube ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Connecting...
+                      </span>
+                    ) : (
+                      "Connect YouTube"
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {selectedPlatforms.length > 0 && (
+              <div className="mt-6 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  <strong>{selectedPlatforms.length}</strong> platform{selectedPlatforms.length > 1 ? 's' : ''} selected: {selectedPlatforms.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(', ')}
+                </p>
+              </div>
+            )}
+          </div>
+        );
+
+      case 6:
+        return (
+          <div className="space-y-6">
+            <div className="text-center space-y-2 mb-8">
+              <h3 className="text-xl font-semibold">Series Configuration</h3>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Enter your series name and select when videos should be published
+              </p>
+            </div>
+
+            <div className="space-y-6">
+              {/* Series Name Input */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Series Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={seriesName}
+                  onChange={(e) => setSeriesName(e.target.value)}
+                  placeholder="e.g., Daily Motivation, Funny Stories, Tech Tips"
+                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                  required
+                />
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Give your series a memorable name that describes the content
+                </p>
+              </div>
+
+              {/* Publish Time Selector */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Publish Time <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={publishTime}
+                  onChange={(e) => setPublishTime(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                  required
+                >
+                  {Array.from({ length: 48 }, (_, i) => {
+                    const hour = Math.floor(i / 2);
+                    const minute = (i % 2) * 30;
+                    const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                    const hour12 = hour % 12 || 12;
+                    const ampm = hour >= 12 ? 'PM' : 'AM';
+                    const time12 = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
+                    return (
+                      <option key={time24} value={time24}>
+                        {time12}
+                      </option>
+                    );
+                  })}
+                </select>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Videos will be published at this time each day
+                </p>
+              </div>
+
+              {/* Summary */}
+              {seriesName && selectedPlatforms.length > 0 && (
+                <div className="mt-6 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                  <h4 className="font-semibold text-sm text-blue-900 dark:text-blue-100 mb-2">
+                    Series Summary
+                  </h4>
+                  <div className="space-y-1 text-sm text-blue-700 dark:text-blue-300">
+                    <p><strong>Name:</strong> {seriesName}</p>
+                    <p><strong>Publish Time:</strong> {(() => {
+                      const [hours, minutes] = publishTime.split(':');
+                      const hour12 = parseInt(hours) % 12 || 12;
+                      const ampm = parseInt(hours) >= 12 ? 'PM' : 'AM';
+                      return `${hour12}:${minutes} ${ampm}`;
+                    })()}</p>
+                    <p><strong>Platforms:</strong> {selectedPlatforms.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(', ')}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -1441,6 +1778,129 @@ export default function Dashboard() {
     </div>
   );
 
+  const renderSeriesManagementPage = () => {
+    const formatTime = (timeStr: string) => {
+      if (!timeStr) return "--:-- --";
+      const [hours, minutes] = timeStr.split(':');
+      const hour12 = parseInt(hours) % 12 || 12;
+      const ampm = parseInt(hours) >= 12 ? 'PM' : 'AM';
+      return `${hour12}:${minutes} ${ampm}`;
+    };
+
+    const formatDate = (dateStr: string | null) => {
+      if (!dateStr) return t.dashboard.seriesManagement.never;
+      const date = new Date(dateStr);
+      return date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+
+    return (
+      <div className="max-w-6xl w-full">
+        <div className="space-y-6">
+          <div className="text-center space-y-2 mb-8">
+            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mx-auto mb-4">
+              <List className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            </div>
+            <h2 className="text-2xl font-bold">{t.dashboard.seriesManagement.title}</h2>
+            <p className="text-zinc-500 dark:text-zinc-400">{t.dashboard.seriesManagement.subtitle}</p>
+          </div>
+
+          {isLoadingSeries ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-zinc-400" />
+              <span className="ml-3 text-zinc-500 dark:text-zinc-400">{t.dashboard.seriesManagement.loading}</span>
+            </div>
+          ) : seriesList.length === 0 ? (
+            <div className="text-center py-12 px-4">
+              <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                <List className="w-8 h-8 text-zinc-400" />
+              </div>
+              <p className="text-zinc-500 dark:text-zinc-400">{t.dashboard.seriesManagement.empty}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {seriesList.map((series) => (
+                <div
+                  key={series.id}
+                  className="p-6 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all bg-white dark:bg-zinc-900"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-lg mb-1">{series.series_name}</h3>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-2 py-1 text-xs font-medium rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                          {t.categories[series.category as keyof typeof t.categories] || series.category}
+                        </span>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-lg ${
+                          series.active
+                            ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                            : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
+                        }`}>
+                          {series.active ? t.dashboard.seriesManagement.active : t.dashboard.seriesManagement.inactive}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setEditingSeries(series);
+                        setIsEditModalOpen(true);
+                      }}
+                      className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                      title={t.dashboard.seriesManagement.editSeries}
+                    >
+                      <Edit className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 text-sm">
+                    <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
+                      <Video className="w-4 h-4" />
+                      <span>
+                        {series.video_type === "ai-images" 
+                          ? t.dashboard.seriesManagement.aiImages 
+                          : t.dashboard.seriesManagement.gameplay}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
+                      <Clock className="w-4 h-4" />
+                      <span>{formatTime(series.publish_time)}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
+                      <span className="font-medium">{t.dashboard.seriesManagement.platforms}:</span>
+                      <div className="flex gap-1 flex-wrap">
+                        {Array.isArray(series.social_platforms) && series.social_platforms.length > 0 ? (
+                          series.social_platforms.map((platform: string) => (
+                            <span key={platform} className="px-2 py-0.5 text-xs rounded bg-zinc-100 dark:bg-zinc-800">
+                              {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-zinc-400 text-xs">None</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {series.last_run && (
+                      <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
+                        <span className="font-medium">{t.dashboard.seriesManagement.lastRun}:</span>
+                        <span className="text-xs">{formatDate(series.last_run)}</span>
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700 text-xs text-zinc-500 dark:text-zinc-400">
+                      Created: {formatDate(series.created_at)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const handleSectionChange = (section: DashboardSection) => {
     setActiveSection(section);
     setIsSidebarOpen(false);
@@ -1500,6 +1960,18 @@ export default function Dashboard() {
             >
               <Link2 className={`w-5 h-5 ${activeSection === "social-media" ? "text-blue-600 dark:text-blue-400" : ""}`} />
               <span>{t.dashboard.menu.socialMedia}</span>
+            </button>
+
+            <button
+              onClick={() => handleSectionChange("series-management")}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all ${
+                activeSection === "series-management"
+                  ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                  : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              }`}
+            >
+              <List className={`w-5 h-5 ${activeSection === "series-management" ? "text-blue-600 dark:text-blue-400" : ""}`} />
+              <span>{t.dashboard.menu.manageSeries}</span>
             </button>
           </div>
         </aside>
@@ -1816,11 +2288,326 @@ export default function Dashboard() {
             </div>
           )}
             </div>
-          ) : (
+          ) : activeSection === "social-media" ? (
             renderSocialMediaPage()
+          ) : (
+            renderSeriesManagementPage()
           )}
         </main>
       </div>
+
+      {/* Edit Series Modal */}
+      {isEditModalOpen && editingSeries && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto"
+          onClick={() => {
+            if (!isUpdatingSeries) {
+              setIsEditModalOpen(false);
+              setEditingSeries(null);
+            }
+          }}
+        >
+          <div 
+            className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden max-w-2xl w-full my-8 animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <Edit className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                  {t.dashboard.seriesManagement.editSeries}
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  if (!isUpdatingSeries) {
+                    setIsEditModalOpen(false);
+                    setEditingSeries(null);
+                  }
+                }}
+                disabled={isUpdatingSeries}
+                className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              >
+                <X className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+              {/* Series Name */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  {t.dashboard.seriesManagement.seriesName}
+                </label>
+                <input
+                  type="text"
+                  defaultValue={editingSeries.series_name}
+                  id="edit-series-name"
+                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                />
+              </div>
+
+              {/* Category */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  {t.dashboard.seriesManagement.category}
+                </label>
+                <select
+                  defaultValue={editingSeries.category}
+                  id="edit-category"
+                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                >
+                  {Object.keys(CATEGORY_ICONS).map((key) => (
+                    <option key={key} value={key}>
+                      {t.categories[key as keyof typeof t.categories]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Publish Time */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  {t.dashboard.seriesManagement.publishTime}
+                </label>
+                <select
+                  defaultValue={editingSeries.publish_time}
+                  id="edit-publish-time"
+                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                >
+                  {Array.from({ length: 48 }, (_, i) => {
+                    const hour = Math.floor(i / 2);
+                    const minute = (i % 2) * 30;
+                    const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                    const hour12 = hour % 12 || 12;
+                    const ampm = hour >= 12 ? 'PM' : 'AM';
+                    const time12 = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
+                    return (
+                      <option key={time24} value={time24}>
+                        {time12}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* Active Status */}
+              <div className="flex items-center justify-between p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
+                <div>
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    {t.dashboard.seriesManagement.active}
+                  </label>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                    {editingSeries.active ? t.dashboard.seriesManagement.active : t.dashboard.seriesManagement.inactive}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const checkbox = document.getElementById('edit-active') as HTMLInputElement;
+                    if (checkbox) checkbox.checked = !checkbox.checked;
+                  }}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    editingSeries.active ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-zinc-600'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    id="edit-active"
+                    defaultChecked={editingSeries.active}
+                    className="sr-only"
+                  />
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      editingSeries.active ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Social Platforms */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  {t.dashboard.seriesManagement.platforms}
+                </label>
+                <div className="space-y-2">
+                  {['tiktok', 'instagram', 'youtube'].map((platform) => (
+                    <label key={platform} className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        defaultChecked={Array.isArray(editingSeries.social_platforms) && editingSeries.social_platforms.includes(platform)}
+                        value={platform}
+                        className="edit-platform-checkbox rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm capitalize">{platform}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Language */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  {t.form.voiceLanguage}
+                </label>
+                <select
+                  defaultValue={editingSeries.language}
+                  id="edit-language"
+                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                >
+                  {Object.entries(LANGUAGE_FLAGS).map(([code, flag]) => (
+                    <option key={code} value={code}>
+                      {flag} {t.languages[code as keyof typeof t.languages]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Voice */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  {t.form.narratorVoice}
+                </label>
+                <select
+                  defaultValue={editingSeries.narrator_voice}
+                  id="edit-voice"
+                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                >
+                  {VOICES.map((voice) => (
+                    <option key={voice} value={voice}>
+                      {voice.charAt(0).toUpperCase() + voice.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Duration */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  {t.form.duration}
+                </label>
+                <select
+                  defaultValue={editingSeries.duration}
+                  id="edit-duration"
+                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                >
+                  {DURATION_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Conditional Fields */}
+              {editingSeries.video_type === "ai-images" && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    {t.form.artStyle}
+                  </label>
+                  <select
+                    defaultValue={editingSeries.art_style || "cartoon"}
+                    id="edit-art-style"
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                  >
+                    {ART_STYLES.map((style) => (
+                      <option key={style.value} value={style.value}>
+                        {t.artStyles[style.value as keyof typeof t.artStyles]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {editingSeries.video_type === "gameplay" && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    Background Video
+                  </label>
+                  <select
+                    defaultValue={editingSeries.background_video || "minecraft"}
+                    id="edit-background-video"
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                  >
+                    {BACKGROUND_VIDEOS.map((bg) => (
+                      <option key={bg.value} value={bg.value}>
+                        {bg.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 p-6 border-t border-zinc-200 dark:border-zinc-800">
+              <button
+                onClick={() => {
+                  if (!isUpdatingSeries) {
+                    setIsEditModalOpen(false);
+                    setEditingSeries(null);
+                  }
+                }}
+                disabled={isUpdatingSeries}
+                className="flex-1 px-4 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              >
+                {t.dashboard.seriesManagement.cancel}
+              </button>
+              <button
+                onClick={() => {
+                  const seriesName = (document.getElementById('edit-series-name') as HTMLInputElement)?.value;
+                  const category = (document.getElementById('edit-category') as HTMLSelectElement)?.value;
+                  const publishTime = (document.getElementById('edit-publish-time') as HTMLSelectElement)?.value;
+                  const active = (document.getElementById('edit-active') as HTMLInputElement)?.checked;
+                  const language = (document.getElementById('edit-language') as HTMLSelectElement)?.value;
+                  const voice = (document.getElementById('edit-voice') as HTMLSelectElement)?.value;
+                  const duration = (document.getElementById('edit-duration') as HTMLSelectElement)?.value;
+                  
+                  const selectedPlatforms: string[] = [];
+                  document.querySelectorAll('.edit-platform-checkbox:checked').forEach((checkbox) => {
+                    selectedPlatforms.push((checkbox as HTMLInputElement).value);
+                  });
+
+                  const updateData: any = {
+                    seriesName,
+                    category,
+                    publishTime,
+                    active,
+                    selectedPlatforms,
+                    language,
+                    voice,
+                    duration,
+                  };
+
+                  if (editingSeries.video_type === "ai-images") {
+                    updateData.artStyle = (document.getElementById('edit-art-style') as HTMLSelectElement)?.value;
+                  }
+
+                  if (editingSeries.video_type === "gameplay") {
+                    updateData.backgroundVideo = (document.getElementById('edit-background-video') as HTMLSelectElement)?.value;
+                  }
+
+                  handleUpdateSeries(updateData);
+                }}
+                disabled={isUpdatingSeries}
+                className="flex-1 px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isUpdatingSeries ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {t.dashboard.seriesManagement.updating}
+                  </>
+                ) : (
+                  t.dashboard.seriesManagement.save
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Preview Video Dialog */}
       {previewVideoType && (
