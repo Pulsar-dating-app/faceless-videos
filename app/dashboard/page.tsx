@@ -651,6 +651,9 @@ export default function Dashboard() {
       setIsGenerating(true);
       
       try {
+        // Get user's timezone (default to UTC if not available)
+        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+        
         const { data, error } = await supabase.functions.invoke("create-series", {
           body: {
             seriesName: seriesName.trim(),
@@ -663,6 +666,7 @@ export default function Dashboard() {
             language: language,
             voice: voice,
             duration: duration,
+            timezone: userTimezone,
           },
         });
 
