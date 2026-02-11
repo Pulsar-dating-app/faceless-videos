@@ -1,9 +1,10 @@
 "use client";
 
 import { ArrowRight, Sparkles, Loader2, UserX, DollarSign, Clock, TrendingUp, Star, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 
@@ -70,6 +71,18 @@ export default function Home() {
       router.push("/login");
     }
   };
+
+  // Scroll to FAQ section if URL has #faq hash
+  useEffect(() => {
+    if (window.location.hash === "#faq") {
+      setTimeout(() => {
+        const faqSection = document.getElementById("faq");
+        if (faqSection) {
+          faqSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 100);
+    }
+  }, []);
 
   // Duplicate videos for seamless infinite loop
   const carouselVideos = [...CAROUSEL_VIDEOS, ...CAROUSEL_VIDEOS];
@@ -285,7 +298,7 @@ export default function Home() {
         </section>
 
         {/* FAQ Section */}
-        <section className="w-full mt-0 px-4 py-16 sm:py-24">
+        <section id="faq" className="w-full mt-0 px-4 py-16 sm:py-24">
           <div className="max-w-4xl mx-auto">
             {/* Section Header */}
             <div className="text-center mb-12 sm:mb-16">
@@ -335,10 +348,7 @@ export default function Home() {
         </section>
       </main>
 
-      {/* Simple Footer */}
-      <footer className="w-full py-6 text-center text-sm text-zinc-500 dark:text-zinc-600">
-        <p>{formatMessage(t.footer.copyright, { year: new Date().getFullYear() })}</p>
-      </footer>
+      <Footer />
     </div>
   );
 }

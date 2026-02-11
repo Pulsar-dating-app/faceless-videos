@@ -54,6 +54,22 @@ export function Navbar({ onLogoClick }: NavbarProps) {
     }
   };
 
+  const handleFaqClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (pathname === "/") {
+      // If on home page, scroll to FAQ section
+      const faqSection = document.getElementById("faq");
+      if (faqSection) {
+        faqSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    } else {
+      // If on another page, navigate to home with FAQ hash
+      router.push("/#faq");
+    }
+    // Close mobile menu if open
+    setIsMobileMenuOpen(false);
+  };
+
   const currentLang = LANGUAGE_OPTIONS.find(l => l.code === language) || LANGUAGE_OPTIONS[0];
 
   return (
@@ -88,9 +104,8 @@ export function Navbar({ onLogoClick }: NavbarProps) {
 
       {/* Desktop Navigation */}
       <nav className="hidden md:flex gap-6 text-sm font-medium text-zinc-600 dark:text-zinc-400 items-center">
-        <a href="#" className="hover:text-blue-600 transition-colors">{t.nav.features}</a>
         <Link href="/pricing" className="hover:text-blue-600 transition-colors">{t.nav.pricing}</Link>
-        <a href="#" className="hover:text-blue-600 transition-colors">{t.nav.about}</a>
+        <a href="#faq" onClick={handleFaqClick} className="hover:text-blue-600 transition-colors cursor-pointer">{t.nav.faq}</a>
         
         {/* Language Switcher */}
         <div className="relative" ref={dropdownRef}>
@@ -159,14 +174,11 @@ export function Navbar({ onLogoClick }: NavbarProps) {
         isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
       }`}>
         <div className="flex flex-col p-6 pt-20 gap-4">
-          <a href="#" className="px-4 py-3 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium transition-colors">
-            {t.nav.features}
-          </a>
           <Link href="/pricing" className="px-4 py-3 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium transition-colors">
             {t.nav.pricing}
           </Link>
-          <a href="#" className="px-4 py-3 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium transition-colors">
-            {t.nav.about}
+          <a href="#faq" onClick={handleFaqClick} className="px-4 py-3 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium transition-colors cursor-pointer">
+            {t.nav.faq}
           </a>
           
           {/* Language Switcher Mobile */}

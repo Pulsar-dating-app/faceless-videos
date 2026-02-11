@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Mail, Lock, User, Loader2, CheckCircle2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -194,10 +195,7 @@ export default function SignupPage() {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="w-full py-6 text-center text-sm text-zinc-500 dark:text-zinc-600">
-        <p>© {new Date().getFullYear()} Viral Faceless Reels. All rights reserved.</p>
-      </footer>
+      <Footer />
 
       {/* Success Dialog */}
       {showSuccessDialog && (
@@ -246,4 +244,3 @@ export default function SignupPage() {
     </div>
   );
 }
-
