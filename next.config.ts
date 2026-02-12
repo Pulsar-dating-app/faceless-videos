@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["ffmpeg-static", "fluent-ffmpeg"],
+  serverExternalPackages: ["ffmpeg-static", "ffprobe-static", "fluent-ffmpeg"],
   images: {
     remotePatterns: [
       {
