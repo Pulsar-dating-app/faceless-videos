@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       SUPABASE_SERVICE_ROLE_KEY
     );
 
-    // Invoke generate-video edge function with internal queue header
+    // 1) Invoke generate-video edge function with internal queue header
     const { data, error } = await supabaseFunctions.functions.invoke(
       "generate-video",
       {
@@ -118,6 +118,7 @@ export async function GET(request: NextRequest) {
         {
           success: false,
           processed: 0,
+          step: "generate-video",
           msg_id: msgId,
           automation_id: payload?.automation_id,
           error: error?.message || data?.error || "Failed to generate video",
@@ -126,7 +127,140 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // On success, archive the message
+    const audioUrl: string | undefined = (data as any)?.audioUrl;
+    const subtitles: string | undefined = (data as any)?.subtitles;
+
+    if (!audioUrl) {
+      console.error(
+        "[consume-queue] Missing audioUrl from generate-video response",
+        data
+      );
+
+      // Treat this as a hard failure and delete the message
+      const { error: deleteError } = await supabaseAdmin.rpc(
+        "pgmq_delete_video",
+        {
+          queue_name: "video_generation_queue",
+          msg_id: msgId,
+        }
+      );
+
+      if (deleteError) {
+        console.error(
+          "[consume-queue] Error deleting failed message from pgmq:",
+          deleteError
+        );
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          processed: 0,
+          step: "generate-video",
+          msg_id: msgId,
+          automation_id: payload?.automation_id,
+          error: "Missing audioUrl from generate-video response",
+        },
+        { status: 500 }
+      );
+    }
+
+    // Decide which background video to use (if any was configured)
+    const backgroundVideoUrl: string | undefined =
+      (payload as any)?.background_video || undefined;
+
+    // 2) Call local /api/merge route to produce final video
+    const baseUrl =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      (process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000");
+
+    let mergeResponse;
+    try {
+      mergeResponse = await fetch(new URL("/api/merge", baseUrl).toString(), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          audioUrl,
+          subtitles,
+          backgroundVideoUrl,
+        }),
+      });
+    } catch (mergeErr: any) {
+      console.error(
+        "[consume-queue] Network error calling /api/merge:",
+        mergeErr
+      );
+      // Do NOT archive/delete here so pgmq can retry this job later
+      return NextResponse.json(
+        {
+          success: false,
+          processed: 0,
+          step: "merge",
+          msg_id: msgId,
+          automation_id: payload?.automation_id,
+          error:
+            mergeErr?.message ||
+            "Network error while calling /api/merge for video merge",
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!mergeResponse.ok) {
+      const errorText = await mergeResponse.text();
+      console.error(
+        "[consume-queue] /api/merge returned non-OK status",
+        mergeResponse.status,
+        errorText
+      );
+      // Do NOT archive/delete here so pgmq can retry this job later
+      return NextResponse.json(
+        {
+          success: false,
+          processed: 0,
+          step: "merge",
+          msg_id: msgId,
+          automation_id: payload?.automation_id,
+          status: mergeResponse.status,
+          error:
+            errorText ||
+            "Failed to merge video via /api/merge (non-OK response)",
+        },
+        { status: 500 }
+      );
+    }
+
+    const mergeData = (await mergeResponse.json()) as {
+      jobId?: string;
+      success?: boolean;
+      url?: string | null;
+    };
+
+    if (!mergeData?.success || !mergeData?.url) {
+      console.error(
+        "[consume-queue] /api/merge did not return success or url",
+        mergeData
+      );
+      // Do NOT archive/delete here so pgmq can retry this job later
+      return NextResponse.json(
+        {
+          success: false,
+          processed: 0,
+          step: "merge",
+          msg_id: msgId,
+          automation_id: payload?.automation_id,
+          error:
+            "Merge worker did not return a successful result or missing final video URL",
+        },
+        { status: 500 }
+      );
+    }
+
+    // 3) On full success (generation + merge), archive the message
     const { error: archiveError } = await supabaseAdmin.rpc(
       "pgmq_archive_video",
       {
@@ -157,6 +291,11 @@ export async function GET(request: NextRequest) {
       processed: 1,
       msg_id: msgId,
       automation_id: payload?.automation_id,
+      // bubble up some useful data for debugging/monitoring
+      audioUrl,
+      subtitlesLength: subtitles?.length ?? 0,
+      mergedVideoUrl: mergeData.url,
+      mergeJobId: mergeData.jobId,
     });
   } catch (error: any) {
     console.error("[consume-queue] Unexpected error:", error);
