@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
           body: JSON.stringify({
             audioUrl,
             subtitles,
-            backgroundVideoUrl: null,
+            backgroundVideoUrl: payload.background_video,
           }),
         });
 

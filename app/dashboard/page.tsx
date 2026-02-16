@@ -113,7 +113,7 @@ export default function Dashboard() {
   const [language, setLanguage] = useState("en");
   const [voice, setVoice] = useState("alloy");
   const [artStyle, setArtStyle] = useState("cartoon");
-  const [backgroundVideo, setBackgroundVideo] = useState("minecraft");
+  const [backgroundVideo, setBackgroundVideo] = useState(BACKGROUND_VIDEOS[0]?.url ?? "");
   const [customPrompt, setCustomPrompt] = useState("");
   const [script, setScript] = useState("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -1096,9 +1096,9 @@ export default function Dashboard() {
                   <button
                     key={bgVideo.value}
                     type="button"
-                    onClick={() => setBackgroundVideo(bgVideo.value)}
+                    onClick={() => setBackgroundVideo(bgVideo.url)}
                     className={`relative overflow-hidden rounded-xl border-2 transition-all ${
-                      backgroundVideo === bgVideo.value
+                      backgroundVideo === bgVideo.url
                         ? "border-blue-500 ring-2 ring-blue-500/50"
                         : "border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600"
                     }`}
@@ -1110,7 +1110,7 @@ export default function Dashboard() {
                         fill
                         className="object-cover"
                       />
-                      {backgroundVideo === bgVideo.value && (
+                      {backgroundVideo === bgVideo.url && (
                         <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
                           <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
                             <Check className="w-5 h-5 text-white" />
@@ -1119,7 +1119,7 @@ export default function Dashboard() {
                       )}
                     </div>
                     <div className={`p-2 text-center text-sm font-medium ${
-                      backgroundVideo === bgVideo.value
+                      backgroundVideo === bgVideo.url
                         ? "text-blue-700 dark:text-blue-300"
                         : "text-zinc-700 dark:text-zinc-300"
                     }`}>
@@ -2532,12 +2532,16 @@ export default function Dashboard() {
                     Background Video
                   </label>
                   <select
-                    defaultValue={editingSeries.background_video || "minecraft"}
+                    defaultValue={
+                      BACKGROUND_VIDEOS.find(
+                        (b) => b.url === editingSeries.background_video || b.value === editingSeries.background_video
+                      )?.url ?? BACKGROUND_VIDEOS[0]?.url ?? ""
+                    }
                     id="edit-background-video"
                     className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
                   >
                     {BACKGROUND_VIDEOS.map((bg) => (
-                      <option key={bg.value} value={bg.value}>
+                      <option key={bg.value} value={bg.url}>
                         {bg.label}
                       </option>
                     ))}
