@@ -54,14 +54,13 @@ export async function GET(request: NextRequest) {
     // Create Supabase admin client
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Read all jobs from pgmq that should be processed in the next 6 hours
-    // We use a larger quantity to get multiple messages
+    // Read only 1 job from pgmq (cron runs every 2 minutes)
     const { data: messages, error: readError } = await supabaseAdmin.rpc(
       "pgmq_read_video",
       {
         queue_name: "video_generation_queue",
         vt: 3600, // 1 hour visibility timeout for processing
-        qty: 100, // Read up to 100 messages
+        qty: 1, // Read only 1 message per cron execution
       }
     );
 
@@ -83,32 +82,11 @@ export async function GET(request: NextRequest) {
 
     console.log(`[consume-queue] Found ${messages.length} jobs in queue`);
 
-    // Filter messages that should be processed in the next 6 hours
-    const now = new Date();
-    const sixHoursFromNow = new Date(now.getTime() + 6 * 60 * 60 * 1000);
-
-    const messagesToProcess = messages.filter((job: any) => {
-      const payload = job.message as AutomationPayload;
-      const scheduledTime = new Date(payload.scheduled_time);
-      return scheduledTime >= now && scheduledTime <= sixHoursFromNow;
-    });
-
-    console.log(`[consume-queue] ${messagesToProcess.length} jobs scheduled in the next 6 hours`);
-
-    if (messagesToProcess.length === 0) {
-      return NextResponse.json({
-        success: true,
-        processed: 0,
-        message: "No jobs scheduled in the next 6 hours",
-      });
-    }
-
     const results: any[] = [];
     const errors: any[] = [];
-    const skipped: any[] = [];
 
     // Process each job sequentially
-    for (const job of messagesToProcess) {
+    for (const job of messages) {
       const msgId: number = job.msg_id;
       const payload = job.message as AutomationPayload;
 
@@ -254,7 +232,6 @@ export async function GET(request: NextRequest) {
       success: true,
       processed: results.length,
       total: messages.length,
-      totalScheduledInNext6Hours: messagesToProcess.length,
       results,
       errors,
     });
