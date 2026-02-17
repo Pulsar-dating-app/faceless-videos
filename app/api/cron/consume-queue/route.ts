@@ -17,6 +17,7 @@ interface AutomationPayload {
   narrator_voice: string;
   video_type: string;
   background_video?: string;
+  art_style?: string;
   social_platforms?: string[];
   scheduled_time: string;
   publish_time: string;
@@ -101,77 +102,176 @@ export async function GET(request: NextRequest) {
       );
 
       try {
-        // 1) Call the generate-video edge function
-        const generateResponse = await fetch(
-          `${SUPABASE_URL}/functions/v1/generate-video`,
-          {
+        let videoUrl: string;
+        let audioUrl: string;
+        let script: string;
+
+        // Check video_type to determine which flow to use
+        if (payload.video_type === "ai-images") {
+          console.log(`[consume-queue] Processing AI-images video for job ${msgId}`);
+          
+          // 1) Call the generate-ai-video edge function to generate script, audio, and images
+          const aiVideoResponse = await fetch(
+            `${SUPABASE_URL}/functions/v1/generate-ai-video`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+              },
+              body: JSON.stringify({
+                userId: payload.user_uid,
+                category: payload.category,
+                prompt: payload.prompt,
+                duration: payload.duration,
+                language: payload.language,
+                voice: payload.narrator_voice,
+                artStyle: payload.art_style,
+              }),
+            }
+          );
+
+          if (!aiVideoResponse.ok) {
+            const errorText = await aiVideoResponse.text();
+            throw new Error(`Generate-ai-video failed: ${errorText}`);
+          }
+
+          const aiVideoData = await aiVideoResponse.json();
+          
+          if (aiVideoData.error) {
+            throw new Error(aiVideoData.error);
+          }
+
+          audioUrl = aiVideoData.audioUrl;
+          script = aiVideoData.script || "";
+          const subtitles = aiVideoData.subtitles || "";
+          const generatedImages = aiVideoData.generatedImages || [];
+          const audioDuration = aiVideoData.audioDuration;
+
+          if (!audioUrl) {
+            throw new Error("Missing audioUrl from generate-ai-video response");
+          }
+
+          if (!generatedImages || generatedImages.length === 0) {
+            throw new Error("No images generated from generate-ai-video response");
+          }
+
+          console.log(`[consume-queue] Generated ${generatedImages.length} AI images and audio for job ${msgId}`);
+
+          // 2) Call /api/merge-ai-video to merge images with audio
+          const baseUrl =
+            process.env.NEXT_PUBLIC_SITE_URL ||
+            (process.env.VERCEL_URL
+              ? `https://${process.env.VERCEL_URL}`
+              : "http://localhost:3000");
+
+          const mergeAiResponse = await fetch(new URL("/api/merge-ai-video", baseUrl).toString(), {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
             },
             body: JSON.stringify({
-              category: payload.category,
-              prompt: payload.prompt,
-              duration: payload.duration,
-              language: payload.language,
-              voice: payload.narrator_voice,
+              audioUrl,
+              subtitles,
+              generatedImages,
+              audioDuration,
             }),
+          });
+
+          if (!mergeAiResponse.ok) {
+            const errorText = await mergeAiResponse.text();
+            throw new Error(`Merge-ai-video failed: ${errorText}`);
           }
-        );
 
-        if (!generateResponse.ok) {
-          const errorText = await generateResponse.text();
-          throw new Error(`Generate-video failed: ${errorText}`);
+          const mergeAiData = await mergeAiResponse.json();
+
+          if (!mergeAiData?.url) {
+            throw new Error("Merge-ai-video did not return url");
+          }
+
+          videoUrl = mergeAiData.url;
+
+          console.log(`[consume-queue] Successfully merged AI video for job ${msgId}: ${videoUrl}`);
+
+        } else {
+          console.log(`[consume-queue] Processing gameplay video for job ${msgId}`);
+
+          // Original flow: Call generate-video for audio/subtitles, then merge with background
+          const generateResponse = await fetch(
+            `${SUPABASE_URL}/functions/v1/generate-video`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+              },
+              body: JSON.stringify({
+                category: payload.category,
+                prompt: payload.prompt,
+                duration: payload.duration,
+                language: payload.language,
+                voice: payload.narrator_voice,
+              }),
+            }
+          );
+
+          if (!generateResponse.ok) {
+            const errorText = await generateResponse.text();
+            throw new Error(`Generate-video failed: ${errorText}`);
+          }
+
+          const generateData = await generateResponse.json();
+          
+          if (generateData.error) {
+            throw new Error(generateData.error);
+          }
+
+          audioUrl = generateData.audioUrl;
+          const subtitles = generateData.subtitles || "";
+          script = generateData.script || "";
+
+          if (!audioUrl) {
+            throw new Error("Missing audioUrl from generate-video response");
+          }
+
+          console.log(`[consume-queue] Generated audio for job ${msgId} (${payload.series_name})`);
+
+          // Call /api/merge with background video
+          const baseUrl =
+            process.env.NEXT_PUBLIC_SITE_URL ||
+            (process.env.VERCEL_URL
+              ? `https://${process.env.VERCEL_URL}`
+              : "http://localhost:3000");
+
+          const mergeResponse = await fetch(new URL("/api/merge", baseUrl).toString(), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              audioUrl,
+              subtitles,
+              backgroundVideoUrl: payload.background_video,
+            }),
+          });
+
+          if (!mergeResponse.ok) {
+            const errorText = await mergeResponse.text();
+            throw new Error(`Merge failed: ${errorText}`);
+          }
+
+          const mergeData = await mergeResponse.json();
+
+          if (!mergeData?.success || !mergeData?.url) {
+            throw new Error("Merge did not return success or url");
+          }
+
+          videoUrl = mergeData.url;
+
+          console.log(`[consume-queue] Successfully merged gameplay video for job ${msgId}: ${videoUrl}`);
         }
 
-        const generateData = await generateResponse.json();
-        
-        if (generateData.error) {
-          throw new Error(generateData.error);
-        }
-
-        const audioUrl = generateData.audioUrl;
-        const subtitles = generateData.subtitles || "";
-        const script = generateData.script || "";
-
-        if (!audioUrl) {
-          throw new Error("Missing audioUrl from generate-video response");
-        }
-
-        console.log(`[consume-queue] Generated audio for job ${msgId} (${payload.series_name})`);
-
-        // 2) Call /api/merge with backgroundVideoUrl as null
-        const baseUrl =
-          process.env.NEXT_PUBLIC_SITE_URL ||
-          (process.env.VERCEL_URL
-            ? `https://${process.env.VERCEL_URL}`
-            : "http://localhost:3000");
-
-        const mergeResponse = await fetch(new URL("/api/merge", baseUrl).toString(), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            audioUrl,
-            subtitles,
-            backgroundVideoUrl: payload.background_video,
-          }),
-        });
-
-        if (!mergeResponse.ok) {
-          const errorText = await mergeResponse.text();
-          throw new Error(`Merge failed: ${errorText}`);
-        }
-
-        const mergeData = await mergeResponse.json();
-
-        if (!mergeData?.success || !mergeData?.url) {
-          throw new Error("Merge did not return success or url");
-        }
-
-        console.log(`[consume-queue] Successfully processed job ${msgId}: ${mergeData.url}`);
+        console.log(`[consume-queue] Successfully processed job ${msgId}: ${videoUrl}`);
 
         // 3) Archive the message on success
         const { error: archiveError } = await supabaseAdmin.rpc(
@@ -194,8 +294,8 @@ export async function GET(request: NextRequest) {
           msgId,
           automationId: payload.automation_id,
           seriesName: payload.series_name,
-          videoUrl: mergeData.url,
-          jobId: mergeData.jobId,
+          videoUrl: videoUrl,
+          videoType: payload.video_type,
           audioUrl,
           script,
         });
@@ -244,4 +344,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
