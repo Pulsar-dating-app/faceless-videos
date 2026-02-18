@@ -157,6 +157,12 @@ export default function Dashboard() {
   // Series configuration
   const [seriesName, setSeriesName] = useState("");
   const [publishTime, setPublishTime] = useState("09:00"); // Default 9 AM
+  const [secondPublishTime, setSecondPublishTime] = useState("17:00"); // For elite plan
+  const [publishDays, setPublishDays] = useState<string[]>([]); // For starter plan (3 days/week)
+
+  // Subscription plan state
+  const [userPlanId, setUserPlanId] = useState<string | null>(null);
+  const [isLoadingPlan, setIsLoadingPlan] = useState<boolean>(true);
 
   // Series management state
   const [seriesList, setSeriesList] = useState<any[]>([]);
@@ -182,6 +188,41 @@ export default function Dashboard() {
       router.push("/login");
     }
   }, [user, isLoading, router]);
+
+  // Load current user's subscription plan
+  useEffect(() => {
+    const loadPlan = async () => {
+      if (!user) {
+        setUserPlanId(null);
+        setIsLoadingPlan(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("subscriptions")
+          .select("plan_id")
+          .eq("user_id", user.id)
+          .single();
+
+        if (error) {
+          console.error("Error loading subscription plan:", error);
+          setUserPlanId(null);
+        } else {
+          setUserPlanId(data?.plan_id ?? null);
+        }
+      } catch (err) {
+        console.error("Unexpected error loading subscription plan:", err);
+        setUserPlanId(null);
+      } finally {
+        setIsLoadingPlan(false);
+      }
+    };
+
+    if (!isLoading) {
+      loadPlan();
+    }
+  }, [user, isLoading]);
 
   // Check TikTok/Instagram/YouTube connection status on mount and when returning from OAuth
   useEffect(() => {
@@ -494,8 +535,8 @@ export default function Dashboard() {
         case 2: return t.steps.categoryDuration;
         case 3: return t.steps.voiceSettings;
         case 4: return t.steps.artStyle;
-        case 5: return "Publishing Platforms";
-        case 6: return "Series Configuration";
+        case 5: return t.dashboard.seriesSetup.stepPublishingPlatforms;
+        case 6: return t.dashboard.seriesSetup.stepSeriesConfiguration;
         default: return "";
       }
     } else {
@@ -503,9 +544,9 @@ export default function Dashboard() {
         case 1: return t.steps.videoType;
         case 2: return t.steps.categoryDuration;
         case 3: return t.steps.voiceSettings;
-        case 4: return "Background Video";
-        case 5: return "Publishing Platforms";
-        case 6: return "Series Configuration";
+        case 4: return t.dashboard.seriesSetup.backgroundVideoStep;
+        case 5: return t.dashboard.seriesSetup.stepPublishingPlatforms;
+        case 6: return t.dashboard.seriesSetup.stepSeriesConfiguration;
         default: return "";
       }
     }
@@ -647,6 +688,23 @@ export default function Dashboard() {
         return;
       }
 
+      const isStarterPlan = userPlanId === "starter";
+      const isElitePlan = userPlanId === "elite";
+
+      if (isStarterPlan) {
+        if (publishDays.length !== 3) {
+          alert("Starter plan requires selecting exactly 3 publish days per week.");
+          return;
+        }
+      }
+
+      if (isElitePlan) {
+        if (!secondPublishTime) {
+          alert("Please select a second publish time for your Elite plan.");
+          return;
+        }
+      }
+
       // Create series instead of generating video
       setIsGenerating(true);
       
@@ -659,6 +717,9 @@ export default function Dashboard() {
             seriesName: seriesName.trim(),
             category: category,
             publishTime: publishTime,
+            secondPublishTime: userPlanId === "elite" ? secondPublishTime : undefined,
+            publishDays: userPlanId === "starter" ? publishDays : undefined,
+            planId: userPlanId ?? undefined,
             selectedPlatforms: selectedPlatforms,
             videoType: videoType,
             artStyle: videoType === "ai-images" ? artStyle : undefined,
@@ -730,6 +791,8 @@ export default function Dashboard() {
     setSelectedPlatforms([]);
     setSeriesName("");
     setPublishTime("09:00");
+    setSecondPublishTime("17:00");
+    setPublishDays([]);
   };
 
   const handlePostToSocial = async (platform: string) => {
@@ -1206,9 +1269,9 @@ export default function Dashboard() {
         return (
           <div className="space-y-6">
             <div className="text-center space-y-2 mb-8">
-              <h3 className="text-xl font-semibold">Choose Publishing Platforms</h3>
+              <h3 className="text-xl font-semibold">{t.dashboard.seriesSetup.publishingPlatformsTitle}</h3>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Select which social media platforms you want to publish your series to
+                {t.dashboard.seriesSetup.publishingPlatformsSubtitle}
               </p>
             </div>
 
@@ -1461,12 +1524,15 @@ export default function Dashboard() {
         );
 
       case 6:
+        const isStarterPlan = userPlanId === "starter";
+        const isElitePlan = userPlanId === "elite";
+
         return (
           <div className="space-y-6">
             <div className="text-center space-y-2 mb-8">
-              <h3 className="text-xl font-semibold">Series Configuration</h3>
+              <h3 className="text-xl font-semibold">{t.dashboard.seriesSetup.seriesConfigurationTitle}</h3>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Enter your series name and select when videos should be published
+                {t.dashboard.seriesSetup.seriesConfigurationSubtitle}
               </p>
             </div>
 
@@ -1474,7 +1540,7 @@ export default function Dashboard() {
               {/* Series Name Input */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Series Name <span className="text-red-500">*</span>
+                  {t.dashboard.seriesSetup.seriesNameLabel} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -1485,55 +1551,174 @@ export default function Dashboard() {
                   required
                 />
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Give your series a memorable name that describes the content
+                  {t.dashboard.seriesSetup.seriesNameHelper}
                 </p>
               </div>
 
-              {/* Publish Time Selector */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Publish Time <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={publishTime}
-                  onChange={(e) => setPublishTime(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
-                  required
-                >
-                  {Array.from({ length: 48 }, (_, i) => {
-                    const hour = Math.floor(i / 2);
-                    const minute = (i % 2) * 30;
-                    const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-                    const hour12 = hour % 12 || 12;
-                    const ampm = hour >= 12 ? 'PM' : 'AM';
-                    const time12 = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
-                    return (
-                      <option key={time24} value={time24}>
-                        {time12}
-                      </option>
-                    );
-                  })}
-                </select>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Videos will be published at this time each day
-                </p>
+              {/* Publish Time Selector(s) */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    {t.dashboard.seriesSetup.publishTimeLabel} <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={publishTime}
+                    onChange={(e) => setPublishTime(e.target.value)}
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                    required
+                  >
+                    {Array.from({ length: 48 }, (_, i) => {
+                      const hour = Math.floor(i / 2);
+                      const minute = (i % 2) * 30;
+                      const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                      const hour12 = hour % 12 || 12;
+                      const ampm = hour >= 12 ? 'PM' : 'AM';
+                      const time12 = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
+                      return (
+                        <option key={time24} value={time24}>
+                          {time12}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {isStarterPlan
+                      ? t.dashboard.seriesSetup.publishTimeHelperStarter
+                      : isElitePlan
+                      ? t.dashboard.seriesSetup.publishTimeHelperElite
+                      : t.dashboard.seriesSetup.publishTimeHelperDefault}
+                  </p>
+                </div>
+
+                {isElitePlan && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      {t.dashboard.seriesSetup.secondPublishTimeLabel} <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={secondPublishTime}
+                      onChange={(e) => setSecondPublishTime(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                      required
+                    >
+                      {Array.from({ length: 48 }, (_, i) => {
+                        const hour = Math.floor(i / 2);
+                        const minute = (i % 2) * 30;
+                        const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                        const hour12 = hour % 12 || 12;
+                        const ampm = hour >= 12 ? 'PM' : 'AM';
+                        const time12 = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
+                        return (
+                          <option key={time24} value={time24}>
+                            {time12}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {t.dashboard.seriesSetup.secondPublishTimeHelperElite}
+                    </p>
+                  </div>
+                )}
+
+                {isStarterPlan && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      {t.dashboard.seriesSetup.publishDaysLabel} <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map(
+                        (day) => {
+                          const isSelected = publishDays.includes(day);
+                          const label =
+                            (t.dashboard.weekdays as any)?.[day] ??
+                            day.charAt(0).toUpperCase() + day.slice(1, 3);
+
+                          const handleClick = () => {
+                            if (isSelected) {
+                              setPublishDays(publishDays.filter((d) => d !== day));
+                            } else {
+                              if (publishDays.length >= 3) {
+                                alert("Starter plan allows exactly 3 days per week. Deselect another day first.");
+                                return;
+                              }
+                              setPublishDays([...publishDays, day]);
+                            }
+                          };
+
+                          return (
+                            <button
+                              key={day}
+                              type="button"
+                              onClick={handleClick}
+                              className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                                isSelected
+                                  ? "bg-blue-600 text-white border-blue-600"
+                                  : "bg-zinc-50 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        }
+                      )}
+                    </div>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {t.dashboard.seriesSetup.publishDaysHelper}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Summary */}
               {seriesName && selectedPlatforms.length > 0 && (
                 <div className="mt-6 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
                   <h4 className="font-semibold text-sm text-blue-900 dark:text-blue-100 mb-2">
-                    Series Summary
+                    {t.dashboard.seriesSetup.summaryTitle}
                   </h4>
                   <div className="space-y-1 text-sm text-blue-700 dark:text-blue-300">
-                    <p><strong>Name:</strong> {seriesName}</p>
-                    <p><strong>Publish Time:</strong> {(() => {
-                      const [hours, minutes] = publishTime.split(':');
-                      const hour12 = parseInt(hours) % 12 || 12;
-                      const ampm = parseInt(hours) >= 12 ? 'PM' : 'AM';
-                      return `${hour12}:${minutes} ${ampm}`;
-                    })()}</p>
-                    <p><strong>Platforms:</strong> {selectedPlatforms.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(', ')}</p>
+                    <p><strong>{t.dashboard.seriesManagement.seriesName}:</strong> {seriesName}</p>
+                    <p>
+                      <strong>
+                        {isElitePlan
+                          ? t.dashboard.seriesSetup.summaryPublishTimes
+                          : t.dashboard.seriesSetup.summaryPublishTime}
+                        :
+                      </strong>{" "}
+                      {(() => {
+                        const formatTimeLabel = (time: string) => {
+                          const [hours, minutes] = time.split(":");
+                          const hour12 = parseInt(hours) % 12 || 12;
+                          const ampm = parseInt(hours) >= 12 ? "PM" : "AM";
+                          return `${hour12}:${minutes} ${ampm}`;
+                        };
+
+                        if (isElitePlan) {
+                          return `${formatTimeLabel(publishTime)} and ${formatTimeLabel(secondPublishTime)}`;
+                        }
+
+                        return formatTimeLabel(publishTime);
+                      })()}
+                    </p>
+                    {isStarterPlan && publishDays.length > 0 && (
+                      <p>
+                        <strong>{t.dashboard.seriesSetup.summaryDays}:</strong>{" "}
+                        {publishDays
+                          .map((d) => {
+                            const label =
+                              (t.dashboard.weekdays as any)?.[d] ??
+                              d.charAt(0).toUpperCase() + d.slice(1);
+                            return label;
+                          })
+                          .join(", ")}
+                      </p>
+                    )}
+                    <p>
+                      <strong>{t.dashboard.seriesManagement.platforms}:</strong>{" "}
+                      {selectedPlatforms
+                        .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+                        .join(", ")}
+                    </p>
                   </div>
                 </div>
               )}
@@ -1791,6 +1976,26 @@ export default function Dashboard() {
       return `${hour12}:${minutes} ${ampm}`;
     };
 
+    const formatScheduleLabel = (series: { schedule_config?: any; publish_time?: string }) => {
+      const sc = series.schedule_config;
+      const weekdays = (t.dashboard as any).weekdays as Record<string, string> | undefined;
+      const dayLabel = (dayKey: string) => weekdays?.[dayKey] ?? dayKey.charAt(0).toUpperCase() + dayKey.slice(1, 3);
+      if (sc && typeof sc === "object") {
+        if (Array.isArray(sc.times) && sc.times.length >= 2) {
+          return `${formatTime(sc.times[0])} and ${formatTime(sc.times[1])}`;
+        }
+        if (Array.isArray(sc.days) && sc.days.length > 0 && typeof sc.time === "string") {
+          const daysStr = sc.days.map(dayLabel).join(", ");
+          return `${daysStr} at ${formatTime(sc.time)}`;
+        }
+        if (typeof sc.time === "string") {
+          return formatTime(sc.time);
+        }
+      }
+      if (series.publish_time) return formatTime(series.publish_time);
+      return "--:-- --";
+    };
+
     const formatDate = (dateStr: string | null) => {
       if (!dateStr) return t.dashboard.seriesManagement.never;
       const date = new Date(dateStr);
@@ -1867,7 +2072,7 @@ export default function Dashboard() {
 
                     <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
                       <Clock className="w-4 h-4" />
-                      <span>{formatTime(series.publish_time)}</span>
+                      <span>{formatScheduleLabel(series)}</span>
                     </div>
 
                     <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
@@ -2378,7 +2583,12 @@ export default function Dashboard() {
                   {t.dashboard.seriesManagement.publishTime}
                 </label>
                 <select
-                  defaultValue={editingSeries.publish_time}
+                  defaultValue={
+                    editingSeries.schedule_config?.time
+                    ?? editingSeries.schedule_config?.times?.[0]
+                    ?? editingSeries.publish_time
+                    ?? "09:00"
+                  }
                   id="edit-publish-time"
                   className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
                 >
@@ -2397,6 +2607,67 @@ export default function Dashboard() {
                   })}
                 </select>
               </div>
+
+              {/* Second Publish Time (Elite - when series has two times) */}
+              {Array.isArray(editingSeries.schedule_config?.times) && editingSeries.schedule_config.times.length >= 2 && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    {t.dashboard.seriesSetup.secondPublishTimeLabel}
+                  </label>
+                  <select
+                    defaultValue={editingSeries.schedule_config.times[1]}
+                    id="edit-second-publish-time"
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                  >
+                    {Array.from({ length: 48 }, (_, i) => {
+                      const hour = Math.floor(i / 2);
+                      const minute = (i % 2) * 30;
+                      const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                      const hour12 = hour % 12 || 12;
+                      const ampm = hour >= 12 ? 'PM' : 'AM';
+                      const time12 = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
+                      return (
+                        <option key={time24} value={time24}>
+                          {time12}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              )}
+
+              {/* Publish Days (Starter - when series has days) */}
+              {Array.isArray(editingSeries.schedule_config?.days) && editingSeries.schedule_config.days.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    {t.dashboard.seriesSetup.publishDaysLabel}
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map((day) => {
+                      const isSelected = editingSeries.schedule_config.days.includes(day);
+                      const label =
+                        (t.dashboard as any).weekdays?.[day] ?? day.charAt(0).toUpperCase() + day.slice(1, 3);
+                      return (
+                        <label
+                          key={day}
+                          className="flex items-center gap-2 p-3 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            defaultChecked={isSelected}
+                            value={day}
+                            className="edit-day-checkbox rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm">{label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {t.dashboard.seriesSetup.publishDaysHelper}
+                  </p>
+                </div>
+              )}
 
               {/* Active Status */}
               <div className="flex items-center justify-between p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
@@ -2589,6 +2860,20 @@ export default function Dashboard() {
                     voice,
                     duration,
                   };
+
+                  const secondPublishEl = document.getElementById('edit-second-publish-time') as HTMLSelectElement | null;
+                  if (secondPublishEl) {
+                    updateData.secondPublishTime = secondPublishEl.value;
+                  }
+                  const editDayCheckboxes = document.querySelectorAll('.edit-day-checkbox:checked');
+                  if (editDayCheckboxes.length > 0) {
+                    const publishDays = Array.from(editDayCheckboxes).map((el) => (el as HTMLInputElement).value);
+                    if (publishDays.length !== 3) {
+                      alert("Please select exactly 3 days for your schedule.");
+                      return;
+                    }
+                    updateData.publishDays = publishDays;
+                  }
 
                   if (editingSeries.video_type === "ai-images") {
                     updateData.artStyle = (document.getElementById('edit-art-style') as HTMLSelectElement)?.value;
