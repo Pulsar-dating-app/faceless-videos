@@ -1,13 +1,8 @@
 {
-    "crons": [
-      {
-        "path": "/api/cron/schedule-videos",
-        "schedule": "0 0 * * *"
-      },
-      {
-        "path": "/api/cron/consume-queue",
-        "schedule": "0 0 * * *"
-      }
-    ]
-  }
-  
+  "crons": [
+    { "path": "/api/cron/schedule-videos", "schedule": "0 0 * * *" },
+    { "path": "/api/cron/build-occurrences", "schedule": "0 2 * * *" },
+    { "path": "/api/cron/reset-generations", "schedule": "0 0 * * 0" },
+    { "path": "/api/cron/consume-queue", "schedule": "0 0 * * *" }
+  ]
+}
