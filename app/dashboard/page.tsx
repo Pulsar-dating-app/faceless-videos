@@ -170,6 +170,8 @@ export default function Dashboard() {
   const [editingSeries, setEditingSeries] = useState<any | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isUpdatingSeries, setIsUpdatingSeries] = useState(false);
+  const [editActive, setEditActive] = useState(true);
+  const [editVideoType, setEditVideoType] = useState<"ai-images" | "gameplay">("gameplay");
 
   // Error dialog state
   const [errorDialog, setErrorDialog] = useState<{
@@ -178,6 +180,13 @@ export default function Dashboard() {
     title: string;
     message: string;
   } | null>(null);
+
+  useEffect(() => {
+    if (editingSeries) {
+      setEditActive(!!editingSeries.active);
+      setEditVideoType(editingSeries.video_type === "ai-images" ? "ai-images" : "gameplay");
+    }
+  }, [editingSeries]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const voicePreviewRef = useRef<HTMLAudioElement | null>(null);
@@ -609,17 +618,36 @@ export default function Dashboard() {
         },
       });
 
-      if (error) {
-        throw error;
+      if (data?.success === false && data?.errorCode) {
+        const errors = (t.dashboard.seriesManagement as { errors?: Record<string, string> }).errors;
+        const message =
+          errors && typeof errors[data.errorCode] === "string"
+            ? errors[data.errorCode]
+            : errors?.SERVER_ERROR ?? t.dashboard.seriesManagement.updateError;
+        setErrorDialog({
+          isOpen: true,
+          type: "error",
+          title: t.dashboard.seriesManagement.updateError,
+          message,
+        });
+        return;
       }
 
-      if (data?.error) {
-        throw new Error(data.error);
+      if (error) {
+        const errors = (t.dashboard.seriesManagement as { errors?: Record<string, string> }).errors;
+        const message = errors?.SERVER_ERROR ?? t.dashboard.seriesManagement.updateError;
+        setErrorDialog({
+          isOpen: true,
+          type: "error",
+          title: t.dashboard.seriesManagement.updateError,
+          message,
+        });
+        return;
       }
 
       // Refresh series list
       await fetchSeries();
-      
+
       // Close modal
       setIsEditModalOpen(false);
       setEditingSeries(null);
@@ -628,12 +656,13 @@ export default function Dashboard() {
       alert(t.dashboard.seriesManagement.updateSuccess);
     } catch (error: unknown) {
       console.error("Error updating series:", error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errors = (t.dashboard.seriesManagement as { errors?: Record<string, string> }).errors;
+      const message = errors?.SERVER_ERROR ?? t.dashboard.seriesManagement.updateError;
       setErrorDialog({
         isOpen: true,
         type: "error",
         title: t.dashboard.seriesManagement.updateError,
-        message: errorMessage || "An error occurred while updating the series. Please try again.",
+        message,
       });
     } finally {
       setIsUpdatingSeries(false);
@@ -2546,86 +2575,85 @@ export default function Dashboard() {
 
             {/* Content */}
             <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-              {/* Series Name */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  {t.dashboard.seriesManagement.seriesName}
-                </label>
-                <input
-                  type="text"
-                  defaultValue={editingSeries.series_name}
-                  id="edit-series-name"
-                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
-                />
-              </div>
-
-              {/* Category */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  {t.dashboard.seriesManagement.category}
-                </label>
-                <select
-                  defaultValue={editingSeries.category}
-                  id="edit-category"
-                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+              {/* Active Status - at top */}
+              <div className="flex items-center justify-between p-4 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Status</p>
+                  <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 mt-0.5">
+                    {editActive ? t.dashboard.seriesManagement.active : t.dashboard.seriesManagement.inactive}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditActive(!editActive)}
+                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                    editActive ? "bg-blue-600" : "bg-zinc-300 dark:bg-zinc-600"
+                  }`}
                 >
-                  {Object.keys(CATEGORY_ICONS).map((key) => (
-                    <option key={key} value={key}>
-                      {t.categories[key as keyof typeof t.categories]}
-                    </option>
-                  ))}
-                </select>
+                  <span
+                    className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                      editActive ? "translate-x-7" : "translate-x-1"
+                    }`}
+                  />
+                </button>
               </div>
 
-              {/* Publish Time */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  {t.dashboard.seriesManagement.publishTime}
-                </label>
-                <select
-                  defaultValue={
-                    editingSeries.schedule_config?.time
-                    ?? editingSeries.schedule_config?.times?.[0]
-                    ?? editingSeries.publish_time
-                    ?? "09:00"
-                  }
-                  id="edit-publish-time"
-                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
-                >
-                  {Array.from({ length: 48 }, (_, i) => {
-                    const hour = Math.floor(i / 2);
-                    const minute = (i % 2) * 30;
-                    const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-                    const hour12 = hour % 12 || 12;
-                    const ampm = hour >= 12 ? 'PM' : 'AM';
-                    const time12 = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
-                    return (
-                      <option key={time24} value={time24}>
-                        {time12}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-
-              {/* Second Publish Time (Elite - when series has two times) */}
-              {Array.isArray(editingSeries.schedule_config?.times) && editingSeries.schedule_config.times.length >= 2 && (
+              {/* Section: Basics */}
+              <div className="space-y-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Basics</p>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                    {t.dashboard.seriesSetup.secondPublishTimeLabel}
+                    {t.dashboard.seriesManagement.seriesName}
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue={editingSeries.series_name}
+                    id="edit-series-name"
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    {t.dashboard.seriesManagement.category}
                   </label>
                   <select
-                    defaultValue={editingSeries.schedule_config.times[1]}
-                    id="edit-second-publish-time"
+                    defaultValue={editingSeries.category}
+                    id="edit-category"
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                  >
+                    {Object.keys(CATEGORY_ICONS).map((key) => (
+                      <option key={key} value={key}>
+                        {t.categories[key as keyof typeof t.categories]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Section: Schedule */}
+              <div className="space-y-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Schedule</p>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    {t.dashboard.seriesManagement.publishTime}
+                  </label>
+                  <select
+                    defaultValue={
+                      editingSeries.schedule_config?.time
+                      ?? editingSeries.schedule_config?.times?.[0]
+                      ?? editingSeries.publish_time
+                      ?? "09:00"
+                    }
+                    id="edit-publish-time"
                     className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
                   >
                     {Array.from({ length: 48 }, (_, i) => {
                       const hour = Math.floor(i / 2);
                       const minute = (i % 2) * 30;
-                      const time24 = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                      const time24 = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
                       const hour12 = hour % 12 || 12;
-                      const ampm = hour >= 12 ? 'PM' : 'AM';
-                      const time12 = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
+                      const ampm = hour >= 12 ? "PM" : "AM";
+                      const time12 = `${hour12}:${minute.toString().padStart(2, "0")} ${ampm}`;
                       return (
                         <option key={time24} value={time24}>
                           {time12}
@@ -2634,83 +2662,76 @@ export default function Dashboard() {
                     })}
                   </select>
                 </div>
-              )}
-
-              {/* Publish Days (Starter - when series has days) */}
-              {Array.isArray(editingSeries.schedule_config?.days) && editingSeries.schedule_config.days.length > 0 && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                    {t.dashboard.seriesSetup.publishDaysLabel}
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map((day) => {
-                      const isSelected = editingSeries.schedule_config.days.includes(day);
-                      const label =
-                        (t.dashboard as any).weekdays?.[day] ?? day.charAt(0).toUpperCase() + day.slice(1, 3);
-                      return (
-                        <label
-                          key={day}
-                          className="flex items-center gap-2 p-3 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            defaultChecked={isSelected}
-                            value={day}
-                            className="edit-day-checkbox rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
-                          />
-                          <span className="text-sm">{label}</span>
-                        </label>
-                      );
-                    })}
+                {Array.isArray(editingSeries.schedule_config?.times) && editingSeries.schedule_config.times.length >= 2 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      {t.dashboard.seriesSetup.secondPublishTimeLabel}
+                    </label>
+                    <select
+                      defaultValue={editingSeries.schedule_config.times[1]}
+                      id="edit-second-publish-time"
+                      className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                    >
+                      {Array.from({ length: 48 }, (_, i) => {
+                        const hour = Math.floor(i / 2);
+                        const minute = (i % 2) * 30;
+                        const time24 = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+                        const hour12 = hour % 12 || 12;
+                        const ampm = hour >= 12 ? "PM" : "AM";
+                        const time12 = `${hour12}:${minute.toString().padStart(2, "0")} ${ampm}`;
+                        return (
+                          <option key={time24} value={time24}>
+                            {time12}
+                          </option>
+                        );
+                      })}
+                    </select>
                   </div>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {t.dashboard.seriesSetup.publishDaysHelper}
-                  </p>
-                </div>
-              )}
-
-              {/* Active Status */}
-              <div className="flex items-center justify-between p-4 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
-                <div>
-                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                    {t.dashboard.seriesManagement.active}
-                  </label>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                    {editingSeries.active ? t.dashboard.seriesManagement.active : t.dashboard.seriesManagement.inactive}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const checkbox = document.getElementById('edit-active') as HTMLInputElement;
-                    if (checkbox) checkbox.checked = !checkbox.checked;
-                  }}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    editingSeries.active ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-zinc-600'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    id="edit-active"
-                    defaultChecked={editingSeries.active}
-                    className="sr-only"
-                  />
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      editingSeries.active ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+                )}
+                {Array.isArray(editingSeries.schedule_config?.days) && editingSeries.schedule_config.days.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      {t.dashboard.seriesSetup.publishDaysLabel}
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map((day) => {
+                        const isSelected = editingSeries.schedule_config.days.includes(day);
+                        const label = (t.dashboard as any).weekdays?.[day] ?? day.charAt(0).toUpperCase() + day.slice(1, 3);
+                        return (
+                          <label
+                            key={day}
+                            className="flex items-center gap-2 p-3 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              defaultChecked={isSelected}
+                              value={day}
+                              className="edit-day-checkbox rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm">{label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {t.dashboard.seriesSetup.publishDaysHelper}
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {/* Social Platforms */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              {/* Section: Platforms */}
+              <div className="space-y-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                   {t.dashboard.seriesManagement.platforms}
-                </label>
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">Select at least one platform.</p>
                 <div className="space-y-2">
-                  {['tiktok', 'instagram', 'youtube'].map((platform) => (
-                    <label key={platform} className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer">
+                  {["tiktok", "instagram", "youtube"].map((platform) => (
+                    <label
+                      key={platform}
+                      className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer"
+                    >
                       <input
                         type="checkbox"
                         defaultChecked={Array.isArray(editingSeries.social_platforms) && editingSeries.social_platforms.includes(platform)}
@@ -2723,102 +2744,134 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Language */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  {t.form.voiceLanguage}
-                </label>
-                <select
-                  defaultValue={editingSeries.language}
-                  id="edit-language"
-                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
-                >
-                  {Object.entries(LANGUAGE_FLAGS).map(([code, flag]) => (
-                    <option key={code} value={code}>
-                      {flag} {t.languages[code as keyof typeof t.languages]}
-                    </option>
-                  ))}
-                </select>
+              {/* Section: Video type */}
+              <div className="space-y-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Video type</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditVideoType("ai-images")}
+                    className={`p-4 rounded-xl border-2 text-left transition-all ${
+                      editVideoType === "ai-images"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                        : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+                    }`}
+                  >
+                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t.dashboard.seriesManagement.aiImages}</span>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Fully AI-generated</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditVideoType("gameplay")}
+                    className={`p-4 rounded-xl border-2 text-left transition-all ${
+                      editVideoType === "gameplay"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                        : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+                    }`}
+                  >
+                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{t.dashboard.seriesManagement.gameplay}</span>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Background video</p>
+                  </button>
+                </div>
               </div>
 
-              {/* Voice */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  {t.form.narratorVoice}
-                </label>
-                <select
-                  defaultValue={editingSeries.narrator_voice}
-                  id="edit-voice"
-                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
-                >
-                  {VOICES.map((voice) => (
-                    <option key={voice} value={voice}>
-                      {voice.charAt(0).toUpperCase() + voice.slice(1)}
-                    </option>
-                  ))}
-                </select>
+              {/* Section: Video options (by type) */}
+              <div className="space-y-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Video options</p>
+                {editVideoType === "ai-images" && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      {t.form.artStyle}
+                    </label>
+                    <select
+                      defaultValue={editingSeries.art_style || "cartoon"}
+                      id="edit-art-style"
+                      className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                    >
+                      {ART_STYLES.map((style) => (
+                        <option key={style.value} value={style.value}>
+                          {t.artStyles[style.value as keyof typeof t.artStyles]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {editVideoType === "gameplay" && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      Background Video
+                    </label>
+                    <select
+                      defaultValue={
+                        BACKGROUND_VIDEOS.find(
+                          (b) => b.url === editingSeries.background_video || b.value === editingSeries.background_video
+                        )?.url ?? BACKGROUND_VIDEOS[0]?.url ?? ""
+                      }
+                      id="edit-background-video"
+                      className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                    >
+                      {BACKGROUND_VIDEOS.map((bg) => (
+                        <option key={bg.value} value={bg.url}>
+                          {bg.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
-              {/* Duration */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  {t.form.duration}
-                </label>
-                <select
-                  defaultValue={editingSeries.duration}
-                  id="edit-duration"
-                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
-                >
-                  {DURATION_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Conditional Fields */}
-              {editingSeries.video_type === "ai-images" && (
+              {/* Section: Language, voice, duration */}
+              <div className="space-y-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Language &amp; voice</p>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                    {t.form.artStyle}
+                    {t.form.voiceLanguage}
                   </label>
                   <select
-                    defaultValue={editingSeries.art_style || "cartoon"}
-                    id="edit-art-style"
+                    defaultValue={editingSeries.language}
+                    id="edit-language"
                     className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
                   >
-                    {ART_STYLES.map((style) => (
-                      <option key={style.value} value={style.value}>
-                        {t.artStyles[style.value as keyof typeof t.artStyles]}
+                    {Object.entries(LANGUAGE_FLAGS).map(([code, flag]) => (
+                      <option key={code} value={code}>
+                        {flag} {t.languages[code as keyof typeof t.languages]}
                       </option>
                     ))}
                   </select>
                 </div>
-              )}
-
-              {editingSeries.video_type === "gameplay" && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                    Background Video
+                    {t.form.narratorVoice}
                   </label>
                   <select
-                    defaultValue={
-                      BACKGROUND_VIDEOS.find(
-                        (b) => b.url === editingSeries.background_video || b.value === editingSeries.background_video
-                      )?.url ?? BACKGROUND_VIDEOS[0]?.url ?? ""
-                    }
-                    id="edit-background-video"
+                    defaultValue={editingSeries.narrator_voice}
+                    id="edit-voice"
                     className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
                   >
-                    {BACKGROUND_VIDEOS.map((bg) => (
-                      <option key={bg.value} value={bg.url}>
-                        {bg.label}
+                    {VOICES.map((v) => (
+                      <option key={v} value={v}>
+                        {v.charAt(0).toUpperCase() + v.slice(1)}
                       </option>
                     ))}
                   </select>
                 </div>
-              )}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    {t.form.duration}
+                  </label>
+                  <select
+                    defaultValue={editingSeries.duration}
+                    id="edit-duration"
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                  >
+                    {DURATION_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
 
             {/* Actions */}
@@ -2837,16 +2890,15 @@ export default function Dashboard() {
               </button>
               <button
                 onClick={() => {
-                  const seriesName = (document.getElementById('edit-series-name') as HTMLInputElement)?.value;
-                  const category = (document.getElementById('edit-category') as HTMLSelectElement)?.value;
-                  const publishTime = (document.getElementById('edit-publish-time') as HTMLSelectElement)?.value;
-                  const active = (document.getElementById('edit-active') as HTMLInputElement)?.checked;
-                  const language = (document.getElementById('edit-language') as HTMLSelectElement)?.value;
-                  const voice = (document.getElementById('edit-voice') as HTMLSelectElement)?.value;
-                  const duration = (document.getElementById('edit-duration') as HTMLSelectElement)?.value;
-                  
+                  const seriesName = (document.getElementById("edit-series-name") as HTMLInputElement)?.value;
+                  const category = (document.getElementById("edit-category") as HTMLSelectElement)?.value;
+                  const publishTime = (document.getElementById("edit-publish-time") as HTMLSelectElement)?.value;
+                  const language = (document.getElementById("edit-language") as HTMLSelectElement)?.value;
+                  const voice = (document.getElementById("edit-voice") as HTMLSelectElement)?.value;
+                  const duration = (document.getElementById("edit-duration") as HTMLSelectElement)?.value;
+
                   const selectedPlatforms: string[] = [];
-                  document.querySelectorAll('.edit-platform-checkbox:checked').forEach((checkbox) => {
+                  document.querySelectorAll(".edit-platform-checkbox:checked").forEach((checkbox) => {
                     selectedPlatforms.push((checkbox as HTMLInputElement).value);
                   });
 
@@ -2854,33 +2906,38 @@ export default function Dashboard() {
                     seriesName,
                     category,
                     publishTime,
-                    active,
+                    active: editActive,
                     selectedPlatforms,
+                    videoType: editVideoType,
                     language,
                     voice,
                     duration,
                   };
 
-                  const secondPublishEl = document.getElementById('edit-second-publish-time') as HTMLSelectElement | null;
+                  const secondPublishEl = document.getElementById("edit-second-publish-time") as HTMLSelectElement | null;
                   if (secondPublishEl) {
                     updateData.secondPublishTime = secondPublishEl.value;
                   }
-                  const editDayCheckboxes = document.querySelectorAll('.edit-day-checkbox:checked');
+                  const editDayCheckboxes = document.querySelectorAll(".edit-day-checkbox:checked");
                   if (editDayCheckboxes.length > 0) {
                     const publishDays = Array.from(editDayCheckboxes).map((el) => (el as HTMLInputElement).value);
                     if (publishDays.length !== 3) {
-                      alert("Please select exactly 3 days for your schedule.");
+                      setErrorDialog({
+                        isOpen: true,
+                        type: "error",
+                        title: t.dashboard.seriesManagement.updateError,
+                        message: "Please select exactly 3 days for your schedule.",
+                      });
                       return;
                     }
                     updateData.publishDays = publishDays;
                   }
 
-                  if (editingSeries.video_type === "ai-images") {
-                    updateData.artStyle = (document.getElementById('edit-art-style') as HTMLSelectElement)?.value;
+                  if (editVideoType === "ai-images") {
+                    updateData.artStyle = (document.getElementById("edit-art-style") as HTMLSelectElement)?.value;
                   }
-
-                  if (editingSeries.video_type === "gameplay") {
-                    updateData.backgroundVideo = (document.getElementById('edit-background-video') as HTMLSelectElement)?.value;
+                  if (editVideoType === "gameplay") {
+                    updateData.backgroundVideo = (document.getElementById("edit-background-video") as HTMLSelectElement)?.value;
                   }
 
                   handleUpdateSeries(updateData);
