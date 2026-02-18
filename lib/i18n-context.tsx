@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 
 // Define all translations
 export const translations = {
@@ -81,17 +81,18 @@ export const translations = {
     // Pricing Page
     pricing: {
       title: "Choose Your Series Plan",
-      subtitle: "Select a plan and choose how many series you want to manage",
+      subtitle: "Select a Series plan and the quantity you want to manage",
       headerTitle: "Choose Your Series Plan",
       headerSubtitle: "Select a plan and choose how many series you want to manage",
       whatIsSeriesTitle: "What is a Series?",
-      whatIsSeriesDescription: "Each series is an independent automated channel. For example: if you choose Pro Series and select 2 series, you'll get 30 videos per month for each series. Each series can have its own topic, style, and publishing schedule.",
+      whatIsSeriesDescription: "Each series is an independent automated channel. For example: if you choose Pro Series and select 2 series, you'll get 1 video per day for each series. Each series can have its own topic, style, and publishing schedule.",
       quantityLabel: "How many series do you want?",
       videosPerMonth: "videos/month total",
       mostPopular: "Most Popular",
       perMonth: "/month",
       getStarted: "Get Started",
       claimOffer: "Get Started - Limited Offer",
+      manageSeries: "Manage Series",
       processing: "Processing...",
       limitedTime: "Limited Time",
       off: "OFF",
@@ -434,17 +435,18 @@ export const translations = {
     },
     pricing: {
       title: "Elige tu Plan de Series",
-      subtitle: "Selecciona un plan y elige cuántas series quieres gestionar",
+      subtitle: "Selecciona un Plan de series y la cantidad que quieres gestionar",
       headerTitle: "Elige tu Plan de Series",
       headerSubtitle: "Selecciona un plan y elige cuántas series quieres gestionar",
       whatIsSeriesTitle: "¿Qué es una Serie?",
-      whatIsSeriesDescription: "Cada serie es un canal automatizado independiente. Por ejemplo: si eliges Pro Series y seleccionas 2 series, obtendrás 30 videos por mes para cada serie. Cada serie puede tener su propio tema, estilo y horario de publicación.",
+      whatIsSeriesDescription: "Cada serie es un canal automatizado independiente. Por ejemplo: si eliges Pro Series y seleccionas 2 series, obtendrás 1 video por día para cada serie. Cada serie puede tener su propio tema, estilo y horario de publicación.",
       quantityLabel: "¿Cuántas series quieres?",
       videosPerMonth: "videos/mes en total",
       mostPopular: "Más Popular",
       perMonth: "/mes",
       getStarted: "Comenzar",
       claimOffer: "Comenzar - Oferta Limitada",
+      manageSeries: "Gestionar Series",
       processing: "Procesando...",
       limitedTime: "Tiempo Limitado",
       off: "DESC",
@@ -775,17 +777,18 @@ export const translations = {
     },
     pricing: {
       title: "Choisissez Votre Plan de Séries",
-      subtitle: "Sélectionnez un plan et choisissez combien de séries vous souhaitez gérer",
+      subtitle: "Sélectionnez un plan de séries et la quantité que vous souhaitez gérer",
       headerTitle: "Choisissez Votre Plan de Séries",
       headerSubtitle: "Sélectionnez un plan et choisissez combien de séries vous souhaitez gérer",
       whatIsSeriesTitle: "Qu'est-ce qu'une Série?",
-      whatIsSeriesDescription: "Chaque série est une chaîne automatisée indépendante. Par exemple: si vous choisissez Pro Series et sélectionnez 2 séries, vous obtiendrez 30 vidéos par mois pour chaque série. Chaque série peut avoir son propre sujet, style et calendrier de publication.",
+      whatIsSeriesDescription: "Chaque série est une chaîne automatisée indépendante. Par exemple: si vous choisissez Pro Series et sélectionnez 2 séries, vous obtiendrez 1 vidéo par jour pour chaque série. Chaque série peut avoir son propre sujet, style et calendrier de publication.",
       quantityLabel: "Combien de séries voulez-vous?",
       videosPerMonth: "vidéos/mois au total",
       mostPopular: "Le Plus Populaire",
       perMonth: "/mois",
       getStarted: "Commencer",
       claimOffer: "Commencer - Offre Limitée",
+      manageSeries: "Gérer les Séries",
       processing: "Traitement...",
       limitedTime: "Temps Limité",
       off: "RÉDUCTION",
@@ -1116,17 +1119,18 @@ export const translations = {
     },
     pricing: {
       title: "Escolha seu Plano de Séries",
-      subtitle: "Selecione um plano e escolha quantas séries você quer gerenciar",
+      subtitle: "Selecione um Plano de series e a quantidade que quer gerenciar",
       headerTitle: "Escolha seu Plano de Séries",
       headerSubtitle: "Selecione um plano e escolha quantas séries você quer gerenciar",
       whatIsSeriesTitle: "O que é uma Série?",
-      whatIsSeriesDescription: "Cada série é um canal automatizado independente. Por exemplo: se você escolher Pro Series e selecionar 2 séries, você terá 30 vídeos por mês para cada série. Cada série pode ter seu próprio tópico, estilo e cronograma de publicação.",
+      whatIsSeriesDescription: "Cada série é um canal automatizado independente. Por exemplo: se você escolher Pro Series e selecionar 2 séries, você terá 1 vídeo por dia para cada série. Cada série pode ter seu próprio tópico, estilo e cronograma de publicação.",
       quantityLabel: "Quantas séries você quer?",
       videosPerMonth: "vídeos/mês no total",
       mostPopular: "Mais Popular",
       perMonth: "/mês",
       getStarted: "Começar",
       claimOffer: "Começar - Oferta Limitada",
+      manageSeries: "Gerenciar Séries",
       processing: "Processando...",
       limitedTime: "Tempo Limitado",
       off: "DESC",
@@ -1457,17 +1461,18 @@ export const translations = {
     },
     pricing: {
       title: "Wähle Deinen Serien-Plan",
-      subtitle: "Wähle einen Plan und entscheide, wie viele Serien du verwalten möchtest",
+      subtitle: "Wähle einen Serien-Typ und die Anzahl, die du verwalten möchtest",
       headerTitle: "Wähle Deinen Serien-Plan",
       headerSubtitle: "Wähle einen Plan und entscheide, wie viele Serien du verwalten möchtest",
       whatIsSeriesTitle: "Was ist eine Serie?",
-      whatIsSeriesDescription: "Jede Serie ist ein unabhängiger automatisierter Kanal. Zum Beispiel: Wenn du Pro Series wählst und 2 Serien auswählst, erhältst du 30 Videos pro Monat für jede Serie. Jede Serie kann ihr eigenes Thema, Stil und Veröffentlichungsplan haben.",
+      whatIsSeriesDescription: "Jede Serie ist ein unabhängiger automatisierter Kanal. Zum Beispiel: Wenn du Pro Series wählst und 2 Serien auswählst, erhältst du 1 Video pro Tag für jede Serie. Jede Serie kann ihr eigenes Thema, Stil und Veröffentlichungsplan haben.",
       quantityLabel: "Wie viele Serien möchtest du?",
       videosPerMonth: "Videos/Monat insgesamt",
       mostPopular: "Am Beliebtesten",
       perMonth: "/Monat",
       getStarted: "Loslegen",
       claimOffer: "Loslegen - Zeitlich Begrenztes Angebot",
+      manageSeries: "Serien verwalten",
       processing: "Verarbeitung...",
       limitedTime: "Begrenzte Zeit",
       off: "RABATT",
@@ -1741,16 +1746,18 @@ interface I18nContextType {
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  // Initialize with saved language from localStorage
-  const [language, setLanguageState] = useState<Language>(() => {
-    if (typeof window !== "undefined") {
-      const savedLang = localStorage.getItem("app-language") as Language;
-      if (savedLang && translations[savedLang]) {
-        return savedLang;
-      }
+  // IMPORTANT: keep initial render consistent between server & client
+  // (avoid reading localStorage during render to prevent hydration mismatch)
+  const [language, setLanguageState] = useState<Language>("en");
+
+  // After hydration, load saved language (client-only)
+  useEffect(() => {
+    const savedLang = localStorage.getItem("app-language") as Language | null;
+    if (savedLang && translations[savedLang] && savedLang !== language) {
+      setLanguageState(savedLang);
     }
-    return "en";
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);

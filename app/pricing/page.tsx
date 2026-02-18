@@ -38,6 +38,9 @@ export default function PricingPage() {
     elite: 1,
   });
 
+  // When user has active subscription, only their plan's button is enabled ("Gerenciar Séries")
+  const [activeSubscription, setActiveSubscription] = useState<{ plan_id: string } | null>(null);
+
   const QUANTITY_OPTIONS = [1, 2, 3, 5, 10];
 
   // === PROMOTION CONFIG - Edit these values ===
@@ -105,6 +108,32 @@ export default function PricingPage() {
     fetchPrices();
   }, []);
 
+  // Fetch active subscription when user is logged in (to show "Gerenciar Séries" on current plan only)
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      if (!session?.user?.id) {
+        setActiveSubscription(null);
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from("subscriptions")
+          .select("plan_id, status")
+          .eq("user_id", session.user.id)
+          .single();
+
+        if (!error && data && data.status !== "canceled" && data.status !== "unpaid") {
+          setActiveSubscription({ plan_id: data.plan_id });
+        } else {
+          setActiveSubscription(null);
+        }
+      } catch {
+        setActiveSubscription(null);
+      }
+    };
+
+    fetchSubscription();
+  }, [session?.user?.id]);
 
   // Get price for a plan (USD only)
   const getPrice = (planId: string): number | null => {
@@ -130,7 +159,6 @@ export default function PricingPage() {
       description: t.pricing.starter.description,
       videosPerSeries: t.pricing.starter.videosPerSeries,
       features: [
-        t.pricing.starter.feature1,
         t.pricing.starter.feature2,
         t.pricing.starter.feature3,
         t.pricing.starter.feature4,
@@ -145,7 +173,6 @@ export default function PricingPage() {
       description: t.pricing.professional.description,
       videosPerSeries: t.pricing.professional.videosPerSeries,
       features: [
-        t.pricing.professional.feature1,
         t.pricing.professional.feature2,
         t.pricing.professional.feature3,
         t.pricing.professional.feature4,
@@ -160,7 +187,6 @@ export default function PricingPage() {
       description: t.pricing.elite.description,
       videosPerSeries: t.pricing.elite.videosPerSeries,
       features: [
-        t.pricing.elite.feature1,
         t.pricing.elite.feature2,
         t.pricing.elite.feature3,
         t.pricing.elite.feature4,
@@ -180,6 +206,18 @@ export default function PricingPage() {
     setLoadingPlanId(planId);
 
     try {
+      // If user already has an active subscription, send them to manage it
+      const { data: subData } = await supabase
+        .from("subscriptions")
+        .select("status")
+        .eq("user_id", session.user.id)
+        .single();
+
+      if (subData && subData.status !== "canceled" && subData.status !== "unpaid") {
+        window.location.href = "/dashboard?section=subscription";
+        return;
+      }
+
       // Headers with user JWT
       const headers = await getAuthHeaders();
 
@@ -328,11 +366,8 @@ export default function PricingPage() {
                   {/* Plan Header */}
                   <div className="text-center mb-8">
                     <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-                    <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-1">
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
                       {plan.description}
-                    </p>
-                    <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-4">
-                      {plan.videosPerSeries}
                     </p>
 
                     {/* Price Display */}
@@ -410,34 +445,39 @@ export default function PricingPage() {
                         </button>
                       ))}
                     </div>
-                    <p className="text-xs text-center text-zinc-600 dark:text-zinc-400">
-                      = <strong className="text-blue-600 dark:text-blue-400">
-                        {parseInt(plan.videosPerSeries.split(' ')[0]) * selectedQuantities[plan.id]} {t.pricing.videosPerMonth}
-                      </strong>
-                    </p>
                   </div>
 
                   {/* CTA Button */}
-                  <button
-                    onClick={() => handleCheckout(plan.id)}
-                    disabled={authLoading || loadingPlanId === plan.id}
-                    className={`w-full h-14 rounded-lg font-semibold text-base transition-all flex items-center justify-center gap-2 ${
-                      plan.popular
-                        ? "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400 shadow-xl hover:shadow-2xl"
-                        : "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50"
-                    }`}
-                  >
-                    {loadingPlanId === plan.id ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        <span>{t.pricing.processing}</span>
-                      </>
-                    ) : plan.promo ? (
-                      <>{t.pricing.claimOffer}</>
-                    ) : (
-                      <>{t.pricing.getStarted}</>
-                    )}
-                  </button>
+                  {activeSubscription && plan.id === activeSubscription.plan_id ? (
+                    <button
+                      type="button"
+                      onClick={() => { window.location.href = "/dashboard?section=subscription"; }}
+                      className="w-full h-14 rounded-lg font-semibold text-base transition-all flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 shadow-xl hover:shadow-2xl"
+                    >
+                      {t.pricing.manageSeries}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleCheckout(plan.id)}
+                      disabled={authLoading || !!activeSubscription || loadingPlanId === plan.id}
+                      className={`w-full h-14 rounded-lg font-semibold text-base transition-all flex items-center justify-center gap-2 ${
+                        plan.popular
+                          ? "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400 shadow-xl hover:shadow-2xl"
+                          : "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50"
+                      }`}
+                    >
+                      {loadingPlanId === plan.id ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span>{t.pricing.processing}</span>
+                        </>
+                      ) : plan.promo ? (
+                        <>{t.pricing.claimOffer}</>
+                      ) : (
+                        <>{t.pricing.getStarted}</>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

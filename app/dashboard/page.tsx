@@ -181,6 +181,15 @@ export default function Dashboard() {
     message: string;
   } | null>(null);
 
+  // Subscription (My Subscription page) state
+  const [subscription, setSubscription] = useState<{
+    plan_id: string;
+    status: string;
+    quantity: number;
+  } | null>(null);
+  const [isLoadingSubscription, setIsLoadingSubscription] = useState(true);
+  const [isLoadingPortal, setIsLoadingPortal] = useState(false);
+
   useEffect(() => {
     if (editingSeries) {
       setEditActive(!!editingSeries.active);
@@ -241,12 +250,18 @@ export default function Dashboard() {
       checkYoutubeConnection();
     }
 
-    // Check for OAuth callback parameters
+    // Check for OAuth callback parameters or section deep link
     const params = new URLSearchParams(window.location.search);
     const connected = params.get('connected');
     const error = params.get('error');
     const section = params.get('section');
     const step = params.get('step');
+
+    // Redirect from pricing: open subscription section and clean URL
+    if (section === 'subscription' && !connected && !error) {
+      setActiveSection('subscription');
+      window.history.replaceState({}, '', '/dashboard');
+    }
 
     if (connected === 'tiktok') {
       // Get TikTok data from URL
@@ -435,11 +450,18 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch subscription data
+  // Fetch subscription data (for "My Subscription" page)
   useEffect(() => {
+    if (!user) {
+      setSubscription(null);
+      setIsLoadingSubscription(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingSubscription(true);
+
     const fetchSubscription = async () => {
-      if (!user) return;
-      setIsLoadingSubscription(true);
       try {
         const { data, error } = await supabase
           .from("subscriptions")
@@ -447,19 +469,21 @@ export default function Dashboard() {
           .eq("user_id", user.id)
           .single();
 
+        if (cancelled) return;
         if (!error && data) {
           setSubscription(data);
         } else {
           setSubscription(null);
         }
       } catch {
-        setSubscription(null);
+        if (!cancelled) setSubscription(null);
       } finally {
-        setIsLoadingSubscription(false);
+        if (!cancelled) setIsLoadingSubscription(false);
       }
     };
 
     fetchSubscription();
+    return () => { cancelled = true; };
   }, [user]);
 
   const handleManageBilling = async () => {
@@ -1876,9 +1900,6 @@ export default function Dashboard() {
                       {subscription.quantity} {t.dashboard.subscription.series}
                     </p>
                   )}
-                </div>
-                <div className="w-14 h-14 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                  <Sparkles className="w-7 h-7 text-blue-600 dark:text-blue-400" />
                 </div>
               </div>
 
