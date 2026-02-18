@@ -32,10 +32,13 @@ export default function PricingPage() {
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
   const [prices, setPrices] = useState<Record<string, PriceData>>({});
   const [isLoadingPrices, setIsLoadingPrices] = useState(true);
-  const [currentSubscription, setCurrentSubscription] = useState<{
-    plan_id: string;
-    status: string;
-  } | null>(null);
+  const [selectedQuantities, setSelectedQuantities] = useState<Record<string, number>>({
+    starter: 1,
+    professional: 1,
+    elite: 1,
+  });
+
+  const QUANTITY_OPTIONS = [1, 2, 3, 5, 10];
 
   // === PROMOTION CONFIG - Edit these values ===
   const PROMO_END_DATE = new Date("2026-03-31T23:59:59");
@@ -102,28 +105,6 @@ export default function PricingPage() {
     fetchPrices();
   }, []);
 
-  // Fetch user's current subscription
-  useEffect(() => {
-    const fetchSubscription = async () => {
-      if (!session?.user?.id) return;
-
-      try {
-        const { data, error } = await supabase
-          .from("subscriptions")
-          .select("plan_id, status")
-          .eq("user_id", session.user.id)
-          .single();
-
-        if (!error && data && data.status !== "canceled") {
-          setCurrentSubscription(data);
-        }
-      } catch (error) {
-        console.error("Error fetching subscription:", error);
-      }
-    };
-
-    fetchSubscription();
-  }, [session]);
 
   // Get price for a plan (USD only)
   const getPrice = (planId: string): number | null => {
@@ -134,10 +115,10 @@ export default function PricingPage() {
     return null;
   };
 
-  // Format price (USD only)
+  // Format price (USD only) - always 2 decimals
   const formatPrice = (amount: number | null): string => {
     if (amount === null) return "—";
-    return `$${amount.toFixed(2)}`;
+    return `$${Number(amount).toFixed(2)}`;
   };
 
   // Pricing data structure with translations
@@ -147,12 +128,12 @@ export default function PricingPage() {
       name: t.pricing.starter.name,
       price: getPrice("starter"),
       description: t.pricing.starter.description,
+      videosPerSeries: t.pricing.starter.videosPerSeries,
       features: [
-        t.pricing.common.feature1,
-        t.pricing.common.feature2,
-        t.pricing.common.feature3,
-        t.pricing.common.feature4,
         t.pricing.starter.feature1,
+        t.pricing.starter.feature2,
+        t.pricing.starter.feature3,
+        t.pricing.starter.feature4,
       ],
       popular: false,
       promo: false,
@@ -162,12 +143,12 @@ export default function PricingPage() {
       name: t.pricing.professional.name,
       price: getPrice("professional"),
       description: t.pricing.professional.description,
+      videosPerSeries: t.pricing.professional.videosPerSeries,
       features: [
-        t.pricing.common.feature1,
-        t.pricing.common.feature2,
-        t.pricing.common.feature3,
-        t.pricing.common.feature4,
         t.pricing.professional.feature1,
+        t.pricing.professional.feature2,
+        t.pricing.professional.feature3,
+        t.pricing.professional.feature4,
       ],
       popular: true,
       promo: true,
@@ -177,12 +158,12 @@ export default function PricingPage() {
       name: t.pricing.elite.name,
       price: getPrice("elite"),
       description: t.pricing.elite.description,
+      videosPerSeries: t.pricing.elite.videosPerSeries,
       features: [
-        t.pricing.common.feature1,
-        t.pricing.common.feature2,
-        t.pricing.common.feature3,
-        t.pricing.common.feature4,
         t.pricing.elite.feature1,
+        t.pricing.elite.feature2,
+        t.pricing.elite.feature3,
+        t.pricing.elite.feature4,
       ],
       popular: false,
       promo: true,
@@ -190,17 +171,16 @@ export default function PricingPage() {
   ];
 
   const handleCheckout = async (planId: string) => {
-    
-    // Check if user is authenticated
     if (!session) {
       window.location.href = "/login";
       return;
     }
 
+    const selectedQuantity = selectedQuantities[planId] || 1;
     setLoadingPlanId(planId);
 
     try {
-      // Headers with user JWT (required for Edge Functions without --no-verify-jwt)
+      // Headers with user JWT
       const headers = await getAuthHeaders();
 
       // Get Supabase project URL from environment
@@ -209,46 +189,7 @@ export default function PricingPage() {
         throw new Error("NEXT_PUBLIC_SUPABASE_URL is not configured");
       }
 
-      // Se já tem subscription ativa, abrir portal diretamente
-      if (currentSubscription && 
-          currentSubscription.status !== "canceled" && 
-          currentSubscription.status !== "unpaid") {
-        console.log("🔄 [PORTAL] User has active subscription, opening billing portal");
-        
-        // Map app language to Stripe locale for UI translation
-        const stripeLocale = language === "pt" ? "pt" : 
-                            language === "es" ? "es" : 
-                            language === "fr" ? "fr" : 
-                            language === "de" ? "de" : 
-                            language === "en" ? "en" : 
-                            "auto";
-
-        const portalResponse = await fetch(
-          `${supabaseUrl}/functions/v1/create-portal-session`,
-          {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-              locale: stripeLocale,
-            }),
-          }
-        );
-
-        if (!portalResponse.ok) {
-          const errorData = await portalResponse.json();
-          throw new Error(errorData.error || "Failed to open billing portal");
-        }
-
-        const { url: portalUrl } = await portalResponse.json();
-        if (portalUrl) {
-          window.location.href = portalUrl;
-          return;
-        } else {
-          throw new Error("No portal URL returned");
-        }
-      }
-
-      // Se não tem subscription, criar checkout normalmente
+      // Create checkout session
       const functionUrl = `${supabaseUrl}/functions/v1/create-checkout-session`;
 
       // Get plan data for translated name
@@ -265,6 +206,7 @@ export default function PricingPage() {
 
       console.log("🟢 [CHECKOUT] Starting checkout with:", {
         planId,
+        quantity: selectedQuantity,
         planName: selectedPlan?.name,
         stripeLocale,
         language,
@@ -278,6 +220,7 @@ export default function PricingPage() {
           headers,
           body: JSON.stringify({ 
             planId,
+            quantity: selectedQuantity,
             planName: selectedPlan?.name, // Translated plan name
             locale: stripeLocale, // Stripe Checkout locale for UI translation
           }),
@@ -318,13 +261,34 @@ export default function PricingPage() {
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-12 sm:py-20">
         <div className="max-w-6xl w-full space-y-12">
           {/* Header Section */}
-          <div className="text-center space-y-4">
-            <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">
-              {t.pricing.title}
-            </h1>
-            <p className="text-lg text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">
-              {t.pricing.subtitle}
-            </p>
+          <div className="text-center space-y-6">
+            <div className="space-y-2">
+              <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">
+                {t.pricing.headerTitle}
+              </h1>
+              <p className="text-lg text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">
+                {t.pricing.headerSubtitle}
+              </p>
+            </div>
+            
+            {/* Explanation Card */}
+            <div className="max-w-3xl mx-auto bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
+              <div className="flex items-start gap-3">
+                <div className="bg-blue-600 text-white rounded-full p-2 flex-shrink-0">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold text-zinc-900 dark:text-white mb-1">
+                    {t.pricing.whatIsSeriesTitle}
+                  </h3>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                    {t.pricing.whatIsSeriesDescription}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Pricing Cards */}
@@ -343,7 +307,7 @@ export default function PricingPage() {
                   <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2.5 px-4 text-center text-sm font-semibold flex items-center justify-center gap-2">
                     <Sparkles className="w-4 h-4" />
                     <span>
-                      {plan.id === "professional" ? PROFESSIONAL_DISCOUNT_PERCENT : ELITE_DISCOUNT_PERCENT}% OFF – {language === "pt" ? "Tempo Limitado" : language === "es" ? "Tiempo Limitado" : language === "fr" ? "Temps Limité" : language === "de" ? "Begrenzte Zeit" : "Limited Time"}
+                      {plan.id === "professional" ? PROFESSIONAL_DISCOUNT_PERCENT : ELITE_DISCOUNT_PERCENT}% {t.pricing.off} – {t.pricing.limitedTime}
                     </span>
                   </div>
                 ) : (
@@ -364,8 +328,11 @@ export default function PricingPage() {
                   {/* Plan Header */}
                   <div className="text-center mb-8">
                     <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-1">
                       {plan.description}
+                    </p>
+                    <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-4">
+                      {plan.videosPerSeries}
                     </p>
 
                     {/* Price Display */}
@@ -375,31 +342,43 @@ export default function PricingPage() {
                       <div className="space-y-1">
                         <div className="flex items-center justify-center gap-2">
                           <span className="text-xl text-zinc-400 line-through">
-                            ${plan.id === "professional" ? PROFESSIONAL_ORIGINAL_PRICE : ELITE_ORIGINAL_PRICE}
+                            {formatPrice((plan.id === "professional" ? PROFESSIONAL_ORIGINAL_PRICE : ELITE_ORIGINAL_PRICE) * selectedQuantities[plan.id])}
                           </span>
                           <span className="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded">
                             -{plan.id === "professional" ? PROFESSIONAL_DISCOUNT_PERCENT : ELITE_DISCOUNT_PERCENT}%
                           </span>
                         </div>
-                        <div className="flex items-baseline justify-center gap-1">
-                          <span className="text-4xl font-extrabold text-blue-600 dark:text-blue-400">
-                            {formatPrice(plan.price)}
-                          </span>
-                          <span className="text-zinc-500 dark:text-zinc-400">{t.pricing.perMonth}</span>
+                        <div className="flex flex-col items-center gap-1">
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-4xl font-extrabold text-blue-600 dark:text-blue-400">
+                              {formatPrice(plan.price ? plan.price * selectedQuantities[plan.id] : null)}
+                            </span>
+                            <span className="text-zinc-500 dark:text-zinc-400">{t.pricing.perMonth}</span>
+                          </div>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                            {formatPrice(plan.price)} × {selectedQuantities[plan.id]}
+                          </p>
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-baseline justify-center gap-1">
-                        <span className="text-4xl font-extrabold">
-                          {formatPrice(plan.price)}
-                        </span>
-                        <span className="text-zinc-500 dark:text-zinc-400">{t.pricing.perMonth}</span>
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-4xl font-extrabold">
+                            {formatPrice(plan.price ? plan.price * selectedQuantities[plan.id] : null)}
+                          </span>
+                          <span className="text-zinc-500 dark:text-zinc-400">{t.pricing.perMonth}</span>
+                        </div>
+                        {selectedQuantities[plan.id] > 1 && (
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                            {formatPrice(plan.price)} × {selectedQuantities[plan.id]}
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
 
                   {/* Features List */}
-                  <ul className="flex-1 space-y-4 mb-8">
+                  <ul className="flex-1 space-y-4 mb-6">
                     {plan.features.map((feature, featureIndex) => (
                       <li key={featureIndex} className="flex items-start gap-3">
                         <Check className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
@@ -410,37 +389,55 @@ export default function PricingPage() {
                     ))}
                   </ul>
 
-                  {/* CTA Button */}
-                  {currentSubscription?.plan_id === plan.id ? (
-                    <div className="text-center">
-                      <span className="inline-block px-4 py-2 rounded-lg bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 font-medium">
-                        ✓ Current Plan
-                      </span>
+                  {/* Quantity Selector */}
+                  <div className="mb-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-4 border border-zinc-200 dark:border-zinc-700">
+                    <label className="block text-sm font-semibold text-zinc-900 dark:text-white mb-3 text-center">
+                      {t.pricing.quantityLabel}
+                    </label>
+                    <div className="flex justify-center gap-2 mb-3">
+                      {QUANTITY_OPTIONS.map((q) => (
+                        <button
+                          key={q}
+                          type="button"
+                          onClick={() => setSelectedQuantities({ ...selectedQuantities, [plan.id]: q })}
+                          className={`min-w-[3rem] py-2.5 px-4 rounded-lg font-bold text-sm transition-all ${
+                            selectedQuantities[plan.id] === q
+                              ? "bg-blue-600 text-white shadow-lg scale-105"
+                              : "bg-white dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-600 border border-zinc-200 dark:border-zinc-600"
+                          }`}
+                        >
+                          {q}×
+                        </button>
+                      ))}
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => handleCheckout(plan.id)}
-                      disabled={authLoading || loadingPlanId === plan.id}
-                      className={`w-full h-12 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-                        plan.popular
-                          ? "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400"
-                          : "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50"
-                      }`}
-                    >
-                      {loadingPlanId === plan.id ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Loading...</span>
-                        </>
-                      ) : currentSubscription ? (
-                        "Change Plan"
-                      ) : plan.promo ? (
-                        <>{language === "pt" ? "Aproveitar Oferta" : language === "es" ? "Aprovechar Oferta" : language === "fr" ? "Profiter de l'Offre" : language === "de" ? "Angebot Sichern" : "Claim Offer"}</>
-                      ) : (
-                        t.pricing.getStarted
-                      )}
-                    </button>
-                  )}
+                    <p className="text-xs text-center text-zinc-600 dark:text-zinc-400">
+                      = <strong className="text-blue-600 dark:text-blue-400">
+                        {parseInt(plan.videosPerSeries.split(' ')[0]) * selectedQuantities[plan.id]} {t.pricing.videosPerMonth}
+                      </strong>
+                    </p>
+                  </div>
+
+                  {/* CTA Button */}
+                  <button
+                    onClick={() => handleCheckout(plan.id)}
+                    disabled={authLoading || loadingPlanId === plan.id}
+                    className={`w-full h-14 rounded-lg font-semibold text-base transition-all flex items-center justify-center gap-2 ${
+                      plan.popular
+                        ? "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400 shadow-xl hover:shadow-2xl"
+                        : "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50"
+                    }`}
+                  >
+                    {loadingPlanId === plan.id ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>{t.pricing.processing}</span>
+                      </>
+                    ) : plan.promo ? (
+                      <>{t.pricing.claimOffer}</>
+                    ) : (
+                      <>{t.pricing.getStarted}</>
+                    )}
+                  </button>
                 </div>
               </div>
             ))}

@@ -93,7 +93,7 @@ const DURATION_OPTIONS = [
   { value: "70", label: "65-75s", monetizable: true },
 ];
 
-type DashboardSection = "video-creation" | "social-media";
+type DashboardSection = "video-creation" | "social-media" | "subscription";
 
 export default function Dashboard() {
   const { user, isLoading } = useAuth();
@@ -158,6 +158,15 @@ export default function Dashboard() {
     title: string;
     message: string;
   } | null>(null);
+
+  // Subscription state
+  const [subscription, setSubscription] = useState<{
+    plan_id: string;
+    status: string;
+    quantity: number;
+  } | null>(null);
+  const [isLoadingSubscription, setIsLoadingSubscription] = useState(true);
+  const [isLoadingPortal, setIsLoadingPortal] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const voicePreviewRef = useRef<HTMLAudioElement | null>(null);
@@ -349,6 +358,70 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Error checking YouTube connection:', error);
+    }
+  };
+
+  // Fetch subscription data
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      if (!user) return;
+      setIsLoadingSubscription(true);
+      try {
+        const { data, error } = await supabase
+          .from("subscriptions")
+          .select("plan_id, status, quantity")
+          .eq("user_id", user.id)
+          .single();
+
+        if (!error && data) {
+          setSubscription(data);
+        } else {
+          setSubscription(null);
+        }
+      } catch {
+        setSubscription(null);
+      } finally {
+        setIsLoadingSubscription(false);
+      }
+    };
+
+    fetchSubscription();
+  }, [user]);
+
+  const handleManageBilling = async () => {
+    setIsLoadingPortal(true);
+    try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (!authSession?.access_token) {
+        router.push("/login");
+        return;
+      }
+
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      if (!supabaseUrl) throw new Error("NEXT_PUBLIC_SUPABASE_URL not set");
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/create-portal-session`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authSession.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Failed to open billing portal");
+      }
+
+      const { url } = await response.json();
+      if (url) {
+        window.location.href = url;
+      }
+    } catch (error) {
+      console.error("Portal error:", error);
+      alert("Failed to open billing portal. Please try again.");
+    } finally {
+      setIsLoadingPortal(false);
     }
   };
 
@@ -1206,6 +1279,106 @@ export default function Dashboard() {
   };
 
 
+  const PLAN_NAMES: Record<string, string> = {
+    starter: t.pricing?.starter?.name || "Starter Series",
+    professional: t.pricing?.professional?.name || "Pro Series",
+    elite: t.pricing?.elite?.name || "Elite Series",
+  };
+
+  const renderSubscriptionPage = () => (
+    <div className="max-w-2xl w-full">
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="text-center space-y-2 mb-8">
+          <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <CreditCard className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          </div>
+          <h2 className="text-2xl font-bold">{t.dashboard.subscription.title}</h2>
+          <p className="text-zinc-500 dark:text-zinc-400">{t.dashboard.subscription.subtitle}</p>
+        </div>
+
+        {/* Plan Card */}
+        {isLoadingSubscription ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          </div>
+        ) : subscription && subscription.status !== "canceled" && subscription.status !== "unpaid" ? (
+          <div className="rounded-2xl border-2 border-blue-500 dark:border-blue-500 bg-white dark:bg-zinc-900 shadow-xl overflow-hidden">
+            {/* Banner */}
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 flex items-center justify-between">
+              <span className="font-semibold">{t.dashboard.subscription.currentPlan}</span>
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                subscription.status === "active" 
+                  ? "bg-green-400/30 text-green-100" 
+                  : "bg-zinc-400/30 text-zinc-100"
+              }`}>
+                {subscription.status === "active" 
+                  ? t.dashboard.subscription.active 
+                  : subscription.status}
+              </span>
+            </div>
+
+            <div className="p-8 space-y-6">
+              {/* Plan name + quantity */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-2xl font-bold">
+                    {PLAN_NAMES[subscription.plan_id] || subscription.plan_id}
+                  </h3>
+                  {subscription.quantity > 1 && (
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                      {subscription.quantity} {t.dashboard.subscription.series}
+                    </p>
+                  )}
+                </div>
+                <div className="w-14 h-14 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <Sparkles className="w-7 h-7 text-blue-600 dark:text-blue-400" />
+                </div>
+              </div>
+
+              {/* Manage billing button */}
+              <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-3">
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  {t.dashboard.subscription.manageBillingDesc}
+                </p>
+                <button
+                  onClick={handleManageBilling}
+                  disabled={isLoadingPortal}
+                  className="w-full h-12 flex items-center justify-center gap-2 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-60 transition-all shadow-lg"
+                >
+                  {isLoadingPortal ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      {t.dashboard.subscription.loadingPortal}
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="w-5 h-5" />
+                      {t.dashboard.subscription.manageBilling}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl border-2 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-8 text-center space-y-4">
+            <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 rounded-xl flex items-center justify-center mx-auto">
+              <CreditCard className="w-8 h-8 text-zinc-400" />
+            </div>
+            <p className="text-zinc-500 dark:text-zinc-400">{t.dashboard.subscription.noPlan}</p>
+            <button
+              onClick={() => router.push("/pricing")}
+              className="h-11 px-6 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all"
+            >
+              {t.pricing?.getStarted || "View Plans"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   const renderSocialMediaPage = () => (
     <div className="max-w-4xl w-full">
       <div className="space-y-6">
@@ -1501,12 +1674,26 @@ export default function Dashboard() {
               <Link2 className={`w-5 h-5 ${activeSection === "social-media" ? "text-blue-600 dark:text-blue-400" : ""}`} />
               <span>{t.dashboard.menu.socialMedia}</span>
             </button>
+
+            <button
+              onClick={() => handleSectionChange("subscription")}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all ${
+                activeSection === "subscription"
+                  ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                  : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              }`}
+            >
+              <CreditCard className={`w-5 h-5 ${activeSection === "subscription" ? "text-blue-600 dark:text-blue-400" : ""}`} />
+              <span>{t.dashboard.menu.subscription}</span>
+            </button>
           </div>
         </aside>
 
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col items-center justify-center px-4 py-4 sm:py-6 md:py-8 overflow-y-auto">
-          {activeSection === "video-creation" ? (
+          {activeSection === "subscription" ? (
+            renderSubscriptionPage()
+          ) : activeSection === "video-creation" ? (
             /* Multi-step Wizard */
             <div className="max-w-2xl w-full">
           {!videoUrl ? (
@@ -1820,6 +2007,7 @@ export default function Dashboard() {
             renderSocialMediaPage()
           )}
         </main>
+
       </div>
 
       {/* Preview Video Dialog */}
