@@ -85,7 +85,7 @@ export const translations = {
       headerTitle: "Choose Your Series Plan",
       headerSubtitle: "Select a plan and choose how many series you want to manage",
       whatIsSeriesTitle: "What is a Series?",
-      whatIsSeriesDescription: "Each series is an independent automated channel. For example: if you choose Pro Series and select 2 series, you'll get 1 video per day for each series. Each series can have its own topic, style, and publishing schedule.",
+      whatIsSeriesDescription: "Each series is an independent automated channel. For example: if you choose Daily Series and select 2 series, you'll get 1 video per day for each series. Each series can have its own topic, style, and publishing schedule.",
       quantityLabel: "How many series do you want?",
       videosPerMonth: "videos/month total",
       mostPopular: "Most Popular",
@@ -105,8 +105,8 @@ export const translations = {
         feature3: "AI-generated content",
         feature4: "Basic support",
       },
-      professional: {
-        name: "Pro Series",
+      daily: {
+        name: "Daily Series",
         description: "Most popular for creators",
         videosPerSeries: "30 videos/month per series",
         feature1: "30 videos per month (per series)",
@@ -439,7 +439,7 @@ export const translations = {
       headerTitle: "Elige tu Plan de Series",
       headerSubtitle: "Selecciona un plan y elige cuántas series quieres gestionar",
       whatIsSeriesTitle: "¿Qué es una Serie?",
-      whatIsSeriesDescription: "Cada serie es un canal automatizado independiente. Por ejemplo: si eliges Pro Series y seleccionas 2 series, obtendrás 1 video por día para cada serie. Cada serie puede tener su propio tema, estilo y horario de publicación.",
+      whatIsSeriesDescription: "Cada serie es un canal automatizado independiente. Por ejemplo: si eliges Daily Series y seleccionas 2 series, obtendrás 1 video por día para cada serie. Cada serie puede tener su propio tema, estilo y horario de publicación.",
       quantityLabel: "¿Cuántas series quieres?",
       videosPerMonth: "videos/mes en total",
       mostPopular: "Más Popular",
@@ -459,8 +459,8 @@ export const translations = {
         feature3: "Contenido generado por IA",
         feature4: "Soporte básico",
       },
-      professional: {
-        name: "Pro Series",
+      daily: {
+        name: "Daily Series",
         description: "Más popular para creadores",
         videosPerSeries: "30 videos/mes por serie",
         feature1: "30 videos por mes (por serie)",
@@ -781,7 +781,7 @@ export const translations = {
       headerTitle: "Choisissez Votre Plan de Séries",
       headerSubtitle: "Sélectionnez un plan et choisissez combien de séries vous souhaitez gérer",
       whatIsSeriesTitle: "Qu'est-ce qu'une Série?",
-      whatIsSeriesDescription: "Chaque série est une chaîne automatisée indépendante. Par exemple: si vous choisissez Pro Series et sélectionnez 2 séries, vous obtiendrez 1 vidéo par jour pour chaque série. Chaque série peut avoir son propre sujet, style et calendrier de publication.",
+      whatIsSeriesDescription: "Chaque série est une chaîne automatisée indépendante. Par exemple: si vous choisissez Daily Series et sélectionnez 2 séries, vous obtiendrez 1 vidéo par jour pour chaque série. Chaque série peut avoir son propre sujet, style et calendrier de publication.",
       quantityLabel: "Combien de séries voulez-vous?",
       videosPerMonth: "vidéos/mois au total",
       mostPopular: "Le Plus Populaire",
@@ -801,8 +801,8 @@ export const translations = {
         feature3: "Contenu généré par IA",
         feature4: "Support de base",
       },
-      professional: {
-        name: "Pro Series",
+      daily: {
+        name: "Daily Series",
         description: "Le plus populaire pour les créateurs",
         videosPerSeries: "30 vidéos/mois par série",
         feature1: "30 vidéos par mois (par série)",
@@ -1123,7 +1123,7 @@ export const translations = {
       headerTitle: "Escolha seu Plano de Séries",
       headerSubtitle: "Selecione um plano e escolha quantas séries você quer gerenciar",
       whatIsSeriesTitle: "O que é uma Série?",
-      whatIsSeriesDescription: "Cada série é um canal automatizado independente. Por exemplo: se você escolher Pro Series e selecionar 2 séries, você terá 1 vídeo por dia para cada série. Cada série pode ter seu próprio tópico, estilo e cronograma de publicação.",
+      whatIsSeriesDescription: "Cada série é um canal automatizado independente. Por exemplo: se você escolher Daily Series e selecionar 2 séries, você terá 1 vídeo por dia para cada série. Cada série pode ter seu próprio tópico, estilo e cronograma de publicação.",
       quantityLabel: "Quantas séries você quer?",
       videosPerMonth: "vídeos/mês no total",
       mostPopular: "Mais Popular",
@@ -1143,8 +1143,8 @@ export const translations = {
         feature3: "Conteúdo gerado por IA",
         feature4: "Suporte básico",
       },
-      professional: {
-        name: "Pro Series",
+      daily: {
+        name: "Daily Series",
         description: "Mais popular para criadores",
         videosPerSeries: "30 vídeos/mês por série",
         feature1: "30 vídeos por mês (por série)",
@@ -1465,7 +1465,7 @@ export const translations = {
       headerTitle: "Wähle Deinen Serien-Plan",
       headerSubtitle: "Wähle einen Plan und entscheide, wie viele Serien du verwalten möchtest",
       whatIsSeriesTitle: "Was ist eine Serie?",
-      whatIsSeriesDescription: "Jede Serie ist ein unabhängiger automatisierter Kanal. Zum Beispiel: Wenn du Pro Series wählst und 2 Serien auswählst, erhältst du 1 Video pro Tag für jede Serie. Jede Serie kann ihr eigenes Thema, Stil und Veröffentlichungsplan haben.",
+      whatIsSeriesDescription: "Jede Serie ist ein unabhängiger automatisierter Kanal. Zum Beispiel: Wenn du Daily Series wählst und 2 Serien auswählst, erhältst du 1 Video pro Tag für jede Serie. Jede Serie kann ihr eigenes Thema, Stil und Veröffentlichungsplan haben.",
       quantityLabel: "Wie viele Serien möchtest du?",
       videosPerMonth: "Videos/Monat insgesamt",
       mostPopular: "Am Beliebtesten",
@@ -1485,8 +1485,8 @@ export const translations = {
         feature3: "KI-generierter Inhalt",
         feature4: "Basis-Support",
       },
-      professional: {
-        name: "Pro Series",
+      daily: {
+        name: "Daily Series",
         description: "Am beliebtesten bei Creators",
         videosPerSeries: "30 Videos/Monat pro Serie",
         feature1: "30 Videos pro Monat (pro Serie)",

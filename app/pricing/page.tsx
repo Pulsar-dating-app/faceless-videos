@@ -34,7 +34,7 @@ export default function PricingPage() {
   const [isLoadingPrices, setIsLoadingPrices] = useState(true);
   const [selectedQuantities, setSelectedQuantities] = useState<Record<string, number>>({
     starter: 1,
-    professional: 1,
+    daily: 1,
     elite: 1,
   });
 
@@ -47,8 +47,8 @@ export default function PricingPage() {
   const PROMO_END_DATE = new Date("2026-03-31T23:59:59");
   
   // Professional plan promo
-  const PROFESSIONAL_ORIGINAL_PRICE = 49.99;
-  const PROFESSIONAL_DISCOUNT_PERCENT = 50;
+  const DAILY_ORIGINAL_PRICE = 49.99;
+  const DAILY_DISCOUNT_PERCENT = 50;
   
   // Elite plan promo
   const ELITE_ORIGINAL_PRICE = 89.99;
@@ -135,11 +135,9 @@ export default function PricingPage() {
     fetchSubscription();
   }, [session?.user?.id]);
 
-  // Get price for a plan (USD only)
+  // Get price for a plan (USD only). Prices come from Supabase table "stripe_prices" (plan_id, currency, amount).
   const getPrice = (planId: string): number | null => {
-    if (prices[planId]) {
-      return prices[planId].amount;
-    }
+    if (prices[planId]) return prices[planId].amount;
     console.log(`❌ [PRICE] No USD price found for ${planId}`);
     return null;
   };
@@ -167,15 +165,15 @@ export default function PricingPage() {
       promo: false,
     },
     {
-      id: "professional",
-      name: t.pricing.professional.name,
-      price: getPrice("professional"),
-      description: t.pricing.professional.description,
-      videosPerSeries: t.pricing.professional.videosPerSeries,
+      id: "daily",
+      name: t.pricing.daily.name,
+      price: getPrice("daily"),
+      description: t.pricing.daily.description,
+      videosPerSeries: t.pricing.daily.videosPerSeries,
       features: [
-        t.pricing.professional.feature2,
-        t.pricing.professional.feature3,
-        t.pricing.professional.feature4,
+        t.pricing.daily.feature2,
+        t.pricing.daily.feature3,
+        t.pricing.daily.feature4,
       ],
       popular: true,
       promo: true,
@@ -345,7 +343,7 @@ export default function PricingPage() {
                   <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2.5 px-4 text-center text-sm font-semibold flex items-center justify-center gap-2">
                     <Sparkles className="w-4 h-4" />
                     <span>
-                      {plan.id === "professional" ? PROFESSIONAL_DISCOUNT_PERCENT : ELITE_DISCOUNT_PERCENT}% {t.pricing.off} – {t.pricing.limitedTime}
+                      {plan.id === "daily" ? DAILY_DISCOUNT_PERCENT : ELITE_DISCOUNT_PERCENT}% {t.pricing.off} – {t.pricing.limitedTime}
                     </span>
                   </div>
                 ) : (
@@ -377,10 +375,10 @@ export default function PricingPage() {
                       <div className="space-y-1">
                         <div className="flex items-center justify-center gap-2">
                           <span className="text-xl text-zinc-400 line-through">
-                            {formatPrice((plan.id === "professional" ? PROFESSIONAL_ORIGINAL_PRICE : ELITE_ORIGINAL_PRICE) * selectedQuantities[plan.id])}
+                            {formatPrice((plan.id === "daily" ? DAILY_ORIGINAL_PRICE : ELITE_ORIGINAL_PRICE) * selectedQuantities[plan.id])}
                           </span>
                           <span className="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded">
-                            -{plan.id === "professional" ? PROFESSIONAL_DISCOUNT_PERCENT : ELITE_DISCOUNT_PERCENT}%
+                            -{plan.id === "daily" ? DAILY_DISCOUNT_PERCENT : ELITE_DISCOUNT_PERCENT}%
                           </span>
                         </div>
                         <div className="flex flex-col items-center gap-1">

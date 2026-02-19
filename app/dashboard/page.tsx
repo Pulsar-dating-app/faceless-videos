@@ -1851,7 +1851,7 @@ export default function Dashboard() {
 
   const PLAN_NAMES: Record<string, string> = {
     starter: t.pricing?.starter?.name || "Starter Series",
-    professional: t.pricing?.professional?.name || "Pro Series",
+    daily: t.pricing?.daily?.name || "Daily Series",
     elite: t.pricing?.elite?.name || "Elite Series",
   };
 
