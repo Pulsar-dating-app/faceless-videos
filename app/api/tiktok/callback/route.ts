@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // Call the Supabase Edge Function
+    // Call the Supabase Edge Function to save connection to database
     const { data, error: functionError } = await supabase.functions.invoke('tiktok-auth', {
       body: { 
         action: 'callback', 
@@ -51,11 +51,10 @@ export async function GET(request: NextRequest) {
       return response;
     }
 
-    console.log('✅ TikTok connection successful!');
+    console.log('✅ TikTok connection successful and saved to database!');
 
-    // Redirect to dashboard with success
-    const tiktokDataEncoded = Buffer.from(JSON.stringify(data.data)).toString('base64');
-    const dashboardUrl = `${APP_URL}/dashboard?connected=tiktok&section=social-media&tiktok_data=${tiktokDataEncoded}`;
+    // Redirect to dashboard with success (no data in URL, will be fetched from DB)
+    const dashboardUrl = `${APP_URL}/dashboard?connected=tiktok&section=social-media`;
     
     const response = NextResponse.redirect(dashboardUrl);
     response.cookies.delete('tiktok_code_verifier');

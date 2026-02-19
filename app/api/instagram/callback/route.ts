@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // Call the Supabase Edge Function
+    // Call the Supabase Edge Function to save connection to database
     const { data, error: functionError } = await supabase.functions.invoke('instagram-auth', {
       body: { 
         action: 'callback', 
@@ -42,13 +42,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(dashboardUrl);
     }
 
-    console.log('✅ Instagram connection successful!');
+    console.log('✅ Instagram connection successful and saved to database!');
 
-    // Redirect to dashboard with success
-    const instagramDataEncoded = Buffer.from(JSON.stringify(data.data)).toString('base64');
-    const dashboardUrl = `${APP_URL}/dashboard?connected=instagram&section=social-media&instagram_data=${encodeURIComponent(
-      instagramDataEncoded,
-    )}`;
+    // Redirect to dashboard with success (no data in URL, will be fetched from DB)
+    const dashboardUrl = `${APP_URL}/dashboard?connected=instagram&section=social-media`;
 
     return NextResponse.redirect(dashboardUrl);
   } catch (err) {

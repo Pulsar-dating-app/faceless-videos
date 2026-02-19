@@ -175,6 +175,8 @@ export async function GET(request: NextRequest) {
               subtitles,
               generatedImages,
               audioDuration,
+              scheduledTime: payload.scheduled_time,
+              platforms: payload.social_platforms || [],
             }),
           });
 
@@ -252,6 +254,8 @@ export async function GET(request: NextRequest) {
               audioUrl,
               subtitles,
               backgroundVideoUrl: payload.background_video,
+              scheduledTime: payload.scheduled_time,
+              platforms: payload.social_platforms || [],
             }),
           });
 
@@ -273,7 +277,7 @@ export async function GET(request: NextRequest) {
 
         console.log(`[consume-queue] Successfully processed job ${msgId}: ${videoUrl}`);
 
-        // 3) Archive the message on success
+        // Archive the message on success
         const { error: archiveError } = await supabaseAdmin.rpc(
           "pgmq_archive_video",
           {

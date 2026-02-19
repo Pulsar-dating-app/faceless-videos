@@ -245,9 +245,7 @@ export default function Dashboard() {
   // Check TikTok/Instagram/YouTube connection status on mount and when returning from OAuth
   useEffect(() => {
     if (user) {
-      checkTiktokConnection();
-      checkInstagramConnection();
-      checkYoutubeConnection();
+      fetchSocialConnections();
     }
 
     // Check for OAuth callback parameters or section deep link
@@ -264,23 +262,9 @@ export default function Dashboard() {
     }
 
     if (connected === 'tiktok') {
-      // Get TikTok data from URL
-      const tiktokDataParam = params.get('tiktok_data');
-      
-      if (tiktokDataParam) {
-        try {
-          // Decode and save to localStorage
-          const decodedData = Buffer.from(tiktokDataParam, 'base64').toString('utf-8');
-          const tiktokData = JSON.parse(decodedData);
-          localStorage.setItem('tiktok_connection', JSON.stringify(tiktokData));
-        } catch (e) {
-          console.error('Error saving TikTok data:', e);
-        }
-      }
-      
       // Show success message
       alert(formatMessage(t.dashboard.socialMedia.connectSuccess, { platform: 'TikTok' }));
-      checkTiktokConnection();
+      fetchSocialConnections(); // Refresh connections from database
       
       // Switch to social media section if specified
       if (section === 'social-media') {
@@ -298,23 +282,9 @@ export default function Dashboard() {
     }
 
     if (connected === 'instagram') {
-      // Get Instagram data from URL
-      const instagramDataParam = params.get('instagram_data');
-      
-      if (instagramDataParam) {
-        try {
-          // Decode and save to localStorage
-          const decodedData = Buffer.from(instagramDataParam, 'base64').toString('utf-8');
-          const instagramData = JSON.parse(decodedData);
-          localStorage.setItem('instagram_connection', JSON.stringify(instagramData));
-        } catch (e) {
-          console.error('Error saving Instagram data:', e);
-        }
-      }
-      
       // Show success message
       alert(formatMessage(t.dashboard.socialMedia.connectSuccess, { platform: 'Instagram' }));
-      checkInstagramConnection();
+      fetchSocialConnections(); // Refresh connections from database
       
       // Switch to social media section if specified
       if (section === 'social-media') {
@@ -332,23 +302,9 @@ export default function Dashboard() {
     }
 
     if (connected === 'youtube') {
-      // Get YouTube data from URL
-      const youtubeDataParam = params.get('youtube_data');
-      
-      if (youtubeDataParam) {
-        try {
-          // Decode and save to localStorage
-          const decodedData = Buffer.from(youtubeDataParam, 'base64').toString('utf-8');
-          const youtubeData = JSON.parse(decodedData);
-          localStorage.setItem('youtube_connection', JSON.stringify(youtubeData));
-        } catch (e) {
-          console.error('Error saving YouTube data:', e);
-        }
-      }
-      
       // Show success message
       alert(formatMessage(t.dashboard.socialMedia.connectSuccess, { platform: 'YouTube' }));
-      checkYoutubeConnection();
+      fetchSocialConnections(); // Refresh connections from database
       
       // Switch to social media section if specified
       if (section === 'social-media') {
@@ -364,7 +320,7 @@ export default function Dashboard() {
       // Clean up URL
       window.history.replaceState({}, '', '/dashboard');
     }
-
+    
     if (error) {
       // Show error message
       const errorMessages: { [key: string]: string } = {
@@ -380,73 +336,67 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const checkTiktokConnection = () => {
+  // Fetch social media connections from database
+  const fetchSocialConnections = async () => {
     if (!user) return;
 
     try {
-      // Check localStorage for TikTok connection (no API call needed!)
-      const tiktokData = localStorage.getItem('tiktok_connection');
-      
-      if (tiktokData) {
-        const data = JSON.parse(tiktokData);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/social-connections', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch connections');
+      }
+
+      const { connections } = await response.json();
+
+      // Update state for each platform
+      const tiktok = connections.find((c: any) => c.platform === 'tiktok');
+      const instagram = connections.find((c: any) => c.platform === 'instagram');
+      const youtube = connections.find((c: any) => c.platform === 'youtube');
+
+      // TikTok
+      if (tiktok) {
         setTiktokConnected(true);
-        setTiktokUsername(data.username);
-        setTiktokAvatar(data.avatar_url);
-        console.log('✅ TikTok conectado:', data.username);
+        setTiktokUsername(tiktok.account_name);
+        setTiktokAvatar(tiktok.metadata?.avatar_url || null);
+        console.log('✅ TikTok conectado:', tiktok.account_name);
       } else {
         setTiktokConnected(false);
         setTiktokUsername(null);
         setTiktokAvatar(null);
-        console.log('❌ TikTok não conectado');
       }
-    } catch (error) {
-      console.error('Error checking TikTok connection:', error);
-    }
-  };
 
-  const checkInstagramConnection = () => {
-    if (!user) return;
-
-    try {
-      // Check localStorage for Instagram connection
-      const instagramData = localStorage.getItem('instagram_connection');
-      
-      if (instagramData) {
-        const data = JSON.parse(instagramData);
+      // Instagram
+      if (instagram) {
         setInstagramConnected(true);
-        setInstagramUsername(data.username);
-        console.log('✅ Instagram conectado:', data.username);
+        setInstagramUsername(instagram.account_name);
+        console.log('✅ Instagram conectado:', instagram.account_name);
       } else {
         setInstagramConnected(false);
         setInstagramUsername(null);
-        console.log('❌ Instagram não conectado');
       }
-    } catch (error) {
-      console.error('Error checking Instagram connection:', error);
-    }
-  };
 
-  const checkYoutubeConnection = () => {
-    if (!user) return;
-
-    try {
-      // Check localStorage for YouTube connection
-      const youtubeData = localStorage.getItem('youtube_connection');
-      
-      if (youtubeData) {
-        const data = JSON.parse(youtubeData);
+      // YouTube
+      if (youtube) {
         setYoutubeConnected(true);
-        setYoutubeChannelTitle(data.channel_title);
-        setYoutubeThumbnail(data.thumbnail_url);
-        console.log('✅ YouTube conectado:', data.channel_title);
+        setYoutubeChannelTitle(youtube.account_name);
+        setYoutubeThumbnail(youtube.metadata?.thumbnail || null);
+        console.log('✅ YouTube conectado:', youtube.account_name);
       } else {
         setYoutubeConnected(false);
         setYoutubeChannelTitle(null);
         setYoutubeThumbnail(null);
-        console.log('❌ YouTube não conectado');
       }
+
     } catch (error) {
-      console.error('Error checking YouTube connection:', error);
+      console.error('Error fetching social connections:', error);
     }
   };
 
@@ -559,8 +509,21 @@ export default function Dashboard() {
     setIsDisconnectingTiktok(true);
 
     try {
-      // Remove from localStorage
-      localStorage.removeItem('tiktok_connection');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch('/api/social-connections', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ platform: 'tiktok' }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to disconnect');
+      }
       
       setTiktokConnected(false);
       setTiktokUsername(null);
@@ -583,8 +546,21 @@ export default function Dashboard() {
     setIsDisconnectingInstagram(true);
 
     try {
-      // Remove from localStorage
-      localStorage.removeItem('instagram_connection');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch('/api/social-connections', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ platform: 'instagram' }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to disconnect');
+      }
       
       setInstagramConnected(false);
       setInstagramUsername(null);
@@ -606,8 +582,21 @@ export default function Dashboard() {
     setIsDisconnectingYoutube(true);
 
     try {
-      // Remove from localStorage
-      localStorage.removeItem('youtube_connection');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch('/api/social-connections', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ platform: 'youtube' }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to disconnect');
+      }
       
       setYoutubeConnected(false);
       setYoutubeChannelTitle(null);
@@ -918,91 +907,48 @@ export default function Dashboard() {
       return;
     }
 
-    // Get connection data from localStorage
-    let connectionData;
-    let accessToken;
-    let refreshToken;
-
-    switch (platform) {
-      case 'tiktok':
-        connectionData = localStorage.getItem('tiktok_connection');
-        if (!connectionData) {
-          alert("Please connect your TikTok account first in the Social Media section");
-          return;
-        }
-        accessToken = JSON.parse(connectionData).access_token;
-        break;
-      case 'instagram':
-        connectionData = localStorage.getItem('instagram_connection');
-        if (!connectionData) {
-          alert("Please connect your Instagram account first in the Social Media section");
-          return;
-        }
-        accessToken = JSON.parse(connectionData).access_token;
-        break;
-      case 'youtube':
-        connectionData = localStorage.getItem('youtube_connection');
-        if (!connectionData) {
-          alert("Please connect your YouTube account first in the Social Media section");
-          return;
-        }
-        const youtubeData = JSON.parse(connectionData);
-        accessToken = youtubeData.access_token;
-        refreshToken = youtubeData.refresh_token;
-        break;
-      default:
-        alert("Platform not supported yet");
-        return;
-    }
-
-    setPostingTo(platform);
-
+    // Get connection data from database
     try {
-      // Convert video URL to absolute URL
-      const absoluteVideoUrl = videoUrl.startsWith('http') 
-        ? videoUrl 
-        : `${window.location.origin}${videoUrl}`;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert("Please sign in first");
+        return;
+      }
 
-      const hashtags = postHashtags.split(' ').filter(tag => tag.trim());
-
-      const response = await fetch('/api/post-to-social', {
-        method: 'POST',
+      const response = await fetch('/api/social-connections', {
         headers: {
-          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({
-          platform,
-          videoUrl: absoluteVideoUrl,
-          accessToken,
-          refreshToken,
-          title: postTitle || 'Amazing Viral Video',
-          description: postDescription,
-          hashtags,
-        }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to post');
+        throw new Error('Failed to fetch connections');
       }
 
-      const data = await response.json();
-      
-      if (platform === 'youtube' && data.url) {
-        alert(`✅ Successfully posted to YouTube!\n\nView at: ${data.url}`);
-      } else if (platform === 'tiktok') {
-        alert(`✅ Successfully posted to TikTok!\n\nYour video is being processed.`);
-      } else {
-        alert(`✅ Successfully posted to ${platform}!`);
+      const { connections } = await response.json();
+      const connection = connections.find((c: any) => c.platform === platform);
+
+      if (!connection) {
+        alert(`Please connect your ${platform} account first in the Social Media section`);
+        return;
       }
 
-      setShowPostPanel(false);
+      // Note: We don't have access_token here anymore in the response for security
+      // The posting should be done server-side by the cronjob system
+      alert(`Posting to ${platform} is now handled automatically by the system. Your video will be posted at the scheduled time.`);
+      return;
+
     } catch (error) {
-      console.error('Error posting to social media:', error);
-      alert(`Failed to post to ${platform}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
+      console.error('Error fetching connection:', error);
+      alert("Failed to verify social media connection");
       setPostingTo(null);
+      setPostingTo(null);
+      return;
     }
+
+    // Note: Direct posting from frontend is deprecated
+    // Videos are now posted automatically by the cronjob system at scheduled times
+    // This function just verifies the connection exists
   };
 
   // Show loading state while checking auth
