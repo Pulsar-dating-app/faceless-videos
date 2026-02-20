@@ -8,11 +8,6 @@ import { Suspense } from "react";
 
 function CheckoutSuccessContent() {
   const { t } = useI18n();
-  
-  // Get session_id from URL
-  const sessionId = typeof window !== "undefined" 
-    ? new URLSearchParams(window.location.search).get("session_id")
-    : null;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -31,11 +26,6 @@ function CheckoutSuccessContent() {
             <p className="text-zinc-600 dark:text-zinc-400">
               Thank you for your subscription. Your payment has been processed successfully.
             </p>
-            {sessionId && (
-              <p className="text-xs text-zinc-500 dark:text-zinc-500">
-                Session ID: {sessionId}
-              </p>
-            )}
           </div>
 
           <div className="flex flex-col gap-4">

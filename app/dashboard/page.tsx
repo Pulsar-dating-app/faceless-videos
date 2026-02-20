@@ -98,7 +98,7 @@ type DashboardSection = "video-creation" | "social-media" | "series-management" 
 export default function Dashboard() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
-  const { t, formatMessage } = useI18n();
+  const { t, formatMessage, language: siteLanguage } = useI18n();
   const [activeSection, setActiveSection] = useState<DashboardSection>("video-creation");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -448,12 +448,20 @@ export default function Dashboard() {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       if (!supabaseUrl) throw new Error("NEXT_PUBLIC_SUPABASE_URL not set");
 
+      const stripeLocale = siteLanguage === "pt" ? "pt" :
+                           siteLanguage === "es" ? "es" :
+                           siteLanguage === "fr" ? "fr" :
+                           siteLanguage === "de" ? "de" :
+                           siteLanguage === "en" ? "en" :
+                           "auto";
+
       const response = await fetch(`${supabaseUrl}/functions/v1/create-portal-session`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${authSession.access_token}`,
         },
+        body: JSON.stringify({ locale: stripeLocale }),
       });
 
       if (!response.ok) {
