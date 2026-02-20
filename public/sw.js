@@ -1,5 +1,6 @@
 const CACHE_NAME = 'video-cache-v1';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
+const MAX_CACHE_BYTES = 50 * 1024 * 1024; // não cacheia vídeos acima de 50 MB
 
 // Hosts cujos vídeos devem ser cacheados
 const VIDEO_HOSTS = ['tzkasbfuhnhfhyvhcjnf.supabase.co'];
@@ -38,14 +39,10 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   if (!isVideoRequest(event.request.url)) return;
 
-  // Responde imediatamente (cache ou rede), sem bloquear
   event.respondWith(handleVideoRequest(event.request));
-
-  // Em paralelo, garante que o vídeo completo fique em cache para a próxima visita
   event.waitUntil(ensureCached(event.request.url));
 });
 
-// Retorna do cache se disponível; caso contrário passa direto para a rede
 async function handleVideoRequest(request) {
   const cache = await caches.open(CACHE_NAME);
   const rangeHeader = request.headers.get('Range');
@@ -58,17 +55,24 @@ async function handleVideoRequest(request) {
       : false;
 
     if (!expired) {
-      return rangeHeader ? serveRange(cached, rangeHeader) : cached;
+      try {
+        if (rangeHeader) {
+          return await serveRange(cached, rangeHeader);
+        }
+        return cached;
+      } catch (err) {
+        // Se qualquer coisa der errado ao servir do cache, cai na rede
+        console.warn('[SW] Falha ao servir do cache, usando rede:', err);
+        await cache.delete(new Request(request.url));
+      }
+    } else {
+      await cache.delete(new Request(request.url));
     }
-
-    await cache.delete(new Request(request.url));
   }
 
-  // Ainda não está em cache — passa para a rede normalmente
   return fetch(request);
 }
 
-// Baixa o vídeo completo e armazena no cache (roda em background)
 async function ensureCached(url) {
   if (pendingCache.has(url)) return;
 
@@ -81,9 +85,21 @@ async function ensureCached(url) {
     const response = await fetch(url, {
       headers: { Accept: 'video/mp4,video/*,*/*' },
     });
+
     if (!response.ok) return;
 
+    // Verifica tamanho antes de ler o body inteiro
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > MAX_CACHE_BYTES) {
+      console.warn('[SW] Vídeo muito grande para cachear:', url, contentLength);
+      return;
+    }
+
     const buffer = await response.arrayBuffer();
+
+    // Confere novamente após leitura (caso content-length não estivesse presente)
+    if (buffer.byteLength === 0 || buffer.byteLength > MAX_CACHE_BYTES) return;
+
     const headers = new Headers(response.headers);
     headers.set('sw-cached-at', new Date().toISOString());
     headers.set('content-length', String(buffer.byteLength));
@@ -99,12 +115,16 @@ async function ensureCached(url) {
   }
 }
 
-// Constrói uma resposta 206 a partir do buffer cacheado
 async function serveRange(response, rangeHeader) {
   const buffer = await response.clone().arrayBuffer();
-  const totalSize = buffer.byteLength;
 
+  if (buffer.byteLength === 0) {
+    throw new Error('Buffer cacheado vazio');
+  }
+
+  const totalSize = buffer.byteLength;
   const match = rangeHeader.match(/bytes=(\d*)-(\d*)/);
+
   if (!match) {
     return new Response('Range inválido', { status: 416 });
   }
