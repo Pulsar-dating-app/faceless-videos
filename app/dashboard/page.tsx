@@ -703,11 +703,22 @@ export default function Dashboard() {
         },
       });
 
-      if (data?.success === false && data?.errorCode) {
+      // On non-2xx, client may set data to null; try to read body from error.context
+      let responseBody = data ?? null;
+      if (error && typeof (error as { context?: Response }).context?.json === "function") {
+        try {
+          const body = await (error as { context: Response }).context.json();
+          if (body && typeof body === "object") responseBody = body as { success?: boolean; errorCode?: string };
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (responseBody?.success === false && responseBody?.errorCode) {
         const errors = (t.dashboard.seriesManagement as { errors?: Record<string, string> }).errors;
         const message =
-          errors && typeof errors[data.errorCode] === "string"
-            ? errors[data.errorCode]
+          errors && typeof errors[responseBody.errorCode] === "string"
+            ? errors[responseBody.errorCode]
             : errors?.SERVER_ERROR ?? t.dashboard.seriesManagement.updateError;
         setErrorDialog({
           isOpen: true,
@@ -720,7 +731,10 @@ export default function Dashboard() {
 
       if (error) {
         const errors = (t.dashboard.seriesManagement as { errors?: Record<string, string> }).errors;
-        const message = errors?.SERVER_ERROR ?? t.dashboard.seriesManagement.updateError;
+        const message =
+          responseBody?.errorCode && errors && typeof errors[responseBody.errorCode] === "string"
+            ? errors[responseBody.errorCode]
+            : errors?.SERVER_ERROR ?? t.dashboard.seriesManagement.updateError;
         setErrorDialog({
           isOpen: true,
           type: "error",
@@ -845,12 +859,34 @@ export default function Dashboard() {
           },
         });
 
-        if (error) {
-          throw error;
+        // On non-2xx, client may set data to null; try to read body from error.context
+        let responseBody = data ?? null;
+        if (error && typeof (error as { context?: Response }).context?.json === "function") {
+          try {
+            const body = await (error as { context: Response }).context.json();
+            if (body && typeof body === "object") responseBody = body as { errorCode?: string; error?: string };
+          } catch {
+            /* ignore */
+          }
         }
 
-        if (data?.error) {
-          throw new Error(data.error);
+        const errors = (t.dashboard.seriesManagement as { errors?: Record<string, string> }).errors;
+        if (error) {
+          const message =
+            responseBody?.errorCode && errors && typeof errors[responseBody.errorCode] === "string"
+              ? errors[responseBody.errorCode]
+              : (responseBody?.error as string) || (error instanceof Error ? error.message : String(error)) || (errors?.SERVER_ERROR ?? "An error occurred while creating your series. Please try again.");
+          setErrorDialog({
+            isOpen: true,
+            type: "error",
+            title: "Failed to Create Series",
+            message,
+          });
+          return;
+        }
+
+        if (responseBody?.error) {
+          throw new Error(responseBody.error as string);
         }
 
         // Success - show message and reset
@@ -859,12 +895,15 @@ export default function Dashboard() {
         
       } catch (error: unknown) {
         console.error("Error creating series:", error);
+        const errors = (t.dashboard.seriesManagement as { errors?: Record<string, string> }).errors;
         const errorMessage = error instanceof Error ? error.message : String(error);
+        const message =
+          errors?.SERVER_ERROR ?? "An error occurred while creating your series. Please try again.";
         setErrorDialog({
           isOpen: true,
           type: "error",
           title: "Failed to Create Series",
-          message: errorMessage || "An error occurred while creating your series. Please try again.",
+          message: errorMessage || message,
         });
       } finally {
         setIsGenerating(false);
