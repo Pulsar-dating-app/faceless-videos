@@ -11,17 +11,13 @@ import { useI18n } from "@/lib/i18n-context";
 // Carousel configuration
 const CAROUSEL_MAX_WIDTH = "1300px"; // Easy to configure - max width of the carousel
 
-// Sample video URLs - replace with your actual video URLs
+// Video URLs from local public folder
 const CAROUSEL_VIDEOS = [
-  "https://tzkasbfuhnhfhyvhcjnf.supabase.co/storage/v1/object/public/showcases/preview_background.mp4",
-  "https://tzkasbfuhnhfhyvhcjnf.supabase.co/storage/v1/object/public/showcases/preview_full_ai.mp4",
-  "https://tzkasbfuhnhfhyvhcjnf.supabase.co/storage/v1/object/public/showcases/preview_full_ai.mp4",
-  "https://tzkasbfuhnhfhyvhcjnf.supabase.co/storage/v1/object/public/showcases/preview_full_ai.mp4",
-  "https://tzkasbfuhnhfhyvhcjnf.supabase.co/storage/v1/object/public/showcases/preview_full_ai.mp4",
-  "https://tzkasbfuhnhfhyvhcjnf.supabase.co/storage/v1/object/public/showcases/preview_full_ai.mp4",
-  // Add more video URLs here as you create them
-  // "/videos/example2.mp4",
-  // "/videos/example3.mp4",
+  "/videos/showcases/preview_background.mp4",
+  "/videos/showcases/preview_full_ai.mp4",
+  "/videos/showcases/preview_full_ai.mp4",
+  "/videos/showcases/preview_full_ai.mp4",
+  "/videos/showcases/preview_full_ai.mp4",
 ];
 
 // Reviews - Easy to edit and add new ones
