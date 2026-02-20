@@ -229,7 +229,6 @@ export async function GET(request: NextRequest) {
           }
 
           audioUrl = generateData.audioUrl;
-          const subtitles = generateData.subtitles || "";
           script = generateData.script || "";
 
           if (!audioUrl) {
@@ -252,7 +251,8 @@ export async function GET(request: NextRequest) {
             },
             body: JSON.stringify({
               audioUrl,
-              subtitles,
+              // Subtitles will be generated later by the FFmpeg worker (Python/stable-ts)
+              subtitles: "",
               backgroundVideoUrl: payload.background_video,
               scheduledTime: payload.scheduled_time,
               platforms: payload.social_platforms || [],
