@@ -17,7 +17,7 @@ export default function TermsPage() {
               Terms and Conditions
             </h1>
             <p className="text-lg text-zinc-600 dark:text-zinc-400">
-              Last updated: [DATE]
+              Last updated: February 23, 2026
             </p>
           </div>
 
