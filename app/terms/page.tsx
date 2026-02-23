@@ -31,9 +31,9 @@ export default function TermsPage() {
                 </p>
                 <div className="mt-4 space-y-2 text-zinc-700 dark:text-zinc-300">
                   <p><strong>Company name:</strong> PULSAR LTDA</p>
-                  <p><strong>Registered address:</strong> [YOUR ADDRESS]</p>
-                  <p><strong>Company ID / Tax ID:</strong> [NUMBER]</p>
-                  <p><strong>Email:</strong> [SUPPORT EMAIL]</p>
+                  <p><strong>Registered address:</strong> Rua Santa Maria, 90, Capivari, São Paulo, Brazil</p>
+                  <p><strong>Company ID / Tax ID:</strong> 58.261.994/0001-80</p>
+                  <p><strong>Email:</strong> info@viralfacelessreels.com</p>
                 </div>
                 <p className="mt-4 text-zinc-700 dark:text-zinc-300 leading-relaxed">
                   By creating an account, purchasing a subscription, or using the Service, you agree to these Terms.
@@ -114,7 +114,7 @@ export default function TermsPage() {
                   Worldwide, perpetual, irrevocable, royalty-free license to use, reproduce, modify, display, distribute, and publish your generated content for marketing, promotional materials, case studies, demonstrations, and advertising of the Service, with or without attribution.
                 </p>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mt-4">
-                  You may request exclusion from marketing use by emailing [SUPPORT EMAIL].
+                  You may request exclusion from marketing use by emailing info@viralfacelessreels.com.
                 </p>
               </section>
 
@@ -149,7 +149,7 @@ export default function TermsPage() {
                   If you believe content generated through our Service infringes your copyright, send a notice to:
                 </p>
                 <p className="text-zinc-700 dark:text-zinc-300 font-semibold mb-4">
-                  [COPYRIGHT EMAIL]
+                  info@viralfacelessreels.com
                 </p>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-2">
                   Include:
@@ -175,7 +175,7 @@ export default function TermsPage() {
                   We reserve the right to:
                 </p>
                 <ul className="list-disc list-inside space-y-2 text-zinc-700 dark:text-zinc-300 ml-4">
-                  <li>Delete stored media after [e.g., 90 days]</li>
+                  <li>Delete stored media after any certain period of time</li>
                   <li>Limit excessive usage</li>
                   <li>Enforce fair use limits to protect infrastructure</li>
                 </ul>
@@ -261,8 +261,7 @@ export default function TermsPage() {
                   For any questions regarding these Terms:
                 </p>
                 <div className="space-y-2 text-zinc-700 dark:text-zinc-300">
-                  <p><strong>Email:</strong> [SUPPORT EMAIL]</p>
-                  <p><strong>Address:</strong> [COMPANY ADDRESS]</p>
+                  <p><strong>Email:</strong> info@viralfacelessreels.com</p>
                 </div>
               </section>
 
