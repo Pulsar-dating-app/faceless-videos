@@ -80,11 +80,11 @@ export function Navbar({ onLogoClick }: NavbarProps) {
         className="flex items-center gap-2 font-bold text-xl cursor-pointer z-50"
       >
         <Image 
-          src="/images/logo22.png" 
+          src="/images/logo.png" 
           alt="Viral Faceless Reels" 
-          width={32} 
-          height={32}
-          className="w-16 h-16 rounded-lg"
+          width={700} 
+          height={700}
+          className="h-12 w-12 rounded-lg object-contain shrink-0"
         />
         <span>Viral Faceless Reels</span>
       </Link>
