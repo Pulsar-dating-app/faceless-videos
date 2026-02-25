@@ -84,7 +84,7 @@ export function Navbar({ onLogoClick }: NavbarProps) {
           alt="Viral Faceless Reels" 
           width={700} 
           height={700}
-          className="h-12 w-12 rounded-lg object-contain shrink-0"
+          className="h-20 w-20 rounded-lg object-contain shrink-0"
         />
         <span>Viral Faceless Reels</span>
       </Link>
