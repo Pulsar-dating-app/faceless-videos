@@ -363,6 +363,16 @@ export const translations = {
         sunday: "Sunday",
       },
     },
+    checkoutSuccess: {
+      title: "Payment Successful!",
+      message: "Thank you for your subscription. Your payment has been processed successfully.",
+      goToDashboard: "Go to Dashboard",
+    },
+    checkoutCancel: {
+      title: "Checkout closed",
+      message: "No charges were made. You can subscribe anytime from the pricing page.",
+      goToPricing: "View plans",
+    },
   },
   es: {
     nav: {
@@ -705,6 +715,16 @@ export const translations = {
         saturday: "Sábado",
         sunday: "Domingo",
       },
+    },
+    checkoutSuccess: {
+      title: "¡Pago exitoso!",
+      message: "Gracias por tu suscripción. Tu pago se ha procesado correctamente.",
+      goToDashboard: "Ir al panel",
+    },
+    checkoutCancel: {
+      title: "Checkout cerrado",
+      message: "No se realizó ningún cargo. Puedes suscribirte en cualquier momento desde la página de precios.",
+      goToPricing: "Ver planes",
     },
   },
   fr: {
@@ -1049,6 +1069,16 @@ export const translations = {
         sunday: "Dimanche",
       },
     },
+    checkoutSuccess: {
+      title: "Paiement réussi !",
+      message: "Merci pour votre abonnement. Votre paiement a été traité avec succès.",
+      goToDashboard: "Aller au tableau de bord",
+    },
+    checkoutCancel: {
+      title: "Paiement annulé",
+      message: "Aucun prélèvement effectué. Vous pouvez vous abonner à tout moment depuis la page des tarifs.",
+      goToPricing: "Voir les offres",
+    },
   },
   pt: {
     nav: {
@@ -1392,6 +1422,16 @@ export const translations = {
         sunday: "Domingo",
       },
     },
+    checkoutSuccess: {
+      title: "Pagamento realizado!",
+      message: "Obrigado pela sua assinatura. Seu pagamento foi processado com sucesso.",
+      goToDashboard: "Ir ao painel",
+    },
+    checkoutCancel: {
+      title: "Checkout fechado",
+      message: "Nenhuma cobrança foi feita. Você pode assinar a qualquer momento na página de preços.",
+      goToPricing: "Ver planos",
+    },
   },
   de: {
     nav: {
@@ -1734,6 +1774,16 @@ export const translations = {
         saturday: "Samstag",
         sunday: "Sonntag",
       },
+    },
+    checkoutSuccess: {
+      title: "Zahlung erfolgreich!",
+      message: "Vielen Dank für Ihr Abonnement. Ihre Zahlung wurde erfolgreich verarbeitet.",
+      goToDashboard: "Zum Dashboard",
+    },
+    checkoutCancel: {
+      title: "Checkout abgebrochen",
+      message: "Es wurde keine Belastung vorgenommen. Sie können sich jederzeit auf der Preisseite anmelden.",
+      goToPricing: "Angebote ansehen",
     },
   },
 };
