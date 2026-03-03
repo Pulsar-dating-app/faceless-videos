@@ -22,26 +22,18 @@ function CheckoutSuccessContent() {
           </div>
 
           <div className="space-y-4">
-            <h1 className="text-3xl font-bold">Payment Successful!</h1>
+            <h1 className="text-3xl font-bold">{t.checkoutSuccess.title}</h1>
             <p className="text-zinc-600 dark:text-zinc-400">
-              Thank you for your subscription. Your payment has been processed successfully.
+              {t.checkoutSuccess.message}
             </p>
           </div>
 
-          <div className="flex flex-col gap-4">
-            <Link
-              href="/"
-              className="w-full bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 rounded-lg font-medium transition-colors text-center"
-            >
-              Go to Dashboard
-            </Link>
-            <Link
-              href="/pricing"
-              className="w-full bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700 px-6 py-3 rounded-lg font-medium transition-colors text-center"
-            >
-              View Plans
-            </Link>
-          </div>
+          <Link
+            href="/dashboard"
+            className="w-full bg-blue-600 text-white hover:bg-blue-700 px-6 py-3 rounded-lg font-medium transition-colors text-center"
+          >
+            {t.checkoutSuccess.goToDashboard}
+          </Link>
         </div>
       </main>
     </div>
