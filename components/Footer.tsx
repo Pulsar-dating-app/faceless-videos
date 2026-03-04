@@ -17,6 +17,13 @@ export function Footer() {
         >
           Terms and Conditions
         </Link>
+        <span className="hidden sm:inline">•</span>
+        <Link 
+          href="/privacy-policy" 
+          className="hover:text-zinc-700 dark:hover:text-zinc-400 transition-colors underline underline-offset-4"
+        >
+          Privacy Policy
+        </Link>
       </div>
     </footer>
   );

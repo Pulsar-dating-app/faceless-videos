@@ -326,6 +326,7 @@ export const translations = {
           SELECT_ART_STYLE_AI: "Please choose an art style for your Fully AI series.",
           SELECT_BACKGROUND_VIDEO: "Please choose a background video for your Background Video series.",
           NO_FIELDS_TO_UPDATE: "No changes to save. Update at least one field.",
+          SERIES_LIMIT_REACHED: "You've reached your series limit. Upgrade your plan to activate more series.",
           SERVER_ERROR: "An error occurred while updating the series. Please try again.",
         },
       },
@@ -361,6 +362,16 @@ export const translations = {
         saturday: "Saturday",
         sunday: "Sunday",
       },
+    },
+    checkoutSuccess: {
+      title: "Payment Successful!",
+      message: "Thank you for your subscription. Your payment has been processed successfully.",
+      goToDashboard: "Go to Dashboard",
+    },
+    checkoutCancel: {
+      title: "Checkout closed",
+      message: "No charges were made. You can subscribe anytime from the pricing page.",
+      goToPricing: "View plans",
     },
   },
   es: {
@@ -668,6 +679,7 @@ export const translations = {
           SELECT_ART_STYLE_AI: "Elige un estilo artístico para tu serie Completamente IA.",
           SELECT_BACKGROUND_VIDEO: "Elige un video de fondo para tu serie Video de Fondo.",
           NO_FIELDS_TO_UPDATE: "No hay cambios que guardar. Actualiza al menos un campo.",
+          SERIES_LIMIT_REACHED: "Has alcanzado el límite de series. Mejora tu plan para activar más series.",
           SERVER_ERROR: "Ocurrió un error al actualizar la serie. Inténtalo de nuevo.",
         },
       },
@@ -703,6 +715,16 @@ export const translations = {
         saturday: "Sábado",
         sunday: "Domingo",
       },
+    },
+    checkoutSuccess: {
+      title: "¡Pago exitoso!",
+      message: "Gracias por tu suscripción. Tu pago se ha procesado correctamente.",
+      goToDashboard: "Ir al panel",
+    },
+    checkoutCancel: {
+      title: "Checkout cerrado",
+      message: "No se realizó ningún cargo. Puedes suscribirte en cualquier momento desde la página de precios.",
+      goToPricing: "Ver planes",
     },
   },
   fr: {
@@ -1010,6 +1032,7 @@ export const translations = {
           SELECT_ART_STYLE_AI: "Veuillez choisir un style artistique pour votre série Entièrement IA.",
           SELECT_BACKGROUND_VIDEO: "Veuillez choisir une vidéo de fond pour votre série Vidéo de Fond.",
           NO_FIELDS_TO_UPDATE: "Aucun changement à enregistrer. Modifiez au moins un champ.",
+          SERIES_LIMIT_REACHED: "Vous avez atteint la limite de séries. Passez à un plan supérieur pour en activer plus.",
           SERVER_ERROR: "Une erreur s'est produite lors de la mise à jour de la série. Veuillez réessayer.",
         },
       },
@@ -1045,6 +1068,16 @@ export const translations = {
         saturday: "Samedi",
         sunday: "Dimanche",
       },
+    },
+    checkoutSuccess: {
+      title: "Paiement réussi !",
+      message: "Merci pour votre abonnement. Votre paiement a été traité avec succès.",
+      goToDashboard: "Aller au tableau de bord",
+    },
+    checkoutCancel: {
+      title: "Paiement annulé",
+      message: "Aucun prélèvement effectué. Vous pouvez vous abonner à tout moment depuis la page des tarifs.",
+      goToPricing: "Voir les offres",
     },
   },
   pt: {
@@ -1352,6 +1385,7 @@ export const translations = {
           SELECT_ART_STYLE_AI: "Escolha um estilo de arte para sua série Totalmente IA.",
           SELECT_BACKGROUND_VIDEO: "Escolha um vídeo de fundo para sua série Vídeo de Fundo.",
           NO_FIELDS_TO_UPDATE: "Nenhuma alteração para salvar. Atualize pelo menos um campo.",
+          SERIES_LIMIT_REACHED: "Você atingiu o limite de séries. Faça upgrade do plano para ativar mais séries.",
           SERVER_ERROR: "Ocorreu um erro ao atualizar a série. Tente novamente.",
         },
       },
@@ -1387,6 +1421,16 @@ export const translations = {
         saturday: "Sábado",
         sunday: "Domingo",
       },
+    },
+    checkoutSuccess: {
+      title: "Pagamento realizado!",
+      message: "Obrigado pela sua assinatura. Seu pagamento foi processado com sucesso.",
+      goToDashboard: "Ir ao painel",
+    },
+    checkoutCancel: {
+      title: "Checkout fechado",
+      message: "Nenhuma cobrança foi feita. Você pode assinar a qualquer momento na página de preços.",
+      goToPricing: "Ver planos",
     },
   },
   de: {
@@ -1694,6 +1738,7 @@ export const translations = {
           SELECT_ART_STYLE_AI: "Bitte wählen Sie einen Kunststil für Ihre Vollständig-KI-Serie.",
           SELECT_BACKGROUND_VIDEO: "Bitte wählen Sie ein Hintergrundvideo für Ihre Hintergrundvideo-Serie.",
           NO_FIELDS_TO_UPDATE: "Keine Änderungen zum Speichern. Aktualisieren Sie mindestens ein Feld.",
+          SERIES_LIMIT_REACHED: "Sie haben Ihr Serienlimit erreicht. Upgraden Sie Ihren Plan, um weitere Serien zu aktivieren.",
           SERVER_ERROR: "Beim Aktualisieren der Serie ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
         },
       },
@@ -1729,6 +1774,16 @@ export const translations = {
         saturday: "Samstag",
         sunday: "Sonntag",
       },
+    },
+    checkoutSuccess: {
+      title: "Zahlung erfolgreich!",
+      message: "Vielen Dank für Ihr Abonnement. Ihre Zahlung wurde erfolgreich verarbeitet.",
+      goToDashboard: "Zum Dashboard",
+    },
+    checkoutCancel: {
+      title: "Checkout abgebrochen",
+      message: "Es wurde keine Belastung vorgenommen. Sie können sich jederzeit auf der Preisseite anmelden.",
+      goToPricing: "Angebote ansehen",
     },
   },
 };
