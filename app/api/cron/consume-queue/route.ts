@@ -4,6 +4,21 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const CRON_SECRET = process.env.CRON_SECRET;
+/** Optional: bypass Vercel Deployment Protection when cron calls internal APIs (merge, merge-ai-video). Set in Vercel Dashboard > Deployment Protection > Bypass for Automation. */
+const VERCEL_BYPASS_SECRET = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+
+/** Builds full URL for internal API call; adds Vercel protection bypass params when VERCEL_AUTOMATION_BYPASS_SECRET is set. */
+function internalApiUrl(path: string): string {
+  const baseUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+  const url = new URL(path, baseUrl);
+  if (VERCEL_BYPASS_SECRET) {
+    url.searchParams.set("x-vercel-set-bypass-cookie", "true");
+    url.searchParams.set("x-vercel-protection-bypass", VERCEL_BYPASS_SECRET);
+  }
+  return url.toString();
+}
 
 interface AutomationPayload {
   automation_id: string;
@@ -158,19 +173,13 @@ export async function GET(request: NextRequest) {
           console.log(`[consume-queue] Generated ${generatedImages.length} AI images and audio for job ${msgId}`);
 
           // 2) Call /api/merge-ai-video to merge images with audio
-          const baseUrl =
-            process.env.NEXT_PUBLIC_SITE_URL ||
-            (process.env.VERCEL_URL
-              ? `https://${process.env.VERCEL_URL}`
-              : "http://localhost:3000");
-
           const mergeAiHeaders: Record<string, string> = {
             "Content-Type": "application/json",
           };
           if (CRON_SECRET) {
             mergeAiHeaders["Authorization"] = `Bearer ${CRON_SECRET}`;
           }
-          const mergeAiResponse = await fetch(new URL("/api/merge-ai-video", baseUrl).toString(), {
+          const mergeAiResponse = await fetch(internalApiUrl("/api/merge-ai-video"), {
             method: "POST",
             headers: mergeAiHeaders,
             body: JSON.stringify({
@@ -241,19 +250,13 @@ export async function GET(request: NextRequest) {
           console.log(`[consume-queue] Generated audio for job ${msgId} (${payload.series_name})`);
 
           // Call /api/merge with background video
-          const baseUrl =
-            process.env.NEXT_PUBLIC_SITE_URL ||
-            (process.env.VERCEL_URL
-              ? `https://${process.env.VERCEL_URL}`
-              : "http://localhost:3000");
-
           const mergeHeaders: Record<string, string> = {
             "Content-Type": "application/json",
           };
           if (CRON_SECRET) {
             mergeHeaders["Authorization"] = `Bearer ${CRON_SECRET}`;
           }
-          const mergeResponse = await fetch(new URL("/api/merge", baseUrl).toString(), {
+          const mergeResponse = await fetch(internalApiUrl("/api/merge"), {
             method: "POST",
             headers: mergeHeaders,
             body: JSON.stringify({
