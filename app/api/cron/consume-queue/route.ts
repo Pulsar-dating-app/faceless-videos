@@ -179,6 +179,9 @@ export async function GET(request: NextRequest) {
           if (CRON_SECRET) {
             mergeAiHeaders["Authorization"] = `Bearer ${CRON_SECRET}`;
           }
+          if (VERCEL_BYPASS_SECRET) {
+            mergeAiHeaders["x-vercel-protection-bypass"] = VERCEL_BYPASS_SECRET;
+          }
           const mergeAiResponse = await fetch(internalApiUrl("/api/merge-ai-video"), {
             method: "POST",
             headers: mergeAiHeaders,
@@ -255,6 +258,9 @@ export async function GET(request: NextRequest) {
           };
           if (CRON_SECRET) {
             mergeHeaders["Authorization"] = `Bearer ${CRON_SECRET}`;
+          }
+          if (VERCEL_BYPASS_SECRET) {
+            mergeHeaders["x-vercel-protection-bypass"] = VERCEL_BYPASS_SECRET;
           }
           const mergeResponse = await fetch(internalApiUrl("/api/merge"), {
             method: "POST",
