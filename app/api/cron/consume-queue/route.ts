@@ -164,11 +164,15 @@ export async function GET(request: NextRequest) {
               ? `https://${process.env.VERCEL_URL}`
               : "http://localhost:3000");
 
+          const mergeAiHeaders: Record<string, string> = {
+            "Content-Type": "application/json",
+          };
+          if (CRON_SECRET) {
+            mergeAiHeaders["Authorization"] = `Bearer ${CRON_SECRET}`;
+          }
           const mergeAiResponse = await fetch(new URL("/api/merge-ai-video", baseUrl).toString(), {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: mergeAiHeaders,
             body: JSON.stringify({
               audioUrl,
               subtitles,
@@ -243,11 +247,15 @@ export async function GET(request: NextRequest) {
               ? `https://${process.env.VERCEL_URL}`
               : "http://localhost:3000");
 
+          const mergeHeaders: Record<string, string> = {
+            "Content-Type": "application/json",
+          };
+          if (CRON_SECRET) {
+            mergeHeaders["Authorization"] = `Bearer ${CRON_SECRET}`;
+          }
           const mergeResponse = await fetch(new URL("/api/merge", baseUrl).toString(), {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: mergeHeaders,
             body: JSON.stringify({
               audioUrl,
               // Subtitles will be generated later by the FFmpeg worker (Python/stable-ts)
