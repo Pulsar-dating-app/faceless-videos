@@ -192,6 +192,7 @@ export async function GET(request: NextRequest) {
               audioDuration,
               scheduledTime: payload.scheduled_time,
               platforms: payload.social_platforms || [],
+              userId: payload.user_uid,
             }),
           });
 
@@ -272,6 +273,7 @@ export async function GET(request: NextRequest) {
               backgroundVideoUrl: payload.background_video,
               scheduledTime: payload.scheduled_time,
               platforms: payload.social_platforms || [],
+              userId: payload.user_uid,
             }),
           });
 
