@@ -3,7 +3,16 @@ import { NextResponse } from "next/server";
 // Default background video URL (hosted on GitHub)
 const DEFAULT_BACKGROUND_VIDEO_URL = "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.1/minecraft_1.mp4";
 
+const CRON_SECRET = process.env.CRON_SECRET;
+
 export async function POST(req: Request) {
+  if (CRON_SECRET) {
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader !== `Bearer ${CRON_SECRET}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
   const { audioUrl, subtitles, backgroundVideoUrl } = await req.json();
   const videoUrl = backgroundVideoUrl || DEFAULT_BACKGROUND_VIDEO_URL;
 

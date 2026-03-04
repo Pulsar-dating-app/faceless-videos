@@ -3,8 +3,17 @@ import { NextResponse } from "next/server";
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
+const CRON_SECRET = process.env.CRON_SECRET;
+
 export async function POST(req: Request) {
   try {
+    if (CRON_SECRET) {
+      const authHeader = req.headers.get("Authorization");
+      if (authHeader !== `Bearer ${CRON_SECRET}`) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+    }
+
     const {
       audioUrl,
       subtitles,
