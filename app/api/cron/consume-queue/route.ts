@@ -3,7 +3,6 @@ import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const CRON_SECRET = process.env.CRON_SECRET;
 
 interface AutomationPayload {
@@ -45,7 +44,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY) {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return NextResponse.json(
         { error: "Supabase configuration missing" },
         { status: 500 }
@@ -117,7 +116,7 @@ export async function GET(request: NextRequest) {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+                "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
               },
               body: JSON.stringify({
                 userId: payload.user_uid,
@@ -205,7 +204,7 @@ export async function GET(request: NextRequest) {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+                "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
               },
               body: JSON.stringify({
                 category: payload.category,
