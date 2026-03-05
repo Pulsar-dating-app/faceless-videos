@@ -360,6 +360,7 @@ async function postToInstagram(userId: string, videoUrl: string, supabase: any) 
       },
       body: JSON.stringify({
         video_url: videoUrl,
+        media_type: 'REELS',
         caption: 'Auto-generated video',
         access_token: connection.access_token,
       }),
