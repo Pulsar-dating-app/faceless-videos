@@ -377,8 +377,39 @@ async function postToInstagram(userId: string, videoUrl: string, supabase: any) 
 
   console.log(`[Instagram] Media container created: ${containerId}`);
 
-  // Wait a bit for Instagram to process the video
-  await new Promise(resolve => setTimeout(resolve, 5000));
+  // Wait for Instagram to process the video by checking status
+  let statusCheckAttempts = 0;
+  const maxStatusChecks = 30; // Max 5 minutes (30 * 10s)
+  let isReady = false;
+
+  while (statusCheckAttempts < maxStatusChecks && !isReady) {
+    await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds between checks
+    
+    const statusResponse = await fetch(
+      `https://graph.instagram.com/v21.0/${containerId}?fields=status_code&access_token=${connection.access_token}`,
+      { method: 'GET' }
+    );
+
+    if (statusResponse.ok) {
+      const statusData = await statusResponse.json();
+      console.log(`[Instagram] Container status: ${statusData.status_code}`);
+      
+      if (statusData.status_code === 'FINISHED') {
+        isReady = true;
+      } else if (statusData.status_code === 'ERROR') {
+        throw new Error('Instagram video processing failed');
+      }
+      // PUBLISHED, IN_PROGRESS, EXPIRED - keep waiting
+    }
+    
+    statusCheckAttempts++;
+  }
+
+  if (!isReady) {
+    throw new Error('Instagram video processing timeout - container not ready after 5 minutes');
+  }
+
+  console.log(`[Instagram] Container ready, publishing...`);
 
   // Publish media
   const publishResponse = await fetch(
