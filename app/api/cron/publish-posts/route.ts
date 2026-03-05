@@ -309,19 +309,26 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any) {
 
   console.log(`[TikTok] Upload initialized: ${publishId}`);
 
+  // TikTok requires Content-Range for the upload PUT request
+  const totalBytes = videoBuffer.length;
+  const contentRange = `bytes 0-${totalBytes - 1}/${totalBytes}`;
+
   // Upload video
   const uploadResponse = await fetch(uploadUrl, {
     method: 'PUT',
     headers: {
       'Content-Type': 'video/mp4',
-      'Content-Length': videoBuffer.length.toString(),
+      'Content-Length': totalBytes.toString(),
+      'Content-Range': contentRange,
     },
     body: videoBuffer,
   });
 
   if (!uploadResponse.ok) {
     const errorText = await uploadResponse.text();
-    throw new Error(`TikTok upload failed: ${errorText}`);
+    const statusInfo = `${uploadResponse.status} ${uploadResponse.statusText}`;
+    const message = errorText?.trim() || statusInfo;
+    throw new Error(`TikTok upload failed: ${message}`);
   }
 
   console.log(`[TikTok] Upload successful: ${publishId}`);
