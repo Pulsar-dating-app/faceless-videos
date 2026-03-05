@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     // Read messages from posting queue
     const { data: messages, error: readError } = await supabaseAdmin.rpc('pgmq_read_posting', {
       queue_name: 'posting_queue',
-      vt: 1200, // 20 min visibility timeout
+      visibility_timeout: 1200, // 20 min visibility timeout
       qty: 10, // Process up to 10 posts per run
     });
 
