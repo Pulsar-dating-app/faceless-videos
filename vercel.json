@@ -4,6 +4,7 @@
     { "path": "/api/cron/build-occurrences", "schedule": "0 2 * * *" },
     { "path": "/api/cron/reset-generations", "schedule": "0 0 * * 0" },
     { "path": "/api/cron/consume-queue", "schedule": "0 0 * * *" },
+    { "path": "/api/cron/queue-scheduler", "schedule": "0 0 * * *" },
     { "path": "/api/cron/publish-posts", "schedule": "0 0 * * *" }
   ],
   "headers": [
