@@ -67,20 +67,6 @@ export async function GET(request: NextRequest) {
       try {
         console.log(`[publish-posts] Processing message ${msgId}`);
 
-        // Check if it's time to post (within 20 minutes)
-        const scheduledTime = new Date(payload.scheduled_time);
-        const now = new Date();
-        const timeDiff = scheduledTime.getTime() - now.getTime();
-        const minutesUntilPost = timeDiff / (1000 * 60);
-
-        if (minutesUntilPost > 20) {
-          console.log(`[publish-posts] Post ${msgId} not ready yet (${minutesUntilPost.toFixed(0)} min remaining)`);
-          // Don't archive, let it be visible again in next run
-          continue;
-        }
-
-        console.log(`[publish-posts] Post ${msgId} is ready to be published`);
-
         // Get scheduled post from database
         const { data: scheduledPost, error: postError } = await supabaseAdmin
           .from('scheduled_posts')
