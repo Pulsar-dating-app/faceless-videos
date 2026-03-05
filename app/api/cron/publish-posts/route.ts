@@ -268,7 +268,8 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any) {
   console.log(`[TikTok] Downloaded video: ${videoBuffer.length} bytes`);
 
   // TikTok API: Initialize upload
-  const initResponse = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
+  // For unaudited apps, use inbox endpoint and SELF_ONLY privacy
+  const initResponse = await fetch('https://open.tiktokapis.com/v2/post/publish/inbox/video/init/', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${connection.access_token}`,
@@ -277,7 +278,7 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any) {
     body: JSON.stringify({
       post_info: {
         title: 'Auto-generated video',
-        privacy_level: 'PUBLIC_TO_EVERYONE',
+        privacy_level: 'SELF_ONLY', // Required for unaudited apps
         disable_duet: false,
         disable_comment: false,
         disable_stitch: false,
