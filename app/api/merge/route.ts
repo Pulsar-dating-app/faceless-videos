@@ -155,9 +155,14 @@ async function postToYouTube(
     url.searchParams.set("x-vercel-protection-bypass", VERCEL_BYPASS_SECRET);
   }
 
-  const response = await fetch( url.toString(), {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (VERCEL_BYPASS_SECRET) {
+    headers['x-vercel-protection-bypass'] = VERCEL_BYPASS_SECRET;
+  }
+
+  const response = await fetch(url.toString(), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       userId,
       videoUrl,
