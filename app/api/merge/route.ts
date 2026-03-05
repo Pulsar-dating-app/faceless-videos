@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 
 // Default background video URL (hosted on GitHub)
 const DEFAULT_BACKGROUND_VIDEO_URL = "https://github.com/mateus-pulsar/static-video-hosting/releases/download/0.0.1/minecraft_1.mp4";
-
+const VERCEL_BYPASS_SECRET = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 
 const CRON_SECRET = process.env.CRON_SECRET;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -149,8 +149,13 @@ async function postToYouTube(
   // Call internal API route to handle YouTube posting
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+  const url = new URL('/api/post-to-youtube', baseUrl);
+  if (VERCEL_BYPASS_SECRET) {
+    url.searchParams.set("x-vercel-set-bypass-cookie", "true");
+    url.searchParams.set("x-vercel-protection-bypass", VERCEL_BYPASS_SECRET);
+  }
 
-  const response = await fetch(new URL('/api/post-to-youtube', baseUrl).toString(), {
+  const response = await fetch( url.toString(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
