@@ -269,7 +269,7 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any) {
 
   // TikTok API: Initialize upload
   // For unaudited apps, use inbox endpoint and SELF_ONLY privacy
-  const initResponse = await fetch('https://open.tiktokapis.com/v2/post/publish/inbox/video/init/', {
+  const initResponse = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${connection.access_token}`,
