@@ -9,7 +9,7 @@ const CRON_SECRET = process.env.CRON_SECRET;
 const MAX_RETRIES = 5;
 
 /** Set to true to intentionally fail TikTok so only Instagram runs and status updates (for testing retry of failed platform). */
-const FORCE_TIKTOK_FAIL = false;
+const FORCE_TIKTOK_FAIL = true;
 
 interface PlatformTarget {
   status: 'pending' | 'published' | 'failed';
