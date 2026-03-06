@@ -203,28 +203,71 @@ export default function Dashboard() {
     onConfirm?: () => void | Promise<void>;
   } | null>(null);
 
+  // Toast / snackbar for all non-blocking notifications (social + generic alerts)
+  const [toast, setToast] = useState<{
+    isOpen: boolean;
+    variant: "success" | "error";
+    title?: string;
+    message: string;
+  } | null>(null);
+
   const closeSocialDialog = () => setSocialDialog(null);
 
-  const showSocialSuccess = (platform: "TikTok" | "Instagram" | "YouTube") => {
-    setSocialDialog({
+  const closeToast = () => setToast(null);
+
+  const showToast = (message: string, options?: { variant?: "success" | "error"; title?: string }) => {
+    setToast({
       isOpen: true,
-      variant: "success",
-      title: `${platform} connected`,
-      message: formatMessage(t.dashboard.socialMedia.connectSuccess, { platform }),
-      confirmLabel: t.form?.close || "Close",
+      variant: options?.variant ?? "error",
+      title: options?.title,
+      message,
     });
   };
 
-  const showSocialError = (
-    title: string,
-    message: string
-  ) => {
-    setSocialDialog({
+  // Auto-dismiss toast after a short delay
+  useEffect(() => {
+    if (!toast?.isOpen) return;
+    const t = setTimeout(() => setToast(null), 4500);
+    return () => clearTimeout(t);
+  }, [toast?.isOpen]);
+
+  // Some translations use {platform} while formatMessage expects {{platform}}.
+  // This helper supports both patterns without changing translation files.
+  const formatMessageLoose = (message: string, params?: Record<string, string | number>) => {
+    if (!params) return message;
+    let formatted = message;
+    for (const [key, value] of Object.entries(params)) {
+      formatted = formatted
+        .replaceAll(`{{${key}}}`, String(value))
+        .replaceAll(`{${key}}`, String(value));
+    }
+    return formatted;
+  };
+
+  const showSocialSuccess = (platform: "TikTok" | "Instagram" | "YouTube") => {
+    setToast({
+      isOpen: true,
+      variant: "success",
+      title: `${platform} connected`,
+      message: formatMessageLoose(t.dashboard.socialMedia.connectSuccess, { platform }),
+    });
+  };
+
+  const showSocialDisconnectSuccess = (platform: "TikTok" | "Instagram" | "YouTube") => {
+    setToast({
+      isOpen: true,
+      variant: "success",
+      title: `${platform} disconnected`,
+      message: formatMessageLoose(t.dashboard.socialMedia.disconnectSuccess, { platform }),
+    });
+  };
+
+  const showSocialDisconnectError = (platform: "TikTok" | "Instagram" | "YouTube") => {
+    setToast({
       isOpen: true,
       variant: "error",
-      title,
-      message,
-      confirmLabel: t.form?.close || "Close",
+      title: `${platform} disconnect failed`,
+      message: formatMessageLoose(t.dashboard.socialMedia.disconnectError, { platform }),
     });
   };
 
@@ -236,7 +279,7 @@ export default function Dashboard() {
       isOpen: true,
       variant: "confirm",
       title: `Disconnect ${platform}?`,
-      message: formatMessage(t.dashboard.socialMedia.disconnectConfirm, { platform }),
+      message: formatMessageLoose(t.dashboard.socialMedia.disconnectConfirm, { platform }),
       confirmLabel: t.dashboard.socialMedia.disconnect || "Disconnect",
       cancelLabel: "Cancel",
       onConfirm,
@@ -390,7 +433,12 @@ export default function Dashboard() {
         'oauth_failed': 'Failed to connect to social media',
         'access_denied': 'You denied access',
       };
-      showSocialError("Connection failed", `Error: ${errorMessages[error] || 'Unknown error occurred'}`);
+      setToast({
+        isOpen: true,
+        variant: "error",
+        title: "Connection failed",
+        message: `Error: ${errorMessages[error] || 'Unknown error occurred'}`,
+      });
       
       // Clean up URL
       window.history.replaceState({}, '', '/dashboard');
@@ -537,7 +585,7 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error("Portal error:", error);
-      alert("Failed to open billing portal. Please try again.");
+      showToast("Failed to open billing portal. Please try again.");
     } finally {
       setIsLoadingPortal(false);
     }
@@ -597,22 +645,10 @@ export default function Dashboard() {
         setTiktokConnected(false);
         setTiktokUsername(null);
         setTiktokAvatar(null);
-        setSocialDialog({
-          isOpen: true,
-          variant: "success",
-          title: "TikTok disconnected",
-          message: formatMessage(t.dashboard.socialMedia.disconnectSuccess, { platform: 'TikTok' }),
-          confirmLabel: t.form?.close || "Close",
-        });
+        showSocialDisconnectSuccess("TikTok");
       } catch (error) {
         console.error('Error disconnecting TikTok:', error);
-        setSocialDialog({
-          isOpen: true,
-          variant: "error",
-          title: "Disconnect failed",
-          message: formatMessage(t.dashboard.socialMedia.disconnectError, { platform: 'TikTok' }),
-          confirmLabel: t.form?.close || "Close",
-        });
+        showSocialDisconnectError("TikTok");
       } finally {
         setIsDisconnectingTiktok(false);
       }
@@ -645,22 +681,10 @@ export default function Dashboard() {
         
         setInstagramConnected(false);
         setInstagramUsername(null);
-        setSocialDialog({
-          isOpen: true,
-          variant: "success",
-          title: "Instagram disconnected",
-          message: formatMessage(t.dashboard.socialMedia.disconnectSuccess, { platform: 'Instagram' }),
-          confirmLabel: t.form?.close || "Close",
-        });
+        showSocialDisconnectSuccess("Instagram");
       } catch (error) {
         console.error('Error disconnecting Instagram:', error);
-        setSocialDialog({
-          isOpen: true,
-          variant: "error",
-          title: "Disconnect failed",
-          message: formatMessage(t.dashboard.socialMedia.disconnectError, { platform: 'Instagram' }),
-          confirmLabel: t.form?.close || "Close",
-        });
+        showSocialDisconnectError("Instagram");
       } finally {
         setIsDisconnectingInstagram(false);
       }
@@ -694,22 +718,10 @@ export default function Dashboard() {
         setYoutubeConnected(false);
         setYoutubeChannelTitle(null);
         setYoutubeThumbnail(null);
-        setSocialDialog({
-          isOpen: true,
-          variant: "success",
-          title: "YouTube disconnected",
-          message: formatMessage(t.dashboard.socialMedia.disconnectSuccess, { platform: 'YouTube' }),
-          confirmLabel: t.form?.close || "Close",
-        });
+        showSocialDisconnectSuccess("YouTube");
       } catch (error) {
         console.error('Error disconnecting YouTube:', error);
-        setSocialDialog({
-          isOpen: true,
-          variant: "error",
-          title: "Disconnect failed",
-          message: formatMessage(t.dashboard.socialMedia.disconnectError, { platform: 'YouTube' }),
-          confirmLabel: t.form?.close || "Close",
-        });
+        showSocialDisconnectError("YouTube");
       } finally {
         setIsDisconnectingYoutube(false);
       }
@@ -904,7 +916,7 @@ export default function Dashboard() {
       setEditingSeries(null);
 
       // Show success message
-      alert(t.dashboard.seriesManagement.updateSuccess);
+      showToast(t.dashboard.seriesManagement.updateSuccess, { variant: "success" });
     } catch (error: unknown) {
       console.error("Error updating series:", error);
       const errors = (t.dashboard.seriesManagement as { errors?: Record<string, string> }).errors;
@@ -939,7 +951,7 @@ export default function Dashboard() {
     
     audio.play().catch((error) => {
       console.error('Error playing voice preview:', error);
-      alert(formatMessage(t.messages.voicePreviewError, { voice: voiceName, language }));
+      showToast(formatMessage(t.messages.voicePreviewError, { voice: voiceName, language }));
     });
 
     setPlayingVoicePreview(voiceName);
@@ -952,7 +964,7 @@ export default function Dashboard() {
 
   const handleGenerate = async () => {
     if (!user) {
-      alert(t.messages.signInRequired);
+      showToast(t.messages.signInRequired);
       router.push("/login");
       return;
     }
@@ -960,11 +972,11 @@ export default function Dashboard() {
     // Validate step 6 requirements
     if (currentStep === 6) {
       if (!seriesName.trim()) {
-        alert("Please enter a series name");
+        showToast("Please enter a series name");
         return;
       }
       if (selectedPlatforms.length === 0) {
-        alert("Please select at least one publishing platform");
+        showToast("Please select at least one publishing platform");
         return;
       }
 
@@ -973,14 +985,14 @@ export default function Dashboard() {
 
       if (isStarterPlan) {
         if (publishDays.length !== 3) {
-          alert("Starter plan requires selecting exactly 3 publish days per week.");
+          showToast("Starter plan requires selecting exactly 3 publish days per week.");
           return;
         }
       }
 
       if (isElitePlan) {
         if (!secondPublishTime) {
-          alert("Please select a second publish time for your Elite plan.");
+          showToast("Please select a second publish time for your Elite plan.");
           return;
         }
       }
@@ -1042,7 +1054,7 @@ export default function Dashboard() {
         }
 
         // Success - show message and reset
-        alert(`Series "${seriesName}" created successfully!`);
+        showToast(`Series "${seriesName}" created successfully!`, { variant: "success" });
         resetWizard();
         
       } catch (error: unknown) {
@@ -1102,7 +1114,7 @@ export default function Dashboard() {
 
   const handlePostToSocial = async (platform: string) => {
     if (!videoUrl) {
-      alert("No video to post");
+      showToast("No video to post");
       return;
     }
 
@@ -1110,7 +1122,7 @@ export default function Dashboard() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert("Please sign in first");
+        showToast("Please sign in first");
         return;
       }
 
@@ -1128,18 +1140,18 @@ export default function Dashboard() {
       const connection = connections.find((c: any) => c.platform === platform);
 
       if (!connection) {
-        alert(`Please connect your ${platform} account first in the Social Media section`);
+        showToast(`Please connect your ${platform} account first in the Social Media section`);
         return;
       }
 
       // Note: We don't have access_token here anymore in the response for security
       // The posting should be done server-side by the cronjob system
-      alert(`Posting to ${platform} is now handled automatically by the system. Your video will be posted at the scheduled time.`);
+      showToast(`Posting to ${platform} is now handled automatically by the system. Your video will be posted at the scheduled time.`, { variant: "success" });
       return;
 
     } catch (error) {
       console.error('Error fetching connection:', error);
-      alert("Failed to verify social media connection");
+      showToast("Failed to verify social media connection");
       setPostingTo(null);
       setPostingTo(null);
       return;
@@ -1901,7 +1913,7 @@ export default function Dashboard() {
                               setPublishDays(publishDays.filter((d) => d !== day));
                             } else {
                               if (publishDays.length >= 3) {
-                                alert("Starter plan allows exactly 3 days per week. Deselect another day first.");
+                                showToast("Starter plan allows exactly 3 days per week. Deselect another day first.");
                                 return;
                               }
                               setPublishDays([...publishDays, day]);
@@ -3518,6 +3530,61 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast (non-blocking) for social + generic alerts */}
+      {toast?.isOpen && (
+        <div className="fixed top-4 right-4 z-[60] w-full max-w-sm px-4 sm:px-0">
+          <div
+            className={`rounded-2xl shadow-2xl border overflow-hidden backdrop-blur bg-white/95 dark:bg-zinc-900/95 ${
+              toast.variant === "success"
+                ? "border-green-200 dark:border-green-900/50"
+                : "border-red-200 dark:border-red-900/50"
+            } animate-in fade-in slide-in-from-top-2 duration-200`}
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-start gap-3 p-4">
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                  toast.variant === "success"
+                    ? "bg-green-100 dark:bg-green-900/30"
+                    : "bg-red-100 dark:bg-red-900/30"
+                }`}
+              >
+                {toast.variant === "success" ? (
+                  <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                {toast.title ? (
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+                    {toast.title}
+                  </p>
+                ) : null}
+                <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  {toast.message}
+                </p>
+              </div>
+              <button
+                onClick={closeToast}
+                className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shrink-0"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+              </button>
+            </div>
+            <div
+              className={`h-1 w-full ${
+                toast.variant === "success"
+                  ? "bg-green-500/70"
+                  : "bg-red-500/70"
+              }`}
+            />
           </div>
         </div>
       )}
