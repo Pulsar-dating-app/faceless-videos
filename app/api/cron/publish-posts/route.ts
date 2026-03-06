@@ -5,6 +5,21 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const CRON_SECRET = process.env.CRON_SECRET;
 
+/** Maximum number of processing attempts before a posting message is permanently archived as failed. */
+const MAX_RETRIES = 5;
+
+interface PlatformTarget {
+  status: 'pending' | 'published' | 'failed';
+  error?: string;
+  publishId?: string;
+  mediaId?: string;
+}
+
+interface TargetsMap {
+  tiktok?: PlatformTarget;
+  instagram?: PlatformTarget;
+}
+
 interface PostingQueueMessage {
   scheduled_post_id: string;
   user_uid: string;
@@ -63,9 +78,46 @@ export async function GET(request: NextRequest) {
     for (const job of messages) {
       const msgId = job.msg_id;
       const payload = job.message as PostingQueueMessage;
+      const retryCount: number = job.read_ct ?? 1;
+
+      // If message exceeded max retries, archive it for audit and mark as failed
+      if (retryCount > MAX_RETRIES) {
+        console.error(
+          `[publish-posts] Job ${msgId} permanently failed after ${retryCount} attempts (max ${MAX_RETRIES}). Archiving for audit.`
+        );
+
+        await supabaseAdmin
+          .from('scheduled_posts')
+          .update({
+            status: 'failed',
+            last_error: `Permanently failed after ${retryCount} attempts`,
+          })
+          .eq('id', payload.scheduled_post_id);
+
+        const { error: archiveFailedError } = await supabaseAdmin.rpc('pgmq_archive_posting', {
+          queue_name: 'posting_queue',
+          msg_id: msgId,
+        });
+
+        if (archiveFailedError) {
+          console.error(
+            `[publish-posts] Failed to archive permanently failed message ${msgId}:`,
+            archiveFailedError
+          );
+        }
+
+        errors.push({
+          msgId,
+          scheduledPostId: payload.scheduled_post_id,
+          error: `Permanently failed after ${retryCount} attempts`,
+          permanentlyFailed: true,
+        });
+
+        continue;
+      }
 
       try {
-        console.log(`[publish-posts] Processing message ${msgId}`);
+        console.log(`[publish-posts] Processing message ${msgId} (attempt ${retryCount}/${MAX_RETRIES})`);
 
         // Get scheduled post from database
         const { data: scheduledPost, error: postError } = await supabaseAdmin
@@ -78,154 +130,157 @@ export async function GET(request: NextRequest) {
           throw new Error('Scheduled post not found');
         }
 
-        // Check retry count
-        if (scheduledPost.retry_count >= scheduledPost.max_retries) {
-          console.log(`[publish-posts] Max retries exceeded for ${msgId}`);
-          
-          await supabaseAdmin
-            .from('scheduled_posts')
-            .update({ status: 'failed', last_error: 'Max retries exceeded' })
-            .eq('id', payload.scheduled_post_id);
-
-          await supabaseAdmin.rpc('pgmq_archive_posting', {
-            queue_name: 'posting_queue',
-            msg_id: msgId,
-          });
-
-          errors.push({ msgId, error: 'Max retries exceeded' });
-          continue;
-        }
-
         // Update status to processing
         await supabaseAdmin
           .from('scheduled_posts')
           .update({ status: 'processing' })
           .eq('id', payload.scheduled_post_id);
 
-        // Post to platforms
-        const postResults = {
-          tiktok: null as any,
-          instagram: null as any,
-        };
+        // Load targets from DB; initialize defensively if missing
+        const targets: TargetsMap = (scheduledPost.targets as TargetsMap) ?? {};
+        if (payload.platforms.tiktok    && !targets.tiktok)    targets.tiktok    = { status: 'pending' };
+        if (payload.platforms.instagram && !targets.instagram) targets.instagram = { status: 'pending' };
 
-        if (payload.platforms.tiktok) {
+        // Post to each platform, skipping ones already published in a previous attempt
+        if (payload.platforms.tiktok && targets.tiktok?.status !== 'published') {
           console.log(`[publish-posts] Posting to TikTok for ${msgId}`);
           try {
-            postResults.tiktok = await postToTikTok(
+            const result = await postToTikTok(
               payload.user_uid,
               payload.video_url,
               supabaseAdmin,
               scheduledPost
             );
+            targets.tiktok = { status: 'published', publishId: result.publishId };
             console.log(`[publish-posts] ✅ TikTok post successful`);
           } catch (error: any) {
             console.error('[publish-posts] TikTok post failed:', error);
-            postResults.tiktok = { error: error.message };
+            targets.tiktok = { status: 'failed', error: error.message };
           }
+        } else if (payload.platforms.tiktok) {
+          console.log(`[publish-posts] TikTok already published for ${msgId}, skipping`);
         }
 
-        if (payload.platforms.instagram) {
+        if (payload.platforms.instagram && targets.instagram?.status !== 'published') {
           console.log(`[publish-posts] Posting to Instagram for ${msgId}`);
           try {
-            postResults.instagram = await postToInstagram(
+            const result = await postToInstagram(
               payload.user_uid,
               payload.video_url,
               supabaseAdmin,
               scheduledPost
             );
+            targets.instagram = { status: 'published', mediaId: result.mediaId };
             console.log(`[publish-posts] ✅ Instagram post successful`);
           } catch (error: any) {
             console.error('[publish-posts] Instagram post failed:', error);
-            postResults.instagram = { error: error.message };
+            targets.instagram = { status: 'failed', error: error.message };
           }
+        } else if (payload.platforms.instagram) {
+          console.log(`[publish-posts] Instagram already published for ${msgId}, skipping`);
         }
 
-        // Check if all posts succeeded
-        const tiktokSuccess = !payload.platforms.tiktok || !postResults.tiktok?.error;
-        const instagramSuccess = !payload.platforms.instagram || !postResults.instagram?.error;
-        const allSuccess = tiktokSuccess && instagramSuccess;
+        // Persist updated targets to DB
+        await supabaseAdmin
+          .from('scheduled_posts')
+          .update({ targets })
+          .eq('id', payload.scheduled_post_id);
+
+        // All enabled platforms must be published to consider the job done
+        const allSuccess =
+          (!payload.platforms.tiktok    || targets.tiktok?.status    === 'published') &&
+          (!payload.platforms.instagram || targets.instagram?.status === 'published');
 
         if (allSuccess) {
           console.log(`[publish-posts] All platforms successful for ${msgId}`);
-          
-          // Update scheduled_posts with success
+
           await supabaseAdmin
             .from('scheduled_posts')
             .update({
               status: 'published',
-              tiktok_publish_id: postResults.tiktok?.publishId || null,
-              tiktok_posted_at: postResults.tiktok ? new Date().toISOString() : null,
-              instagram_media_id: postResults.instagram?.mediaId || null,
-              instagram_posted_at: postResults.instagram ? new Date().toISOString() : null,
+              tiktok_publish_id: targets.tiktok?.publishId || null,
+              tiktok_posted_at: targets.tiktok?.status === 'published' ? new Date().toISOString() : null,
+              instagram_media_id: targets.instagram?.mediaId || null,
+              instagram_posted_at: targets.instagram?.status === 'published' ? new Date().toISOString() : null,
             })
             .eq('id', payload.scheduled_post_id);
 
-          // Archive the message
           await supabaseAdmin.rpc('pgmq_archive_posting', {
             queue_name: 'posting_queue',
             msg_id: msgId,
           });
 
-          results.push({ msgId, scheduledPostId: payload.scheduled_post_id, success: true });
+          results.push({ msgId, scheduledPostId: payload.scheduled_post_id, success: true, targets });
         } else {
-          console.log(`[publish-posts] Partial failure for ${msgId}, will retry`);
-          
-          // Increment retry count
+          console.log(
+            `[publish-posts] Partial failure for ${msgId} (attempt ${retryCount}/${MAX_RETRIES}), releasing back to queue`
+          );
+
           await supabaseAdmin
             .from('scheduled_posts')
             .update({
               status: 'pending',
-              retry_count: scheduledPost.retry_count + 1,
               last_error: JSON.stringify({
-                tiktok: postResults.tiktok?.error || null,
-                instagram: postResults.instagram?.error || null,
+                tiktok: targets.tiktok?.error || null,
+                instagram: targets.instagram?.error || null,
               }),
             })
             .eq('id', payload.scheduled_post_id);
 
-          // Message will be visible again after visibility timeout
+          // Release message back to queue immediately for retry
+          // Requires pgmq_set_vt_posting RPC in Supabase; if missing, message reappears after VT expires.
+          const { error: setVtError } = await supabaseAdmin.rpc('pgmq_set_vt_posting', {
+            queue_name: 'posting_queue',
+            msg_id: msgId,
+            vt: 0,
+          });
+          if (setVtError) {
+            console.warn(
+              `[publish-posts] set_vt failed for msg ${msgId} (message will reappear when VT expires):`,
+              setVtError.message
+            );
+          }
+
           errors.push({
             msgId,
             scheduledPostId: payload.scheduled_post_id,
             error: 'Partial failure, will retry',
+            attempt: retryCount,
+            remainingRetries: MAX_RETRIES - retryCount,
+            targets,
           });
         }
 
       } catch (error: any) {
-        console.error(`[publish-posts] Error processing post ${msgId}:`, error);
+        console.error(
+          `[publish-posts] Error processing post ${msgId} (attempt ${retryCount}/${MAX_RETRIES}):`,
+          error
+        );
 
-        // Increment retry count
-        const { data: scheduledPost } = await supabaseAdmin
+        await supabaseAdmin
           .from('scheduled_posts')
-          .select('retry_count, max_retries')
-          .eq('id', payload.scheduled_post_id)
-          .single();
+          .update({ status: 'pending', last_error: error.message })
+          .eq('id', payload.scheduled_post_id);
 
-        if (scheduledPost && scheduledPost.retry_count < scheduledPost.max_retries) {
-          await supabaseAdmin
-            .from('scheduled_posts')
-            .update({
-              status: 'pending',
-              retry_count: scheduledPost.retry_count + 1,
-              last_error: error.message,
-            })
-            .eq('id', payload.scheduled_post_id);
-        } else {
-          await supabaseAdmin
-            .from('scheduled_posts')
-            .update({
-              status: 'failed',
-              last_error: error.message,
-            })
-            .eq('id', payload.scheduled_post_id);
-
-          await supabaseAdmin.rpc('pgmq_archive_posting', {
-            queue_name: 'posting_queue',
-            msg_id: msgId,
-          });
+        // Release message back to queue immediately for retry
+        const { error: setVtError } = await supabaseAdmin.rpc('pgmq_set_vt_posting', {
+          queue_name: 'posting_queue',
+          msg_id: msgId,
+          vt: 0,
+        });
+        if (setVtError) {
+          console.warn(
+            `[publish-posts] set_vt failed for msg ${msgId} (message will reappear when VT expires):`,
+            setVtError.message
+          );
         }
 
-        errors.push({ msgId, error: error.message });
+        errors.push({
+          msgId,
+          error: error.message,
+          attempt: retryCount,
+          remainingRetries: MAX_RETRIES - retryCount,
+        });
       }
     }
 

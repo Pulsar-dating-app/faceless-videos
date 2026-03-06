@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const CRON_SECRET = process.env.CRON_SECRET;
-
+//Le da tabela e joga para fila
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
@@ -79,6 +79,16 @@ export async function GET(request: NextRequest) {
           console.log(`[queue-scheduler] Post ${post.id} already in queue, skipping`);
           continue;
         }
+
+        // Initialize per-platform targets for retry tracking
+        const initialTargets: Record<string, { status: string }> = {};
+        if (platforms.tiktok)    initialTargets.tiktok    = { status: 'pending' };
+        if (platforms.instagram) initialTargets.instagram = { status: 'pending' };
+
+        await supabaseAdmin
+          .from('scheduled_posts')
+          .update({ targets: initialTargets })
+          .eq('id', post.id);
 
         // Build queue message
         const queueMessage = {
