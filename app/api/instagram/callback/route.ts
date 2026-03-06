@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
 
     if (functionError || !data?.success) {
       console.error('❌ Instagram callback error:', functionError);
-      const dashboardUrl = `${APP_URL}/dashboard?error=oauth_failed`;
+      const errorCode = data?.code || 'oauth_failed';
+      const dashboardUrl = `${APP_URL}/dashboard?error=${errorCode}`;
       return NextResponse.redirect(dashboardUrl);
     }
 

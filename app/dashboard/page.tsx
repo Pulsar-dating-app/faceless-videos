@@ -433,6 +433,7 @@ export default function Dashboard() {
         'missing_params': oauthErrors?.missing_params ?? 'OAuth parameters missing',
         'oauth_failed': oauthErrors?.oauth_failed ?? 'Failed to connect to social media',
         'access_denied': oauthErrors?.access_denied ?? 'You denied access',
+        'publish_scope_required': oauthErrors?.publish_scope_required ?? 'You must allow posting permission to connect. Please try again and enable posting when asked.',
       };
       const unknownError = (t.messages as { unknownError?: string }).unknownError ?? 'Unknown error occurred';
       setToast({
