@@ -114,7 +114,6 @@ export default function Dashboard() {
   const [voice, setVoice] = useState("alloy");
   const [artStyle, setArtStyle] = useState("cartoon");
   const [backgroundVideo, setBackgroundVideo] = useState(BACKGROUND_VIDEOS[0]?.url ?? "");
-  const [customPrompt, setCustomPrompt] = useState("");
   const [script, setScript] = useState("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -1468,17 +1467,6 @@ export default function Dashboard() {
                   </button>
                 ))}
               </div>
-              
-              {/* Optional Custom Prompt */}
-              <div className="space-y-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                <label className="text-sm font-medium">{t.form.customPrompt || "Custom Prompt (optional)"}</label>
-                <textarea 
-                  value={customPrompt}
-                  onChange={(e) => setCustomPrompt(e.target.value)}
-                  placeholder={t.form.customPromptPlaceholder || "Add specific details for your video..."}
-                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[80px] resize-none text-sm"
-                />
-              </div>
             </div>
           );
         } else {
@@ -1526,17 +1514,6 @@ export default function Dashboard() {
                     </div>
                   </button>
                 ))}
-              </div>
-              
-              {/* Optional Custom Prompt */}
-              <div className="space-y-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                <label className="text-sm font-medium">{t.form.customPrompt || "Custom Prompt (optional)"}</label>
-                <textarea 
-                  value={customPrompt}
-                  onChange={(e) => setCustomPrompt(e.target.value)}
-                  placeholder={t.form.customPromptPlaceholder || "Add specific details for your video..."}
-                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[80px] resize-none text-sm"
-                />
               </div>
             </div>
           );
