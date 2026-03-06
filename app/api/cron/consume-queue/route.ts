@@ -7,6 +7,9 @@ const CRON_SECRET = process.env.CRON_SECRET;
 /** Optional: bypass Vercel Deployment Protection when cron calls internal APIs (merge, merge-ai-video). Set in Vercel Dashboard > Deployment Protection > Bypass for Automation. */
 const VERCEL_BYPASS_SECRET = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 
+/** Maximum number of processing attempts before a queue message is permanently archived as failed. */
+const MAX_RETRIES = 10;
+
 /** Builds full URL for internal API call; adds Vercel protection bypass params when VERCEL_AUTOMATION_BYPASS_SECRET is set. */
 function internalApiUrl(path: string): string {
   const baseUrl =
@@ -104,11 +107,45 @@ export async function GET(request: NextRequest) {
     for (const job of messages) {
       const msgId: number = job.msg_id;
       const payload = job.message as AutomationPayload;
+      const retryCount: number = job.read_ct ?? 1;
+
+      // If message exceeded max retries, archive it for audit and skip processing
+      if (retryCount > MAX_RETRIES) {
+        console.error(
+          `[consume-queue] Job ${msgId} permanently failed after ${retryCount} attempts (max ${MAX_RETRIES}). Archiving for audit.`
+        );
+
+        const { error: archiveFailedError } = await supabaseAdmin.rpc(
+          "pgmq_archive_video",
+          {
+            queue_name: "video_generation_queue",
+            msg_id: msgId,
+          }
+        );
+
+        if (archiveFailedError) {
+          console.error(
+            `[consume-queue] Failed to archive permanently failed message ${msgId}:`,
+            archiveFailedError
+          );
+        }
+
+        errors.push({
+          msgId,
+          automationId: payload.automation_id,
+          seriesName: payload.series_name,
+          error: `Permanently failed after ${retryCount} attempts`,
+          permanentlyFailed: true,
+        });
+
+        continue;
+      }
 
       console.log(
         "[consume-queue] Processing job",
         JSON.stringify({
           msg_id: msgId,
+          attempt: `${retryCount}/${MAX_RETRIES}`,
           automation_id: payload?.automation_id,
           user_uid: payload?.user_uid,
           scheduled_time: payload?.scheduled_time,
@@ -327,18 +364,21 @@ export async function GET(request: NextRequest) {
         });
 
       } catch (error: any) {
-        console.error(`[consume-queue] Error processing job ${msgId}:`, error);
+        console.error(
+          `[consume-queue] Error processing job ${msgId} (attempt ${retryCount}/${MAX_RETRIES}):`,
+          error
+        );
 
-        // Não deletamos a mensagem: quando o VT (visibility timeout) expirar,
-        // ela volta à fila para nova tentativa. Opcionalmente, forçar VT = 0
-        // devolve a mensagem à fila imediatamente (requer RPC pgmq_set_vt_video no Supabase).
+        // Release the message back to the queue immediately (VT = 0)
+        // so it can be retried on the next cron tick instead of waiting 1 hour.
+        // Requires the pgmq_set_vt_video RPC in Supabase (see docs/supabase-rpcs.sql).
+        // If the RPC is missing, the message will reappear automatically when the VT expires (1h).
         const { error: setVtError } = await supabaseAdmin.rpc("pgmq_set_vt_video", {
           queue_name: "video_generation_queue",
           msg_id: msgId,
           vt: 0,
         });
         if (setVtError) {
-          // RPC pode não existir ainda; mensagem mesmo assim volta quando VT expirar (ex.: 1h)
           console.warn(
             `[consume-queue] set_vt failed for msg ${msgId} (message will reappear when VT expires):`,
             setVtError.message
@@ -350,6 +390,8 @@ export async function GET(request: NextRequest) {
           automationId: payload.automation_id,
           seriesName: payload.series_name,
           error: error.message || "Unknown error",
+          attempt: retryCount,
+          remainingRetries: MAX_RETRIES - retryCount,
         });
       }
     }
