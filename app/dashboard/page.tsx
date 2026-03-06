@@ -192,6 +192,57 @@ export default function Dashboard() {
     message: string;
   } | null>(null);
 
+  // Social media connect/disconnect dialog state (replaces alert/confirm)
+  const [socialDialog, setSocialDialog] = useState<{
+    isOpen: boolean;
+    variant: "success" | "error" | "confirm";
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    onConfirm?: () => void | Promise<void>;
+  } | null>(null);
+
+  const closeSocialDialog = () => setSocialDialog(null);
+
+  const showSocialSuccess = (platform: "TikTok" | "Instagram" | "YouTube") => {
+    setSocialDialog({
+      isOpen: true,
+      variant: "success",
+      title: `${platform} connected`,
+      message: formatMessage(t.dashboard.socialMedia.connectSuccess, { platform }),
+      confirmLabel: t.form?.close || "Close",
+    });
+  };
+
+  const showSocialError = (
+    title: string,
+    message: string
+  ) => {
+    setSocialDialog({
+      isOpen: true,
+      variant: "error",
+      title,
+      message,
+      confirmLabel: t.form?.close || "Close",
+    });
+  };
+
+  const confirmDisconnect = (
+    platform: "TikTok" | "Instagram" | "YouTube",
+    onConfirm: () => void | Promise<void>
+  ) => {
+    setSocialDialog({
+      isOpen: true,
+      variant: "confirm",
+      title: `Disconnect ${platform}?`,
+      message: formatMessage(t.dashboard.socialMedia.disconnectConfirm, { platform }),
+      confirmLabel: t.dashboard.socialMedia.disconnect || "Disconnect",
+      cancelLabel: "Cancel",
+      onConfirm,
+    });
+  };
+
   // Subscription (My Subscription page) state
   const [subscription, setSubscription] = useState<{
     plan_id: string;
@@ -274,7 +325,7 @@ export default function Dashboard() {
 
     if (connected === 'tiktok') {
       // Show success message
-      alert(formatMessage(t.dashboard.socialMedia.connectSuccess, { platform: 'TikTok' }));
+      showSocialSuccess("TikTok");
       fetchSocialConnections(); // Refresh connections from database
       
       // Switch to social media section if specified
@@ -294,7 +345,7 @@ export default function Dashboard() {
 
     if (connected === 'instagram') {
       // Show success message
-      alert(formatMessage(t.dashboard.socialMedia.connectSuccess, { platform: 'Instagram' }));
+      showSocialSuccess("Instagram");
       fetchSocialConnections(); // Refresh connections from database
       
       // Switch to social media section if specified
@@ -314,7 +365,7 @@ export default function Dashboard() {
 
     if (connected === 'youtube') {
       // Show success message
-      alert(formatMessage(t.dashboard.socialMedia.connectSuccess, { platform: 'YouTube' }));
+      showSocialSuccess("YouTube");
       fetchSocialConnections(); // Refresh connections from database
       
       // Switch to social media section if specified
@@ -339,7 +390,7 @@ export default function Dashboard() {
         'oauth_failed': 'Failed to connect to social media',
         'access_denied': 'You denied access',
       };
-      alert(`Error: ${errorMessages[error] || 'Unknown error occurred'}`);
+      showSocialError("Connection failed", `Error: ${errorMessages[error] || 'Unknown error occurred'}`);
       
       // Clean up URL
       window.history.replaceState({}, '', '/dashboard');
@@ -521,112 +572,148 @@ export default function Dashboard() {
 
   const handleDisconnectTiktok = async () => {
     if (!user) return;
+    confirmDisconnect("TikTok", async () => {
+      closeSocialDialog();
 
-    const confirmed = confirm(formatMessage(t.dashboard.socialMedia.disconnectConfirm, { platform: 'TikTok' }));
-    if (!confirmed) return;
+      setIsDisconnectingTiktok(true);
 
-    setIsDisconnectingTiktok(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
 
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+        const response = await fetch('/api/social-connections', {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ platform: 'tiktok' }),
+        });
 
-      const response = await fetch('/api/social-connections', {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ platform: 'tiktok' }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to disconnect');
+        if (!response.ok) {
+          throw new Error('Failed to disconnect');
+        }
+        
+        setTiktokConnected(false);
+        setTiktokUsername(null);
+        setTiktokAvatar(null);
+        setSocialDialog({
+          isOpen: true,
+          variant: "success",
+          title: "TikTok disconnected",
+          message: formatMessage(t.dashboard.socialMedia.disconnectSuccess, { platform: 'TikTok' }),
+          confirmLabel: t.form?.close || "Close",
+        });
+      } catch (error) {
+        console.error('Error disconnecting TikTok:', error);
+        setSocialDialog({
+          isOpen: true,
+          variant: "error",
+          title: "Disconnect failed",
+          message: formatMessage(t.dashboard.socialMedia.disconnectError, { platform: 'TikTok' }),
+          confirmLabel: t.form?.close || "Close",
+        });
+      } finally {
+        setIsDisconnectingTiktok(false);
       }
-      
-      setTiktokConnected(false);
-      setTiktokUsername(null);
-      setTiktokAvatar(null);
-      alert(formatMessage(t.dashboard.socialMedia.disconnectSuccess, { platform: 'TikTok' }));
-    } catch (error) {
-      console.error('Error disconnecting TikTok:', error);
-      alert(formatMessage(t.dashboard.socialMedia.disconnectError, { platform: 'TikTok' }));
-    } finally {
-      setIsDisconnectingTiktok(false);
-    }
+    });
   };
 
   const handleDisconnectInstagram = async () => {
     if (!user) return;
+    confirmDisconnect("Instagram", async () => {
+      closeSocialDialog();
 
-    const confirmed = confirm(formatMessage(t.dashboard.socialMedia.disconnectConfirm, { platform: 'Instagram' }));
-    if (!confirmed) return;
+      setIsDisconnectingInstagram(true);
 
-    setIsDisconnectingInstagram(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
 
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+        const response = await fetch('/api/social-connections', {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ platform: 'instagram' }),
+        });
 
-      const response = await fetch('/api/social-connections', {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ platform: 'instagram' }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to disconnect');
+        if (!response.ok) {
+          throw new Error('Failed to disconnect');
+        }
+        
+        setInstagramConnected(false);
+        setInstagramUsername(null);
+        setSocialDialog({
+          isOpen: true,
+          variant: "success",
+          title: "Instagram disconnected",
+          message: formatMessage(t.dashboard.socialMedia.disconnectSuccess, { platform: 'Instagram' }),
+          confirmLabel: t.form?.close || "Close",
+        });
+      } catch (error) {
+        console.error('Error disconnecting Instagram:', error);
+        setSocialDialog({
+          isOpen: true,
+          variant: "error",
+          title: "Disconnect failed",
+          message: formatMessage(t.dashboard.socialMedia.disconnectError, { platform: 'Instagram' }),
+          confirmLabel: t.form?.close || "Close",
+        });
+      } finally {
+        setIsDisconnectingInstagram(false);
       }
-      
-      setInstagramConnected(false);
-      setInstagramUsername(null);
-      alert(formatMessage(t.dashboard.socialMedia.disconnectSuccess, { platform: 'Instagram' }));
-    } catch (error) {
-      console.error('Error disconnecting Instagram:', error);
-      alert(formatMessage(t.dashboard.socialMedia.disconnectError, { platform: 'Instagram' }));
-    } finally {
-      setIsDisconnectingInstagram(false);
-    }
+    });
   };
 
   const handleDisconnectYoutube = async () => {
     if (!user) return;
+    confirmDisconnect("YouTube", async () => {
+      closeSocialDialog();
 
-    const confirmed = confirm(formatMessage(t.dashboard.socialMedia.disconnectConfirm, { platform: 'YouTube' }));
-    if (!confirmed) return;
+      setIsDisconnectingYoutube(true);
 
-    setIsDisconnectingYoutube(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
 
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+        const response = await fetch('/api/social-connections', {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ platform: 'youtube' }),
+        });
 
-      const response = await fetch('/api/social-connections', {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ platform: 'youtube' }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to disconnect');
+        if (!response.ok) {
+          throw new Error('Failed to disconnect');
+        }
+        
+        setYoutubeConnected(false);
+        setYoutubeChannelTitle(null);
+        setYoutubeThumbnail(null);
+        setSocialDialog({
+          isOpen: true,
+          variant: "success",
+          title: "YouTube disconnected",
+          message: formatMessage(t.dashboard.socialMedia.disconnectSuccess, { platform: 'YouTube' }),
+          confirmLabel: t.form?.close || "Close",
+        });
+      } catch (error) {
+        console.error('Error disconnecting YouTube:', error);
+        setSocialDialog({
+          isOpen: true,
+          variant: "error",
+          title: "Disconnect failed",
+          message: formatMessage(t.dashboard.socialMedia.disconnectError, { platform: 'YouTube' }),
+          confirmLabel: t.form?.close || "Close",
+        });
+      } finally {
+        setIsDisconnectingYoutube(false);
       }
-      
-      setYoutubeConnected(false);
-      setYoutubeChannelTitle(null);
-      setYoutubeThumbnail(null);
-      alert(formatMessage(t.dashboard.socialMedia.disconnectSuccess, { platform: 'YouTube' }));
-    } catch (error) {
-      console.error('Error disconnecting YouTube:', error);
-      alert(formatMessage(t.dashboard.socialMedia.disconnectError, { platform: 'YouTube' }));
-    } finally {
-      setIsDisconnectingYoutube(false);
-    }
+    });
   };
 
   // Calculate total steps based on video type
@@ -3347,6 +3434,89 @@ export default function Dashboard() {
                 loop
                 className="max-h-[calc(90vh-80px)] w-auto"
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Social Media Dialog (Connect/Disconnect) */}
+      {socialDialog?.isOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => {
+            // avoid closing confirm by outside click while disconnecting
+            if (socialDialog.variant !== "confirm") closeSocialDialog();
+          }}
+        >
+          <div
+            className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden max-w-md w-full animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                    socialDialog.variant === "success"
+                      ? "bg-green-100 dark:bg-green-900/30"
+                      : socialDialog.variant === "confirm"
+                        ? "bg-amber-100 dark:bg-amber-900/30"
+                        : "bg-red-100 dark:bg-red-900/30"
+                  }`}
+                >
+                  {socialDialog.variant === "success" ? (
+                    <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  ) : socialDialog.variant === "confirm" ? (
+                    <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  )}
+                </div>
+                <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                  {socialDialog.title}
+                </h3>
+              </div>
+              <button
+                onClick={closeSocialDialog}
+                className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <X className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
+                {socialDialog.message}
+              </p>
+              <div className="flex gap-3 mt-6">
+                {socialDialog.variant === "confirm" ? (
+                  <>
+                    <button
+                      onClick={closeSocialDialog}
+                      className="flex-1 px-4 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                    >
+                      {socialDialog.cancelLabel || "Cancel"}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (socialDialog.onConfirm) {
+                          await socialDialog.onConfirm();
+                        } else {
+                          closeSocialDialog();
+                        }
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors"
+                    >
+                      {socialDialog.confirmLabel || (t.dashboard.socialMedia.disconnect || "Disconnect")}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={closeSocialDialog}
+                    className="flex-1 px-4 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    {socialDialog.confirmLabel || (t.form?.close || "Close")}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
