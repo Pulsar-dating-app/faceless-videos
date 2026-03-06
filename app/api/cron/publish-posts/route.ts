@@ -8,9 +8,6 @@ const CRON_SECRET = process.env.CRON_SECRET;
 /** Maximum number of processing attempts before a posting message is permanently archived as failed. */
 const MAX_RETRIES = 5;
 
-/** Set to true to intentionally fail TikTok so only Instagram runs and status updates (for testing retry of failed platform). */
-const FORCE_INSTA_FAIL = true;
-
 interface PlatformTarget {
   status: 'pending' | 'published' | 'failed';
   error?: string;
@@ -404,9 +401,6 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any, sch
 }
 
 async function postToInstagram(userId: string, videoUrl: string, supabase: any, scheduledPost: any) {
-  if (FORCE_INSTA_FAIL) {
-    throw new Error('Intentional TikTok failure for testing (FORCE_TIKTOK_FAIL)');
-  }
   // Get Instagram connection
   const { data: connection } = await supabase
     .from('social_media_connections')
