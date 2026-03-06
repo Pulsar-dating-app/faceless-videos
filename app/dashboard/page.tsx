@@ -2015,7 +2015,7 @@ export default function Dashboard() {
           <p className="text-zinc-500 dark:text-zinc-400">{t.dashboard.socialMedia.subtitle}</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* TikTok */}
           <div className={`p-6 rounded-xl border-2 transition-all ${
             tiktokConnected 
@@ -2211,22 +2211,6 @@ export default function Dashboard() {
                 )}
               </button>
             )}
-          </div>
-
-          {/* Facebook */}
-          <div className="p-6 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">FB</span>
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg">Facebook</h3>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">{t.dashboard.socialMedia.notConnected}</p>
-              </div>
-            </div>
-            <button className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors">
-              {t.dashboard.socialMedia.connect}
-            </button>
           </div>
         </div>
 
