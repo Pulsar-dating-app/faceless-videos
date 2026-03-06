@@ -3418,8 +3418,8 @@ export default function Dashboard() {
             <div className="flex items-center justify-center">
               <video
                 src={previewVideoType === "gameplay" 
-                  ? "/videos/category_examples/preview_background.mp4"
-                  : "/videos/category_examples/preview_full_ai.mp4"
+                  ? "/videos/showcases/preview_background.mp4"
+                  : "/videos/showcases/preview_full_ai.mp4"
                 }
                 controls
                 autoPlay
