@@ -50,8 +50,6 @@ export const translations = {
       pasteJson: "Paste Edge Function response JSON here:",
       close: "Close",
       upgradePlan: "Upgrade Plan",
-      customPrompt: "Custom Prompt (optional)",
-      customPromptPlaceholder: "Add specific details for your series...",
     },
     // Steps
     steps: {
@@ -460,8 +458,6 @@ export const translations = {
       pasteJson: "Pega aquí la respuesta JSON de Edge Function:",
       close: "Cerrar",
       upgradePlan: "Mejorar Plan",
-      customPrompt: "Indicación personalizada (opcional)",
-      customPromptPlaceholder: "Agrega detalles específicos para tu serie...",
     },
     steps: {
       videoType: "Tipo de Video",
@@ -856,8 +852,6 @@ export const translations = {
       pasteJson: "Collez ici la réponse JSON de Edge Function:",
       close: "Fermer",
       upgradePlan: "Mettre à Niveau",
-      customPrompt: "Invite personnalisée (facultatif)",
-      customPromptPlaceholder: "Ajoutez des détails spécifiques pour votre série...",
     },
     steps: {
       videoType: "Type de Vidéo",
@@ -1252,8 +1246,6 @@ export const translations = {
       pasteJson: "Cole aqui a resposta JSON da Edge Function:",
       close: "Fechar",
       upgradePlan: "Atualizar Plano",
-      customPrompt: "Prompt personalizado (opcional)",
-      customPromptPlaceholder: "Adicione detalhes específicos para a sua série...",
     },
     steps: {
       videoType: "Tipo de Vídeo",
@@ -1648,8 +1640,6 @@ export const translations = {
       pasteJson: "JSON-Antwort der Edge-Funktion hier einfügen:",
       close: "Schließen",
       upgradePlan: "Plan Upgraden",
-      customPrompt: "Benutzerdefinierte Anweisung (optional)",
-      customPromptPlaceholder: "Füge spezifische Details für deine Serie hinzu...",
     },
     steps: {
       videoType: "Videotyp",
