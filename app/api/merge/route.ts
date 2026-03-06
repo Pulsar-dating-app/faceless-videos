@@ -83,6 +83,7 @@ async function handleSocialMediaPosting(
     tiktok: platformsToPost.includes('tiktok'),
     instagram: platformsToPost.includes('instagram'),
   };
+  const hasTikTokOrInstagram = platformsObj.tiktok || platformsObj.instagram;
 
   // Insert into scheduled_posts
   const { data: scheduledPost, error: dbError } = await supabaseAdmin
@@ -107,7 +108,7 @@ async function handleSocialMediaPosting(
   // Post to YouTube immediately with publishAt
   if (platformsObj.youtube) {
     try {
-      await postToYouTube(userId, videoUrl, scheduledTime, scheduledPost.id);
+      await postToYouTube(userId, videoUrl, scheduledTime, scheduledPost.id, hasTikTokOrInstagram);
     } catch (error) {
       console.error('Error posting to YouTube:', error);
       // Continue even if YouTube fails
@@ -144,7 +145,8 @@ async function postToYouTube(
   userId: string,
   videoUrl: string,
   scheduledTime: string,
-  scheduledPostId: string
+  scheduledPostId: string,
+  hasTikTokOrInstagram: boolean
 ) {
   // Call internal API route to handle YouTube posting
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
@@ -168,6 +170,7 @@ async function postToYouTube(
       videoUrl,
       scheduledTime,
       scheduledPostId,
+      hasTikTokOrInstagram,
     }),
   });
 

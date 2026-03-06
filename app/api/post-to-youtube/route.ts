@@ -10,7 +10,7 @@ export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, videoUrl, scheduledTime, scheduledPostId } = await request.json();
+    const { userId, videoUrl, scheduledTime, scheduledPostId, hasTikTokOrInstagram = false } = await request.json();
 
     if (!userId || !videoUrl || !scheduledTime || !scheduledPostId) {
       return NextResponse.json(
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
         }
 
         const retryData = await retryResponse.json();
-        await updateScheduledPost(supabaseAdmin, scheduledPostId, retryData.id);
+        await updateScheduledPost(supabaseAdmin, scheduledPostId, retryData.id, hasTikTokOrInstagram);
         
         return NextResponse.json({
           success: true,
@@ -149,8 +149,8 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ YouTube upload successful: ${uploadData.id}`);
 
-    // Update scheduled_posts
-    await updateScheduledPost(supabaseAdmin, scheduledPostId, uploadData.id);
+    // Update scheduled_posts (only set status to published when YouTube is the only platform)
+    await updateScheduledPost(supabaseAdmin, scheduledPostId, uploadData.id, hasTikTokOrInstagram);
 
     return NextResponse.json({
       success: true,
@@ -212,14 +212,19 @@ async function refreshYouTubeToken(
 async function updateScheduledPost(
   supabase: any,
   scheduledPostId: string,
-  videoId: string
+  videoId: string,
+  hasTikTokOrInstagram: boolean
 ) {
+  const update: Record<string, unknown> = {
+    youtube_video_id: videoId,
+    youtube_posted_at: new Date().toISOString(),
+  };
+  // Only set status to published when YouTube is the only platform; otherwise publish-posts will set it
+  if (!hasTikTokOrInstagram) {
+    update.status = 'published';
+  }
   await supabase
     .from('scheduled_posts')
-    .update({
-      youtube_video_id: videoId,
-      youtube_posted_at: new Date().toISOString(),
-      status: 'published', // Will be published at scheduledTime by YouTube
-    })
+    .update(update)
     .eq('id', scheduledPostId);
 }
