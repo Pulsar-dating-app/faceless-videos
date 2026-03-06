@@ -248,7 +248,7 @@ export default function Dashboard() {
     setToast({
       isOpen: true,
       variant: "success",
-      title: `${platform} connected`,
+      title: formatMessageLoose(t.dashboard.socialMedia.connectSuccessTitle, { platform }),
       message: formatMessageLoose(t.dashboard.socialMedia.connectSuccess, { platform }),
     });
   };
@@ -257,7 +257,7 @@ export default function Dashboard() {
     setToast({
       isOpen: true,
       variant: "success",
-      title: `${platform} disconnected`,
+      title: formatMessageLoose(t.dashboard.socialMedia.disconnectSuccessTitle, { platform }),
       message: formatMessageLoose(t.dashboard.socialMedia.disconnectSuccess, { platform }),
     });
   };
