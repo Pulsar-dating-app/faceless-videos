@@ -161,6 +161,7 @@ export async function GET(request: NextRequest) {
           const subtitles = aiVideoData.subtitles || "";
           const generatedImages = aiVideoData.generatedImages || [];
           const audioDuration = aiVideoData.audioDuration;
+          const metadata = aiVideoData.metadata; // Extract metadata
 
           if (!audioUrl) {
             throw new Error("Missing audioUrl from generate-ai-video response");
@@ -193,6 +194,7 @@ export async function GET(request: NextRequest) {
               scheduledTime: payload.scheduled_time,
               platforms: payload.social_platforms || [],
               userId: payload.user_uid,
+              metadata, // Add metadata
             }),
           });
 
@@ -246,6 +248,7 @@ export async function GET(request: NextRequest) {
 
           audioUrl = generateData.audioUrl;
           script = generateData.script || "";
+          const metadata = generateData.metadata; // Extract metadata
 
           if (!audioUrl) {
             throw new Error("Missing audioUrl from generate-video response");
@@ -274,6 +277,7 @@ export async function GET(request: NextRequest) {
               scheduledTime: payload.scheduled_time,
               platforms: payload.social_platforms || [],
               userId: payload.user_uid,
+              metadata, // Add metadata
             }),
           });
 

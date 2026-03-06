@@ -21,6 +21,13 @@ export async function POST(request: NextRequest) {
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // Fetch scheduled post to get metadata
+    const { data: scheduledPost } = await supabaseAdmin
+      .from('scheduled_posts')
+      .select('title, description, hashtags')
+      .eq('id', scheduledPostId)
+      .single();
+
     // Get YouTube connection
     const { data: connection, error: connectionError } = await supabaseAdmin
       .from('social_media_connections')
@@ -60,13 +67,19 @@ export async function POST(request: NextRequest) {
 
     console.log(`Video downloaded: ${videoBuffer.length} bytes`);
 
+    // Prepare metadata with hashtags in description
+    const hashtagString = scheduledPost?.hashtags?.map((tag: string) => `#${tag}`).join(' ') || '';
+    const fullDescription = scheduledPost?.description 
+      ? `${scheduledPost.description}\n\n${hashtagString}`
+      : `Automatically generated video\n\n${hashtagString}`;
+
     // Prepare metadata for YouTube
     const metadata = {
       snippet: {
-        title: `Auto Video - ${new Date().toISOString().split('T')[0]}`,
-        description: 'Automatically generated video',
+        title: scheduledPost?.title || `Auto Video - ${new Date().toISOString().split('T')[0]}`,
+        description: fullDescription,
         categoryId: '22', // People & Blogs
-        tags: ['auto', 'generated'],
+        tags: scheduledPost?.hashtags || ['auto', 'generated'],
       },
       status: {
         privacyStatus: 'private', // Required for scheduling
