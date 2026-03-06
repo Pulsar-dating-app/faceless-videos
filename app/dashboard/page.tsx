@@ -114,7 +114,6 @@ export default function Dashboard() {
   const [voice, setVoice] = useState("alloy");
   const [artStyle, setArtStyle] = useState("cartoon");
   const [backgroundVideo, setBackgroundVideo] = useState(BACKGROUND_VIDEOS[0]?.url ?? "");
-  const [customPrompt, setCustomPrompt] = useState("");
   const [script, setScript] = useState("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -433,6 +432,7 @@ export default function Dashboard() {
         'missing_params': oauthErrors?.missing_params ?? 'OAuth parameters missing',
         'oauth_failed': oauthErrors?.oauth_failed ?? 'Failed to connect to social media',
         'access_denied': oauthErrors?.access_denied ?? 'You denied access',
+        'publish_scope_required': oauthErrors?.publish_scope_required ?? 'You must allow posting permission to connect. Please try again and enable posting when asked.',
       };
       const unknownError = (t.messages as { unknownError?: string }).unknownError ?? 'Unknown error occurred';
       setToast({
@@ -1373,7 +1373,7 @@ export default function Dashboard() {
                   className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                 >
                   {Object.entries(LANGUAGE_FLAGS).map(([code, flag]) => (
-                    <option key={code} value={code}>
+                    <option key={code} value={code} className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white">
                       {flag} {t.languages[code as keyof typeof t.languages]}
                     </option>
                   ))}
@@ -1467,17 +1467,6 @@ export default function Dashboard() {
                   </button>
                 ))}
               </div>
-              
-              {/* Optional Custom Prompt */}
-              <div className="space-y-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                <label className="text-sm font-medium">{t.form.customPrompt || "Custom Prompt (optional)"}</label>
-                <textarea 
-                  value={customPrompt}
-                  onChange={(e) => setCustomPrompt(e.target.value)}
-                  placeholder={t.form.customPromptPlaceholder || "Add specific details for your video..."}
-                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[80px] resize-none text-sm"
-                />
-              </div>
             </div>
           );
         } else {
@@ -1525,17 +1514,6 @@ export default function Dashboard() {
                     </div>
                   </button>
                 ))}
-              </div>
-              
-              {/* Optional Custom Prompt */}
-              <div className="space-y-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                <label className="text-sm font-medium">{t.form.customPrompt || "Custom Prompt (optional)"}</label>
-                <textarea 
-                  value={customPrompt}
-                  onChange={(e) => setCustomPrompt(e.target.value)}
-                  placeholder={t.form.customPromptPlaceholder || "Add specific details for your video..."}
-                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition-all min-h-[80px] resize-none text-sm"
-                />
               </div>
             </div>
           );
@@ -1823,7 +1801,7 @@ export default function Dashboard() {
                   value={seriesName}
                   onChange={(e) => setSeriesName(e.target.value)}
                   placeholder="e.g., Daily Motivation, Funny Stories, Tech Tips"
-                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
                   required
                 />
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -1837,12 +1815,12 @@ export default function Dashboard() {
                   <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                     {t.dashboard.seriesSetup.publishTimeLabel} <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    value={publishTime}
-                    onChange={(e) => setPublishTime(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
-                    required
-                  >
+                <select
+                  value={publishTime}
+                  onChange={(e) => setPublishTime(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                  required
+                >
                     {Array.from({ length: 48 }, (_, i) => {
                       const hour = Math.floor(i / 2);
                       const minute = (i % 2) * 30;
@@ -1851,7 +1829,7 @@ export default function Dashboard() {
                       const ampm = hour >= 12 ? 'PM' : 'AM';
                       const time12 = `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
                       return (
-                        <option key={time24} value={time24}>
+                        <option key={time24} value={time24} className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white">
                           {time12}
                         </option>
                       );
@@ -1871,12 +1849,12 @@ export default function Dashboard() {
                     <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                       {t.dashboard.seriesSetup.secondPublishTimeLabel} <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      value={secondPublishTime}
-                      onChange={(e) => setSecondPublishTime(e.target.value)}
-                      className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
-                      required
-                    >
+                  <select
+                    value={secondPublishTime}
+                    onChange={(e) => setSecondPublishTime(e.target.value)}
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                    required
+                  >
                       {Array.from({ length: 48 }, (_, i) => {
                         const hour = Math.floor(i / 2);
                         const minute = (i % 2) * 30;
@@ -3063,7 +3041,7 @@ export default function Dashboard() {
                     type="text"
                     defaultValue={editingSeries.series_name}
                     id="edit-series-name"
-                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
                   />
                 </div>
                 <div className="space-y-2">
@@ -3073,10 +3051,10 @@ export default function Dashboard() {
                   <select
                     defaultValue={editingSeries.category}
                     id="edit-category"
-                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
                   >
                     {Object.keys(CATEGORY_ICONS).map((key) => (
-                      <option key={key} value={key}>
+                      <option key={key} value={key} className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white">
                         {t.categories[key as keyof typeof t.categories]}
                       </option>
                     ))}
@@ -3099,7 +3077,7 @@ export default function Dashboard() {
                       ?? "09:00"
                     }
                     id="edit-publish-time"
-                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
                   >
                     {Array.from({ length: 48 }, (_, i) => {
                       const hour = Math.floor(i / 2);
@@ -3109,7 +3087,7 @@ export default function Dashboard() {
                       const ampm = hour >= 12 ? "PM" : "AM";
                       const time12 = `${hour12}:${minute.toString().padStart(2, "0")} ${ampm}`;
                       return (
-                        <option key={time24} value={time24}>
+                        <option key={time24} value={time24} className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white">
                           {time12}
                         </option>
                       );
@@ -3124,7 +3102,7 @@ export default function Dashboard() {
                     <select
                       defaultValue={editingSeries.schedule_config.times[1]}
                       id="edit-second-publish-time"
-                      className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                      className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
                     >
                       {Array.from({ length: 48 }, (_, i) => {
                         const hour = Math.floor(i / 2);
@@ -3240,10 +3218,10 @@ export default function Dashboard() {
                     <select
                       defaultValue={editingSeries.art_style || "cartoon"}
                       id="edit-art-style"
-                      className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                      className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
                     >
                       {ART_STYLES.map((style) => (
-                        <option key={style.value} value={style.value}>
+                        <option key={style.value} value={style.value} className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white">
                           {t.artStyles[style.value as keyof typeof t.artStyles]}
                         </option>
                       ))}
@@ -3262,10 +3240,10 @@ export default function Dashboard() {
                         )?.url ?? BACKGROUND_VIDEOS[0]?.url ?? ""
                       }
                       id="edit-background-video"
-                      className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                      className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
                     >
                       {BACKGROUND_VIDEOS.map((bg) => (
-                        <option key={bg.value} value={bg.url}>
+                        <option key={bg.value} value={bg.url} className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white">
                           {bg.label}
                         </option>
                       ))}
@@ -3284,10 +3262,10 @@ export default function Dashboard() {
                   <select
                     defaultValue={editingSeries.language}
                     id="edit-language"
-                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
                   >
                     {Object.entries(LANGUAGE_FLAGS).map(([code, flag]) => (
-                      <option key={code} value={code}>
+                      <option key={code} value={code} className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white">
                         {flag} {t.languages[code as keyof typeof t.languages]}
                       </option>
                     ))}
@@ -3300,10 +3278,10 @@ export default function Dashboard() {
                   <select
                     defaultValue={editingSeries.narrator_voice}
                     id="edit-voice"
-                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
                   >
                     {VOICES.map((v) => (
-                      <option key={v} value={v}>
+                      <option key={v} value={v} className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white">
                         {v.charAt(0).toUpperCase() + v.slice(1)}
                       </option>
                     ))}
@@ -3316,10 +3294,10 @@ export default function Dashboard() {
                   <select
                     defaultValue={editingSeries.duration}
                     id="edit-duration"
-                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                    className="w-full px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
                   >
                     {DURATION_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
+                      <option key={opt.value} value={opt.value} className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white">
                         {opt.label}
                       </option>
                     ))}
@@ -3440,8 +3418,8 @@ export default function Dashboard() {
             <div className="flex items-center justify-center">
               <video
                 src={previewVideoType === "gameplay" 
-                  ? "/videos/category_examples/preview_background.mp4"
-                  : "/videos/category_examples/preview_full_ai.mp4"
+                  ? "/videos/showcases/preview_background.mp4"
+                  : "/videos/showcases/preview_full_ai.mp4"
                 }
                 controls
                 autoPlay
