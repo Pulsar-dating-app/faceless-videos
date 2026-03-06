@@ -26,7 +26,8 @@ export async function POST(req: Request) {
       audioDuration,
       scheduledTime,
       platforms,
-      userId
+      userId,
+      metadata
     } = await req.json();
 
     console.log("audioUrl", audioUrl);
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
     // Handle social media posting if video was generated successfully
     if (data.url && scheduledTime && platforms && platforms.length > 0 && userId) {
       try {
-        await handleSocialMediaPosting(userId, data.url, scheduledTime, platforms);
+        await handleSocialMediaPosting(userId, data.url, scheduledTime, platforms, metadata);
       } catch (error) {
         console.error('Error in social media posting flow:', error);
         // Don't fail the whole request if posting setup fails
@@ -89,7 +90,8 @@ async function handleSocialMediaPosting(
   userId: string,
   videoUrl: string,
   scheduledTime: string,
-  platforms: string[]
+  platforms: string[],
+  metadata?: { title: string; description: string; hashtags: string[] }
 ) {
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -124,6 +126,9 @@ async function handleSocialMediaPosting(
       scheduled_time: scheduledTime,
       platforms: platformsObj,
       status: 'pending',
+      title: metadata?.title || null,
+      description: metadata?.description || null,
+      hashtags: metadata?.hashtags || null,
     })
     .select()
     .single();

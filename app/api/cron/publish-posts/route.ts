@@ -114,7 +114,8 @@ export async function GET(request: NextRequest) {
             postResults.tiktok = await postToTikTok(
               payload.user_uid,
               payload.video_url,
-              supabaseAdmin
+              supabaseAdmin,
+              scheduledPost
             );
             console.log(`[publish-posts] ✅ TikTok post successful`);
           } catch (error: any) {
@@ -129,7 +130,8 @@ export async function GET(request: NextRequest) {
             postResults.instagram = await postToInstagram(
               payload.user_uid,
               payload.video_url,
-              supabaseAdmin
+              supabaseAdmin,
+              scheduledPost
             );
             console.log(`[publish-posts] ✅ Instagram post successful`);
           } catch (error: any) {
@@ -243,7 +245,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function postToTikTok(userId: string, videoUrl: string, supabase: any) {
+async function postToTikTok(userId: string, videoUrl: string, supabase: any, scheduledPost: any) {
   // Get TikTok connection
   const { data: connection } = await supabase
     .from('social_media_connections')
@@ -267,6 +269,12 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any) {
 
   console.log(`[TikTok] Downloaded video: ${videoBuffer.length} bytes`);
 
+  // Format description with hashtags
+  const hashtagString = scheduledPost?.hashtags?.map((tag: string) => `#${tag}`).join(' ') || '';
+  const fullDescription = scheduledPost?.description 
+    ? `${scheduledPost.description} ${hashtagString}`
+    : hashtagString;
+
   // TikTok API: Initialize upload
   // For unaudited apps, use inbox endpoint and SELF_ONLY privacy
   const initResponse = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
@@ -277,7 +285,8 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any) {
     },
     body: JSON.stringify({
       post_info: {
-        title: 'Auto-generated video',
+        // TikTok has a single caption field: "title". Use description + hashtags for the visible caption.
+        title: fullDescription || scheduledPost?.title || 'Auto-generated video',
         privacy_level: 'SELF_ONLY', // Required for unaudited apps
         disable_duet: false,
         disable_comment: false,
@@ -336,7 +345,7 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any) {
   return { publishId, success: true };
 }
 
-async function postToInstagram(userId: string, videoUrl: string, supabase: any) {
+async function postToInstagram(userId: string, videoUrl: string, supabase: any, scheduledPost: any) {
   // Get Instagram connection
   const { data: connection } = await supabase
     .from('social_media_connections')
@@ -357,6 +366,12 @@ async function postToInstagram(userId: string, videoUrl: string, supabase: any) 
 
   console.log(`[Instagram] Creating media container for account: ${accountId}`);
 
+  // Format caption with hashtags (Instagram uses caption, not title)
+  const hashtagString = scheduledPost?.hashtags?.map((tag: string) => `#${tag}`).join(' ') || '';
+  const caption = scheduledPost?.description 
+    ? `${scheduledPost.description}\n\n${hashtagString}`
+    : hashtagString;
+
   // Instagram requires publicly accessible URL
   // Create media container
   const containerResponse = await fetch(
@@ -369,7 +384,7 @@ async function postToInstagram(userId: string, videoUrl: string, supabase: any) 
       body: JSON.stringify({
         video_url: videoUrl,
         media_type: 'REELS',
-        caption: 'Auto-generated video',
+        caption: caption || 'Auto-generated video',
         access_token: connection.access_token,
       }),
     }
