@@ -150,29 +150,10 @@ async function handleSocialMediaPosting(
     }
   }
 
-  // Add TikTok/Instagram to posting queue
+  // TikTok/Instagram will be picked up by the queue-scheduler cron
+  // which initializes targets and enqueues the post at the appropriate scheduled_time.
   if (platformsObj.tiktok || platformsObj.instagram) {
-    const queueMessage = {
-      scheduled_post_id: scheduledPost.id,
-      user_uid: userId,
-      video_url: videoUrl,
-      scheduled_time: scheduledTime,
-      platforms: {
-        tiktok: platformsObj.tiktok,
-        instagram: platformsObj.instagram,
-      },
-    };
-
-    const { error: queueError } = await supabaseAdmin.rpc('pgmq_send_posting', {
-      queue_name: 'posting_queue',
-      message: queueMessage,
-    });
-
-    if (queueError) {
-      console.error('Error adding to posting queue:', queueError);
-    } else {
-      console.log(`✅ Added to posting queue: ${scheduledPost.id}`);
-    }
+    console.log(`✅ Post ${scheduledPost.id} saved as pending — queue-scheduler will enqueue for TikTok/Instagram`);
   }
 }
 
