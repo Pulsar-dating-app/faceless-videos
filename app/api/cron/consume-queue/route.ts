@@ -328,20 +328,20 @@ export async function GET(request: NextRequest) {
 
       } catch (error: any) {
         console.error(`[consume-queue] Error processing job ${msgId}:`, error);
-        
-        // Delete the message on hard failure to avoid infinite retries
-        const { error: deleteError } = await supabaseAdmin.rpc(
-          "pgmq_delete_video",
-          {
-            queue_name: "video_generation_queue",
-            msg_id: msgId,
-          }
-        );
 
-        if (deleteError) {
-          console.error(
-            `[consume-queue] Error deleting failed message ${msgId}:`,
-            deleteError
+        // Não deletamos a mensagem: quando o VT (visibility timeout) expirar,
+        // ela volta à fila para nova tentativa. Opcionalmente, forçar VT = 0
+        // devolve a mensagem à fila imediatamente (requer RPC pgmq_set_vt_video no Supabase).
+        const { error: setVtError } = await supabaseAdmin.rpc("pgmq_set_vt_video", {
+          queue_name: "video_generation_queue",
+          msg_id: msgId,
+          vt: 0,
+        });
+        if (setVtError) {
+          // RPC pode não existir ainda; mensagem mesmo assim volta quando VT expirar (ex.: 1h)
+          console.warn(
+            `[consume-queue] set_vt failed for msg ${msgId} (message will reappear when VT expires):`,
+            setVtError.message
           );
         }
 
