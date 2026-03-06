@@ -266,7 +266,7 @@ export default function Dashboard() {
     setToast({
       isOpen: true,
       variant: "error",
-      title: `${platform} disconnect failed`,
+      title: formatMessageLoose(t.dashboard.socialMedia.disconnectErrorTitle, { platform }),
       message: formatMessageLoose(t.dashboard.socialMedia.disconnectError, { platform }),
     });
   };
@@ -278,10 +278,10 @@ export default function Dashboard() {
     setSocialDialog({
       isOpen: true,
       variant: "confirm",
-      title: `Disconnect ${platform}?`,
+      title: formatMessageLoose(t.dashboard.socialMedia.disconnectConfirmTitle, { platform }),
       message: formatMessageLoose(t.dashboard.socialMedia.disconnectConfirm, { platform }),
       confirmLabel: t.dashboard.socialMedia.disconnect || "Disconnect",
-      cancelLabel: "Cancel",
+      cancelLabel: t.messages.cancel,
       onConfirm,
     });
   };
@@ -428,16 +428,18 @@ export default function Dashboard() {
     
     if (error) {
       // Show error message
+      const oauthErrors = (t.messages as { oauthErrors?: Record<string, string> }).oauthErrors;
       const errorMessages: { [key: string]: string } = {
-        'missing_params': 'OAuth parameters missing',
-        'oauth_failed': 'Failed to connect to social media',
-        'access_denied': 'You denied access',
+        'missing_params': oauthErrors?.missing_params ?? 'OAuth parameters missing',
+        'oauth_failed': oauthErrors?.oauth_failed ?? 'Failed to connect to social media',
+        'access_denied': oauthErrors?.access_denied ?? 'You denied access',
       };
+      const unknownError = (t.messages as { unknownError?: string }).unknownError ?? 'Unknown error occurred';
       setToast({
         isOpen: true,
         variant: "error",
-        title: "Connection failed",
-        message: `Error: ${errorMessages[error] || 'Unknown error occurred'}`,
+        title: t.messages.connectionFailed,
+        message: formatMessageLoose((t.messages as { oauthErrorFormat?: string }).oauthErrorFormat ?? 'Error: {{error}}', { error: errorMessages[error] || unknownError }),
       });
       
       // Clean up URL
@@ -585,7 +587,7 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error("Portal error:", error);
-      showToast("Failed to open billing portal. Please try again.");
+      showToast(t.messages.billingPortalError);
     } finally {
       setIsLoadingPortal(false);
     }
@@ -843,11 +845,11 @@ export default function Dashboard() {
       await fetchScheduledPosts();
     } catch (err: unknown) {
       console.error("Error cancelling scheduled post:", err);
-      const msg = err instanceof Error ? err.message : "Failed to cancel scheduled post.";
+      const msg = err instanceof Error ? err.message : t.dashboard.scheduledPosts.cancelPostFailedMessage;
       setErrorDialog({
         isOpen: true,
         type: "error",
-        title: "Cancel Failed",
+        title: t.dashboard.scheduledPosts.cancelFailed,
         message: msg,
       });
     } finally {
@@ -972,11 +974,11 @@ export default function Dashboard() {
     // Validate step 6 requirements
     if (currentStep === 6) {
       if (!seriesName.trim()) {
-        showToast("Please enter a series name");
+        showToast(t.messages.seriesNameRequired);
         return;
       }
       if (selectedPlatforms.length === 0) {
-        showToast("Please select at least one publishing platform");
+        showToast(t.messages.selectOnePlatform);
         return;
       }
 
@@ -985,14 +987,14 @@ export default function Dashboard() {
 
       if (isStarterPlan) {
         if (publishDays.length !== 3) {
-          showToast("Starter plan requires selecting exactly 3 publish days per week.");
+          showToast(t.messages.starterPlanThreeDays);
           return;
         }
       }
 
       if (isElitePlan) {
         if (!secondPublishTime) {
-          showToast("Please select a second publish time for your Elite plan.");
+          showToast(t.messages.eliteSecondPublishTime);
           return;
         }
       }
@@ -1054,7 +1056,7 @@ export default function Dashboard() {
         }
 
         // Success - show message and reset
-        showToast(`Series "${seriesName}" created successfully!`, { variant: "success" });
+        showToast(formatMessageLoose(t.messages.seriesCreatedSuccess, { name: seriesName }), { variant: "success" });
         resetWizard();
         
       } catch (error: unknown) {
@@ -1114,7 +1116,7 @@ export default function Dashboard() {
 
   const handlePostToSocial = async (platform: string) => {
     if (!videoUrl) {
-      showToast("No video to post");
+      showToast(t.messages.noVideoToPost);
       return;
     }
 
@@ -1122,7 +1124,7 @@ export default function Dashboard() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        showToast("Please sign in first");
+        showToast(t.messages.signInFirst);
         return;
       }
 
@@ -1140,18 +1142,18 @@ export default function Dashboard() {
       const connection = connections.find((c: any) => c.platform === platform);
 
       if (!connection) {
-        showToast(`Please connect your ${platform} account first in the Social Media section`);
+        showToast(formatMessageLoose(t.messages.connectAccountFirst, { platform }));
         return;
       }
 
       // Note: We don't have access_token here anymore in the response for security
       // The posting should be done server-side by the cronjob system
-      showToast(`Posting to ${platform} is now handled automatically by the system. Your video will be posted at the scheduled time.`, { variant: "success" });
+      showToast(formatMessageLoose(t.messages.postingHandledAutomatically, { platform }), { variant: "success" });
       return;
 
     } catch (error) {
       console.error('Error fetching connection:', error);
-      showToast("Failed to verify social media connection");
+      showToast(t.messages.socialConnectionVerifyFailed);
       setPostingTo(null);
       setPostingTo(null);
       return;
@@ -1913,7 +1915,7 @@ export default function Dashboard() {
                               setPublishDays(publishDays.filter((d) => d !== day));
                             } else {
                               if (publishDays.length >= 3) {
-                                showToast("Starter plan allows exactly 3 days per week. Deselect another day first.");
+                                showToast(t.messages.starterPlanDeselectDay);
                                 return;
                               }
                               setPublishDays([...publishDays, day]);
@@ -3505,7 +3507,7 @@ export default function Dashboard() {
                       onClick={closeSocialDialog}
                       className="flex-1 px-4 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                     >
-                      {socialDialog.cancelLabel || "Cancel"}
+                      {socialDialog.cancelLabel || t.messages.cancel}
                     </button>
                     <button
                       onClick={async () => {
