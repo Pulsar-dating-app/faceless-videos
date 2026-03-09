@@ -189,6 +189,9 @@ export default function Dashboard() {
     video_url: string;
     scheduled_time: string;
     platforms: { tiktok?: boolean; youtube?: boolean; instagram?: boolean };
+    title?: string | null;
+    description?: string | null;
+    hashtags?: string[] | null;
   }>>([]);
   const [isLoadingScheduledPosts, setIsLoadingScheduledPosts] = useState(false);
   const [cancelPostId, setCancelPostId] = useState<string | null>(null);
@@ -2379,6 +2382,51 @@ export default function Dashboard() {
                         )}
                       </div>
                     </div>
+
+                    {post.platforms?.youtube && post.title && (
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-xs uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
+                            {scheduledT?.youtubeTitleLabel ?? "Title"}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 text-[10px] font-semibold uppercase tracking-wide">
+                            {scheduledT?.youtubeOnlyBadge ?? "YouTube Only"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-zinc-800 dark:text-zinc-200 line-clamp-2">
+                          {post.title}
+                        </p>
+                      </div>
+                    )}
+
+                    {post.description && (
+                      <div className="space-y-1">
+                        <span className="font-semibold text-xs uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
+                          {scheduledT?.descriptionLabel ?? "Description"}
+                        </span>
+                        <p className="text-sm text-zinc-700 dark:text-zinc-300 line-clamp-3 whitespace-pre-line">
+                          {post.description}
+                        </p>
+                      </div>
+                    )}
+
+                    {Array.isArray(post.hashtags) && post.hashtags.length > 0 && (
+                      <div className="space-y-1">
+                        <span className="font-semibold text-xs uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
+                          {scheduledT?.hashtagsLabel ?? "Hashtags"}
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {post.hashtags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="px-2 py-0.5 text-xs rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="flex gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-700">
                       <a
