@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X, Info, Share2, Send, AlertCircle, CreditCard, List, Edit, Power, Download, Trash2 } from "lucide-react";
+import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X, Info, Share2, Send, AlertCircle, CreditCard, List, Edit, Power, Download, Trash2, Star, Lightbulb, Search, Brain, PawPrint, HelpCircle } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
@@ -44,9 +44,12 @@ const VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
 const ART_STYLES = [
   { value: "anime", preview: "/images/anime_preview.png" },
   { value: "cartoon", preview: "/images/cartoon_preview.png" },
-  { value: "ghibli", preview: "/images/ghibli_preview.png" },
   { value: "horror", preview: "/images/horror_preview.png" },
   { value: "realistic", preview: "/images/realistic_preview.png" },
+  { value: "cinematic", preview: "/images/cinematic_preview.png" },
+  { value: "3d-render", preview: "/images/3d_render_preview.png" },
+  { value: "cyberpunk", preview: "/images/cyberpunk_preview.png" },
+  { value: "oil-painting", preview: "/images/oil_painting_preview.png" },
 ];
 
 // Background videos with preview images and URLs
@@ -85,6 +88,14 @@ const CATEGORY_ICONS: { [key: string]: React.ReactNode } = {
   history: <BookOpen className="w-5 h-5" />,
   reddit: <MessageCircle className="w-5 h-5" />,
   "reddit-relationship": <Heart className="w-5 h-5" />,
+  "top-5": <Star className="w-5 h-5" />,
+  "fun-facts": <Sparkles className="w-5 h-5" />,
+  "life-hacks": <Lightbulb className="w-5 h-5" />,
+  mystery: <Search className="w-5 h-5" />,
+  psychology: <Brain className="w-5 h-5" />,
+  "did-you-know": <Info className="w-5 h-5" />,
+  animals: <PawPrint className="w-5 h-5" />,
+  riddles: <HelpCircle className="w-5 h-5" />,
 };
 
 // Duration options with monetization info
@@ -1426,8 +1437,8 @@ export default function Dashboard() {
           return (
             <div className="space-y-6">
               <div className="text-center space-y-2 mb-8">
-                <h3 className="text-xl font-semibold">Choose Background Video</h3>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">Select the background video for your gameplay video</p>
+                <h3 className="text-xl font-semibold">{t.steps.chooseBackgroundVideo}</h3>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">{t.steps.chooseBackgroundVideoDesc}</p>
               </div>
               
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
@@ -1478,7 +1489,7 @@ export default function Dashboard() {
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">{t.steps.chooseArtStyleDesc}</p>
               </div>
               
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                 {ART_STYLES.map((style) => (
                   <button
                     key={style.value}
