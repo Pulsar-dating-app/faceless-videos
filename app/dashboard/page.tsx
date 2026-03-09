@@ -3216,7 +3216,9 @@ export default function Dashboard() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                   {t.dashboard.seriesManagement.platforms}
                 </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">Select at least one platform.</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {t.dashboard.seriesManagement.platformsHint}
+                </p>
                 <div className="space-y-2">
                   {["tiktok", "instagram", "youtube"].map((platform) => (
                     <label
