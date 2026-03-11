@@ -2023,7 +2023,7 @@ export default function Dashboard() {
           <div className="flex justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
           </div>
-        ) : subscription && subscription.status !== "canceled" && subscription.status !== "unpaid" ? (
+        ) : subscription && subscription.status === "active" ? (
           <div className="rounded-2xl border-2 border-blue-500 dark:border-blue-500 bg-white dark:bg-zinc-900 shadow-xl overflow-hidden">
             {/* Banner */}
             <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 flex items-center justify-between">
