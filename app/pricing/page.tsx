@@ -122,7 +122,8 @@ export default function PricingPage() {
           .eq("user_id", session.user.id)
           .single();
 
-        if (!error && data && data.status !== "canceled" && data.status !== "unpaid") {
+        // Only treat as "has subscription to manage" when Stripe subscription is fully active
+        if (!error && data && data.status === "active") {
           setActiveSubscription({ plan_id: data.plan_id });
         } else {
           setActiveSubscription(null);
@@ -204,14 +205,14 @@ export default function PricingPage() {
     setLoadingPlanId(planId);
 
     try {
-      // If user already has an active subscription, send them to manage it
+      // If user already has an active subscription, send them to manage it (incomplete etc. can still checkout)
       const { data: subData } = await supabase
         .from("subscriptions")
         .select("status")
         .eq("user_id", session.user.id)
         .single();
 
-      if (subData && subData.status !== "canceled" && subData.status !== "unpaid") {
+      if (subData && subData.status === "active") {
         window.location.href = "/dashboard?section=subscription";
         return;
       }
