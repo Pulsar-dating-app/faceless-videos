@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { postToTikTok, postToInstagram } from '@/lib/social-posting';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -78,6 +79,16 @@ export async function GET(request: NextRequest) {
           throw new Error('Scheduled post not found');
         }
 
+        // Skip already-published posts (e.g. user clicked "Publish Now" before cron ran)
+        if (scheduledPost.status === 'published') {
+          console.log(`[publish-posts] Post ${payload.scheduled_post_id} already published, archiving message`);
+          await supabaseAdmin.rpc('pgmq_archive_posting', {
+            queue_name: 'posting_queue',
+            msg_id: msgId,
+          });
+          continue;
+        }
+
         // Check retry count
         if (scheduledPost.retry_count >= scheduledPost.max_retries) {
           console.log(`[publish-posts] Max retries exceeded for ${msgId}`);
@@ -104,8 +115,8 @@ export async function GET(request: NextRequest) {
 
         // Post to platforms
         const postResults = {
-          tiktok: null as any,
-          instagram: null as any,
+          tiktok: null as { publishId: string; success: true } | { error: string } | null,
+          instagram: null as { mediaId: string; success: true } | { error: string } | null,
         };
 
         if (payload.platforms.tiktok) {
@@ -118,9 +129,10 @@ export async function GET(request: NextRequest) {
               scheduledPost
             );
             console.log(`[publish-posts] ✅ TikTok post successful`);
-          } catch (error: any) {
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
             console.error('[publish-posts] TikTok post failed:', error);
-            postResults.tiktok = { error: error.message };
+            postResults.tiktok = { error: msg };
           }
         }
 
@@ -134,29 +146,32 @@ export async function GET(request: NextRequest) {
               scheduledPost
             );
             console.log(`[publish-posts] ✅ Instagram post successful`);
-          } catch (error: any) {
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
             console.error('[publish-posts] Instagram post failed:', error);
-            postResults.instagram = { error: error.message };
+            postResults.instagram = { error: msg };
           }
         }
 
         // Check if all posts succeeded
-        const tiktokSuccess = !payload.platforms.tiktok || !postResults.tiktok?.error;
-        const instagramSuccess = !payload.platforms.instagram || !postResults.instagram?.error;
+        const tiktokSuccess = !payload.platforms.tiktok || !('error' in (postResults.tiktok ?? {}));
+        const instagramSuccess = !payload.platforms.instagram || !('error' in (postResults.instagram ?? {}));
         const allSuccess = tiktokSuccess && instagramSuccess;
 
         if (allSuccess) {
           console.log(`[publish-posts] All platforms successful for ${msgId}`);
           
-          // Update scheduled_posts with success
+          const tiktokOk = postResults.tiktok && 'publishId' in postResults.tiktok ? postResults.tiktok : null;
+          const instagramOk = postResults.instagram && 'mediaId' in postResults.instagram ? postResults.instagram : null;
+
           await supabaseAdmin
             .from('scheduled_posts')
             .update({
               status: 'published',
-              tiktok_publish_id: postResults.tiktok?.publishId || null,
-              tiktok_posted_at: postResults.tiktok ? new Date().toISOString() : null,
-              instagram_media_id: postResults.instagram?.mediaId || null,
-              instagram_posted_at: postResults.instagram ? new Date().toISOString() : null,
+              tiktok_publish_id: tiktokOk?.publishId || null,
+              tiktok_posted_at: tiktokOk ? new Date().toISOString() : null,
+              instagram_media_id: instagramOk?.mediaId || null,
+              instagram_posted_at: instagramOk ? new Date().toISOString() : null,
             })
             .eq('id', payload.scheduled_post_id);
 
@@ -170,20 +185,18 @@ export async function GET(request: NextRequest) {
         } else {
           console.log(`[publish-posts] Partial failure for ${msgId}, will retry`);
           
-          // Increment retry count
+          const tiktokErr = postResults.tiktok && 'error' in postResults.tiktok ? postResults.tiktok.error : null;
+          const instagramErr = postResults.instagram && 'error' in postResults.instagram ? postResults.instagram.error : null;
+
           await supabaseAdmin
             .from('scheduled_posts')
             .update({
               status: 'pending',
               retry_count: scheduledPost.retry_count + 1,
-              last_error: JSON.stringify({
-                tiktok: postResults.tiktok?.error || null,
-                instagram: postResults.instagram?.error || null,
-              }),
+              last_error: JSON.stringify({ tiktok: tiktokErr, instagram: instagramErr }),
             })
             .eq('id', payload.scheduled_post_id);
 
-          // Message will be visible again after visibility timeout
           errors.push({
             msgId,
             scheduledPostId: payload.scheduled_post_id,
@@ -191,10 +204,10 @@ export async function GET(request: NextRequest) {
           });
         }
 
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
         console.error(`[publish-posts] Error processing post ${msgId}:`, error);
 
-        // Increment retry count
         const { data: scheduledPost } = await supabaseAdmin
           .from('scheduled_posts')
           .select('retry_count, max_retries')
@@ -207,7 +220,7 @@ export async function GET(request: NextRequest) {
             .update({
               status: 'pending',
               retry_count: scheduledPost.retry_count + 1,
-              last_error: error.message,
+              last_error: msg,
             })
             .eq('id', payload.scheduled_post_id);
         } else {
@@ -215,7 +228,7 @@ export async function GET(request: NextRequest) {
             .from('scheduled_posts')
             .update({
               status: 'failed',
-              last_error: error.message,
+              last_error: msg,
             })
             .eq('id', payload.scheduled_post_id);
 
@@ -225,7 +238,7 @@ export async function GET(request: NextRequest) {
           });
         }
 
-        errors.push({ msgId, error: error.message });
+        errors.push({ msgId, error: msg });
       }
     }
 
@@ -239,9 +252,10 @@ export async function GET(request: NextRequest) {
       errors,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
     console.error('[publish-posts] Unexpected error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
