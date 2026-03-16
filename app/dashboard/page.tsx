@@ -192,10 +192,12 @@ export default function Dashboard() {
     title?: string | null;
     description?: string | null;
     hashtags?: string[] | null;
+    status?: string | null;
   }>>([]);
   const [isLoadingScheduledPosts, setIsLoadingScheduledPosts] = useState(false);
   const [cancelPostId, setCancelPostId] = useState<string | null>(null);
   const [isDeletingPost, setIsDeletingPost] = useState(false);
+  const [isPublishingPost, setIsPublishingPost] = useState<string | null>(null);
 
   // Error dialog state
   const [errorDialog, setErrorDialog] = useState<{
@@ -868,6 +870,36 @@ export default function Dashboard() {
       });
     } finally {
       setIsDeletingPost(false);
+    }
+  };
+
+  const handlePublishNow = async (postId: string) => {
+    if (!user) return;
+    setIsPublishingPost(postId);
+    try {
+      const response = await fetch('/api/publish-post-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheduledPostId: postId, userId: user.id }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error ?? 'Failed to publish post');
+      }
+      const scheduledT = (t.dashboard as { scheduledPosts?: Record<string, string> }).scheduledPosts;
+      showToast(scheduledT?.publishSuccess ?? 'Video published successfully!', { variant: 'success' });
+      await fetchScheduledPosts();
+    } catch (err: unknown) {
+      console.error('Error publishing post now:', err);
+      const scheduledT = (t.dashboard as { scheduledPosts?: Record<string, string> }).scheduledPosts;
+      setErrorDialog({
+        isOpen: true,
+        type: 'error',
+        title: scheduledT?.publishFailed ?? 'Failed to publish video',
+        message: err instanceof Error ? err.message : 'An unexpected error occurred.',
+      });
+    } finally {
+      setIsPublishingPost(null);
     }
   };
 
@@ -2439,9 +2471,28 @@ export default function Dashboard() {
                         <Download className="w-4 h-4" />
                         {scheduledT?.download ?? "Download"}
                       </a>
+                      {post.status !== 'published' && (
+                        <button
+                          onClick={() => handlePublishNow(post.id)}
+                          disabled={isPublishingPost !== null || isDeletingPost}
+                          className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+                        >
+                          {isPublishingPost === post.id ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              {scheduledT?.publishing ?? "Publishing..."}
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-4 h-4" />
+                              {scheduledT?.publishNow ?? "Publish Now"}
+                            </>
+                          )}
+                        </button>
+                      )}
                       <button
                         onClick={() => setCancelPostId(post.id)}
-                        disabled={isDeletingPost}
+                        disabled={isDeletingPost || isPublishingPost !== null}
                         className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
                       >
                         <Trash2 className="w-4 h-4" />

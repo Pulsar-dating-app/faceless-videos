@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { postToTikTok, postToInstagram } from '@/lib/social-posting';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -78,6 +79,16 @@ export async function GET(request: NextRequest) {
           throw new Error('Scheduled post not found');
         }
 
+        // Skip already-published posts (e.g. user clicked "Publish Now" before cron ran)
+        if (scheduledPost.status === 'published') {
+          console.log(`[publish-posts] Post ${payload.scheduled_post_id} already published, archiving message`);
+          await supabaseAdmin.rpc('pgmq_archive_posting', {
+            queue_name: 'posting_queue',
+            msg_id: msgId,
+          });
+          continue;
+        }
+
         // Check retry count
         if (scheduledPost.retry_count >= scheduledPost.max_retries) {
           console.log(`[publish-posts] Max retries exceeded for ${msgId}`);
@@ -104,8 +115,8 @@ export async function GET(request: NextRequest) {
 
         // Post to platforms
         const postResults = {
-          tiktok: null as any,
-          instagram: null as any,
+          tiktok: null as { publishId: string; success: true } | { error: string } | null,
+          instagram: null as { mediaId: string; success: true } | { error: string } | null,
         };
 
         if (payload.platforms.tiktok) {
@@ -118,9 +129,10 @@ export async function GET(request: NextRequest) {
               scheduledPost
             );
             console.log(`[publish-posts] ✅ TikTok post successful`);
-          } catch (error: any) {
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
             console.error('[publish-posts] TikTok post failed:', error);
-            postResults.tiktok = { error: error.message };
+            postResults.tiktok = { error: msg };
           }
         }
 
@@ -134,29 +146,32 @@ export async function GET(request: NextRequest) {
               scheduledPost
             );
             console.log(`[publish-posts] ✅ Instagram post successful`);
-          } catch (error: any) {
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error);
             console.error('[publish-posts] Instagram post failed:', error);
-            postResults.instagram = { error: error.message };
+            postResults.instagram = { error: msg };
           }
         }
 
         // Check if all posts succeeded
-        const tiktokSuccess = !payload.platforms.tiktok || !postResults.tiktok?.error;
-        const instagramSuccess = !payload.platforms.instagram || !postResults.instagram?.error;
+        const tiktokSuccess = !payload.platforms.tiktok || !('error' in (postResults.tiktok ?? {}));
+        const instagramSuccess = !payload.platforms.instagram || !('error' in (postResults.instagram ?? {}));
         const allSuccess = tiktokSuccess && instagramSuccess;
 
         if (allSuccess) {
           console.log(`[publish-posts] All platforms successful for ${msgId}`);
           
-          // Update scheduled_posts with success
+          const tiktokOk = postResults.tiktok && 'publishId' in postResults.tiktok ? postResults.tiktok : null;
+          const instagramOk = postResults.instagram && 'mediaId' in postResults.instagram ? postResults.instagram : null;
+
           await supabaseAdmin
             .from('scheduled_posts')
             .update({
               status: 'published',
-              tiktok_publish_id: postResults.tiktok?.publishId || null,
-              tiktok_posted_at: postResults.tiktok ? new Date().toISOString() : null,
-              instagram_media_id: postResults.instagram?.mediaId || null,
-              instagram_posted_at: postResults.instagram ? new Date().toISOString() : null,
+              tiktok_publish_id: tiktokOk?.publishId || null,
+              tiktok_posted_at: tiktokOk ? new Date().toISOString() : null,
+              instagram_media_id: instagramOk?.mediaId || null,
+              instagram_posted_at: instagramOk ? new Date().toISOString() : null,
             })
             .eq('id', payload.scheduled_post_id);
 
@@ -170,20 +185,18 @@ export async function GET(request: NextRequest) {
         } else {
           console.log(`[publish-posts] Partial failure for ${msgId}, will retry`);
           
-          // Increment retry count
+          const tiktokErr = postResults.tiktok && 'error' in postResults.tiktok ? postResults.tiktok.error : null;
+          const instagramErr = postResults.instagram && 'error' in postResults.instagram ? postResults.instagram.error : null;
+
           await supabaseAdmin
             .from('scheduled_posts')
             .update({
               status: 'pending',
               retry_count: scheduledPost.retry_count + 1,
-              last_error: JSON.stringify({
-                tiktok: postResults.tiktok?.error || null,
-                instagram: postResults.instagram?.error || null,
-              }),
+              last_error: JSON.stringify({ tiktok: tiktokErr, instagram: instagramErr }),
             })
             .eq('id', payload.scheduled_post_id);
 
-          // Message will be visible again after visibility timeout
           errors.push({
             msgId,
             scheduledPostId: payload.scheduled_post_id,
@@ -191,10 +204,10 @@ export async function GET(request: NextRequest) {
           });
         }
 
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
         console.error(`[publish-posts] Error processing post ${msgId}:`, error);
 
-        // Increment retry count
         const { data: scheduledPost } = await supabaseAdmin
           .from('scheduled_posts')
           .select('retry_count, max_retries')
@@ -207,7 +220,7 @@ export async function GET(request: NextRequest) {
             .update({
               status: 'pending',
               retry_count: scheduledPost.retry_count + 1,
-              last_error: error.message,
+              last_error: msg,
             })
             .eq('id', payload.scheduled_post_id);
         } else {
@@ -215,7 +228,7 @@ export async function GET(request: NextRequest) {
             .from('scheduled_posts')
             .update({
               status: 'failed',
-              last_error: error.message,
+              last_error: msg,
             })
             .eq('id', payload.scheduled_post_id);
 
@@ -225,7 +238,7 @@ export async function GET(request: NextRequest) {
           });
         }
 
-        errors.push({ msgId, error: error.message });
+        errors.push({ msgId, error: msg });
       }
     }
 
@@ -239,224 +252,9 @@ export async function GET(request: NextRequest) {
       errors,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
     console.error('[publish-posts] Unexpected error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
-}
-
-async function postToTikTok(userId: string, videoUrl: string, supabase: any, scheduledPost: any) {
-  // Get TikTok connection
-  const { data: connection } = await supabase
-    .from('social_media_connections')
-    .select('*')
-    .eq('user_uid', userId)
-    .eq('platform', 'tiktok')
-    .single();
-
-  if (!connection) {
-    throw new Error('TikTok not connected');
-  }
-
-  // Download video
-  const videoResponse = await fetch(videoUrl);
-  if (!videoResponse.ok) {
-    throw new Error(`Failed to download video: ${videoResponse.statusText}`);
-  }
-
-  const videoBlob = await videoResponse.blob();
-  const videoBuffer = Buffer.from(await videoBlob.arrayBuffer());
-
-  console.log(`[TikTok] Downloaded video: ${videoBuffer.length} bytes`);
-
-  // Format description with hashtags
-  const hashtagString = scheduledPost?.hashtags?.map((tag: string) => `#${tag}`).join(' ') || '';
-  const fullDescription = scheduledPost?.description 
-    ? `${scheduledPost.description} ${hashtagString}`
-    : hashtagString;
-
-  // TikTok API: Initialize upload
-  // For unaudited apps, use inbox endpoint and SELF_ONLY privacy
-  const initResponse = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${connection.access_token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      post_info: {
-        // TikTok has a single caption field: "title". Use description + hashtags for the visible caption.
-        title: fullDescription || scheduledPost?.title || 'Auto-generated video',
-        privacy_level: 'SELF_ONLY', // Required for unaudited apps
-        disable_duet: false,
-        disable_comment: false,
-        disable_stitch: false,
-        video_cover_timestamp_ms: 1000,
-      },
-      source_info: {
-        source: 'FILE_UPLOAD',
-        video_size: videoBuffer.length,
-        chunk_size: videoBuffer.length,
-        total_chunk_count: 1,
-      },
-    }),
-  });
-
-  if (!initResponse.ok) {
-    const errorText = await initResponse.text();
-    throw new Error(`TikTok init failed: ${errorText}`);
-  }
-
-  const initData = await initResponse.json();
-  
-  if (!initData.data || !initData.data.upload_url) {
-    throw new Error('TikTok init response missing upload_url');
-  }
-
-  const uploadUrl = initData.data.upload_url;
-  const publishId = initData.data.publish_id;
-
-  console.log(`[TikTok] Upload initialized: ${publishId}`);
-
-  // TikTok requires Content-Range for the upload PUT request
-  const totalBytes = videoBuffer.length;
-  const contentRange = `bytes 0-${totalBytes - 1}/${totalBytes}`;
-
-  // Upload video
-  const uploadResponse = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'video/mp4',
-      'Content-Length': totalBytes.toString(),
-      'Content-Range': contentRange,
-    },
-    body: videoBuffer,
-  });
-
-  if (!uploadResponse.ok) {
-    const errorText = await uploadResponse.text();
-    const statusInfo = `${uploadResponse.status} ${uploadResponse.statusText}`;
-    const message = errorText?.trim() || statusInfo;
-    throw new Error(`TikTok upload failed: ${message}`);
-  }
-
-  console.log(`[TikTok] Upload successful: ${publishId}`);
-
-  return { publishId, success: true };
-}
-
-async function postToInstagram(userId: string, videoUrl: string, supabase: any, scheduledPost: any) {
-  // Get Instagram connection
-  const { data: connection } = await supabase
-    .from('social_media_connections')
-    .select('*')
-    .eq('user_uid', userId)
-    .eq('platform', 'instagram')
-    .single();
-
-  if (!connection) {
-    throw new Error('Instagram not connected');
-  }
-
-  const accountId = connection.metadata?.instagram_user_id || connection.account_id;
-
-  if (!accountId) {
-    throw new Error('Instagram account ID not found');
-  }
-
-  console.log(`[Instagram] Creating media container for account: ${accountId}`);
-
-  // Format caption with hashtags (Instagram uses caption, not title)
-  const hashtagString = scheduledPost?.hashtags?.map((tag: string) => `#${tag}`).join(' ') || '';
-  const caption = scheduledPost?.description 
-    ? `${scheduledPost.description}\n\n${hashtagString}`
-    : hashtagString;
-
-  // Instagram requires publicly accessible URL
-  // Create media container
-  const containerResponse = await fetch(
-    `https://graph.instagram.com/v21.0/${accountId}/media`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        video_url: videoUrl,
-        media_type: 'REELS',
-        caption: caption || 'Auto-generated video',
-        access_token: connection.access_token,
-      }),
-    }
-  );
-
-  if (!containerResponse.ok) {
-    const errorText = await containerResponse.text();
-    throw new Error(`Instagram container failed: ${errorText}`);
-  }
-
-  const containerData = await containerResponse.json();
-  const containerId = containerData.id;
-
-  console.log(`[Instagram] Media container created: ${containerId}`);
-
-  // Wait for Instagram to process the video by checking status
-  let statusCheckAttempts = 0;
-  const maxStatusChecks = 30; // Max 5 minutes (30 * 10s)
-  let isReady = false;
-
-  while (statusCheckAttempts < maxStatusChecks && !isReady) {
-    await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds between checks
-    
-    const statusResponse = await fetch(
-      `https://graph.instagram.com/v21.0/${containerId}?fields=status_code&access_token=${connection.access_token}`,
-      { method: 'GET' }
-    );
-
-    if (statusResponse.ok) {
-      const statusData = await statusResponse.json();
-      console.log(`[Instagram] Container status: ${statusData.status_code}`);
-      
-      if (statusData.status_code === 'FINISHED') {
-        isReady = true;
-      } else if (statusData.status_code === 'ERROR') {
-        throw new Error('Instagram video processing failed');
-      }
-      // PUBLISHED, IN_PROGRESS, EXPIRED - keep waiting
-    }
-    
-    statusCheckAttempts++;
-  }
-
-  if (!isReady) {
-    throw new Error('Instagram video processing timeout - container not ready after 5 minutes');
-  }
-
-  console.log(`[Instagram] Container ready, publishing...`);
-
-  // Publish media
-  const publishResponse = await fetch(
-    `https://graph.instagram.com/v21.0/${accountId}/media_publish`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        creation_id: containerId,
-        access_token: connection.access_token,
-      }),
-    }
-  );
-
-  if (!publishResponse.ok) {
-    const errorText = await publishResponse.text();
-    throw new Error(`Instagram publish failed: ${errorText}`);
-  }
-
-  const publishData = await publishResponse.json();
-
-  console.log(`[Instagram] Published: ${publishData.id}`);
-
-  return { mediaId: publishData.id, success: true };
 }
