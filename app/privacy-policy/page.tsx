@@ -17,7 +17,7 @@ export default function PrivacyPolicyPage() {
               Privacy Policy
             </h1>
             <p className="text-lg text-zinc-600 dark:text-zinc-400">
-              Last updated: February 24, 2026
+              Last updated: March 17, 2026
             </p>
           </div>
 
@@ -28,8 +28,9 @@ export default function PrivacyPolicyPage() {
               <section>
                 <h2 className="text-2xl font-bold mt-8 mb-4 text-zinc-900 dark:text-zinc-100 first:mt-0">1. Who is the Controller?</h2>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-4">
-                  We are:
+                  This Privacy Policy applies specifically to the application Viral Faceless Reels.
                 </p>
+                <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-4">We are:</p>
                 <div className="space-y-2 text-zinc-700 dark:text-zinc-300">
                   <p><strong>Company name:</strong> PULSAR LTDA</p>
                   <p><strong>Registered address:</strong> Rua Santa Maria, 90, Capivari, São Paulo, Brazil</p>
@@ -44,33 +45,33 @@ export default function PrivacyPolicyPage() {
               <section>
                 <h2 className="text-2xl font-bold mt-8 mb-4 text-zinc-900 dark:text-zinc-100">2. Age Requirements</h2>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-2">
-                  Our services are intended for users aged 18 and older.
+                  Viral Faceless Reels is intended for users aged 18 and older.
                 </p>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-2">
-                  If you are under 18, you may only use the Service with parental consent.
+                  If you are under 18, you may only use the App with parental consent.
                 </p>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                  If you&apos;re using the service, we understand that you confirm you are over 18 or have parental consent.
+                  By using Viral Faceless Reels, you confirm that you are over 18 or have appropriate consent.
                 </p>
               </section>
 
               <section>
                 <h2 className="text-2xl font-bold mt-8 mb-4 text-zinc-900 dark:text-zinc-100">3. Categories of Personal Data We Process</h2>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-4">
-                  We process the following categories of personal data:
+                  When you use Viral Faceless Reels, we may process the following categories of personal data:
                 </p>
                 <ul className="list-disc list-inside space-y-2 text-zinc-700 dark:text-zinc-300 ml-4">
                   <li><strong>Identity Data:</strong> Email, name</li>
                   <li><strong>Payment Data:</strong> Billing information, payment method details (processed by Stripe)</li>
                   <li><strong>Technical Data:</strong> IP address, browser, device, usage logs</li>
-                  <li><strong>Social Media Data:</strong> OAuth tokens, account IDs, profile data from connected platforms</li>
-                  <li><strong>Usage Data:</strong> Subscription plan, number of series</li>
+                  <li><strong>Social Media Data:</strong> OAuth tokens, account IDs, profile data from connected platforms (including TikTok, YouTube, Instagram)</li>
+                  <li><strong>Usage Data:</strong> Subscription plan, number of generated series</li>
                   <li><strong>Communications Data:</strong> Emails, support messages</li>
                 </ul>
 
                 <h3 className="text-xl font-semibold mt-6 mb-3 text-zinc-900 dark:text-zinc-100">Payment Processing</h3>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                  We use Stripe as our third-party payment processor. We do not collect, store, or have access to your credit card details or other sensitive financial information. All payment information is collected and processed directly by Stripe in accordance with Stripe&apos;s own Privacy Policy.
+                  We use Stripe as our third-party payment processor. We do not collect, store, or have access to your credit card details or other sensitive financial information. All payment information is collected and processed directly by Stripe in accordance with Stripe&apos;s Privacy Policy.
                 </p>
               </section>
 
@@ -78,30 +79,38 @@ export default function PrivacyPolicyPage() {
                 <h2 className="text-2xl font-bold mt-8 mb-4 text-zinc-900 dark:text-zinc-100">4. Purpose of Processing</h2>
 
                 <h3 className="text-xl font-semibold mt-6 mb-3 text-zinc-900 dark:text-zinc-100">Service Provision (Contract Performance)</h3>
-                <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-2">
-                  We use your data to:
-                </p>
                 <ul className="list-disc list-inside space-y-2 text-zinc-700 dark:text-zinc-300 ml-4 mb-4">
                   <li>Provide AI video generation</li>
-                  <li>Publish videos to connected social platforms</li>
-                  <li>Maintain your account</li>
+                  <li>Publish videos to connected social platforms such as TikTok, YouTube, and Instagram</li>
+                  <li>Maintain and manage your account</li>
                 </ul>
 
-                <h3 className="text-xl font-semibold mt-6 mb-3 text-zinc-900 dark:text-zinc-100">Testimonials & Social Proof</h3>
+                <h3 className="text-xl font-semibold mt-6 mb-3 text-zinc-900 dark:text-zinc-100">Social Media Integration (TikTok, YouTube, Instagram)</h3>
+                <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-2">
+                  If you connect your TikTok account to Viral Faceless Reels, we may access and use certain authorized data (such as account ID, profile information, and access tokens) solely to enable video publishing and platform integration features.
+                </p>
+
+                <h3 className="text-xl font-semibold mt-6 mb-3 text-zinc-900 dark:text-zinc-100">Testimonials &amp; Social Proof</h3>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-4">
-                  We may display anonymized profile images for social proof without names or identifiers.
+                  We may display anonymized profile images for social proof without names or identifying information.
                 </p>
 
                 <h3 className="text-xl font-semibold mt-6 mb-3 text-zinc-900 dark:text-zinc-100">AI-Powered Services</h3>
+                <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-2">
+                  We use service usage data and preferences to improve our AI video generation capabilities.
+                </p>
+                <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-2">
+                  We do NOT use your personal data to train external AI models.
+                </p>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                  We use your service usage data and preferences to improve our AI video generation capabilities. We do not use your personal data to train external AI models. Our AI systems generate content based on your selected preferences but do not make automated decisions that significantly affect your legal rights.
+                  Our AI systems do not make automated decisions that significantly affect your legal rights.
                 </p>
               </section>
 
               <section>
                 <h2 className="text-2xl font-bold mt-8 mb-4 text-zinc-900 dark:text-zinc-100">5. Data Retention</h2>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-4">
-                  We retain data as follows:
+                  We retain personal data in Viral Faceless Reels as follows:
                 </p>
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden">
@@ -118,7 +127,7 @@ export default function PrivacyPolicyPage() {
                       </tr>
                       <tr>
                         <td className="border border-zinc-200 dark:border-zinc-700 px-4 py-3">Social Tokens</td>
-                        <td className="border border-zinc-200 dark:border-zinc-700 px-4 py-3">Until you disconnect</td>
+                        <td className="border border-zinc-200 dark:border-zinc-700 px-4 py-3">Until you disconnect the account</td>
                       </tr>
                       <tr>
                         <td className="border border-zinc-200 dark:border-zinc-700 px-4 py-3">Usage Logs</td>
@@ -126,7 +135,7 @@ export default function PrivacyPolicyPage() {
                       </tr>
                       <tr>
                         <td className="border border-zinc-200 dark:border-zinc-700 px-4 py-3">Generated Content</td>
-                        <td className="border border-zinc-200 dark:border-zinc-700 px-4 py-3">Less than a day</td>
+                        <td className="border border-zinc-200 dark:border-zinc-700 px-4 py-3">Less than 24 hours</td>
                       </tr>
                     </tbody>
                   </table>
@@ -138,56 +147,56 @@ export default function PrivacyPolicyPage() {
 
               <section>
                 <h2 className="text-2xl font-bold mt-8 mb-4 text-zinc-900 dark:text-zinc-100">6. International Data Transfers</h2>
+                <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-2">
+                  Your data may be transferred and processed outside your country of residence, including the United States and other jurisdictions where our service providers operate.
+                </p>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                  We may transfer and process personal data outside of your country of residence, including to the United States and other jurisdictions where our service providers operate. When we do so, we take appropriate measures to ensure that such transfers comply with applicable data protection laws and that your personal data remains protected.
+                  We ensure appropriate safeguards are in place to protect your data in accordance with applicable laws (such as GDPR).
                 </p>
               </section>
 
               <section>
                 <h2 className="text-2xl font-bold mt-8 mb-4 text-zinc-900 dark:text-zinc-100">7. Use of YouTube / Google API Services</h2>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-2">
-                  When you connect YouTube:
+                  If you connect YouTube to Viral Faceless Reels:
                 </p>
                 <ul className="list-disc list-inside space-y-2 text-zinc-700 dark:text-zinc-300 ml-4 mb-4">
                   <li>We store OAuth tokens to publish scheduled videos</li>
-                  <li>You may revoke access at anytime</li>
+                  <li>You may revoke access at any time</li>
                   <li>You agree to YouTube Terms of Service</li>
                   <li>Google Privacy Policy applies</li>
                 </ul>
 
                 <h3 className="text-xl font-semibold mt-6 mb-3 text-zinc-900 dark:text-zinc-100">Google User Data Commitments</h3>
-                <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-2">
-                  We explicitly state:
-                </p>
                 <ul className="list-disc list-inside space-y-2 text-zinc-700 dark:text-zinc-300 ml-4">
-                  <li>We only access email, name, avatar, and YouTube channel info</li>
+                  <li>We only access email, name, avatar, and YouTube channel information</li>
                   <li>We do NOT use Google data for AI/ML training</li>
                   <li>We do NOT sell or use Google data for advertising</li>
-                  <li>We fully comply with Google API Services User Data Policy</li>
+                  <li>We comply with Google API Services User Data Policy</li>
                 </ul>
               </section>
 
               <section>
                 <h2 className="text-2xl font-bold mt-8 mb-4 text-zinc-900 dark:text-zinc-100">8. Data Security</h2>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                  We use modern technical and organizational safeguards to protect data.
+                  We implement appropriate technical and organizational measures to protect your personal data against unauthorized access, loss, or misuse.
                 </p>
               </section>
 
               <section>
                 <h2 className="text-2xl font-bold mt-8 mb-4 text-zinc-900 dark:text-zinc-100">9. Sharing Data with Third Parties (Processors)</h2>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-4">
-                  We share data only with trusted processors:
+                  We only share data with trusted service providers necessary to operate Viral Faceless Reels:
                 </p>
                 <ul className="list-disc list-inside space-y-2 text-zinc-700 dark:text-zinc-300 ml-4 mb-4">
                   <li><strong>Vercel</strong> – Hosting</li>
                   <li><strong>Supabase</strong> – Database</li>
                   <li><strong>Stripe</strong> – Payments</li>
-                  <li><strong>Hostinger</strong> – Emails</li>
-                  <li><strong>TikTok, Instagram, YouTube APIs</strong> – Publishing</li>
+                  <li><strong>Hostinger</strong> – Email services</li>
+                  <li><strong>TikTok, YouTube, Instagram APIs</strong> – Content publishing</li>
                 </ul>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                  All processors meet GDPR-level security standards.
+                  All processors adhere to GDPR-level security standards.
                 </p>
               </section>
 
@@ -197,15 +206,15 @@ export default function PrivacyPolicyPage() {
                   You have the right to:
                 </p>
                 <ul className="list-disc list-inside space-y-2 text-zinc-700 dark:text-zinc-300 ml-4 mb-4">
-                  <li>Access your data</li>
+                  <li>Access your personal data</li>
                   <li>Correct inaccurate data</li>
-                  <li>Restrict processing</li>
-                  <li>Data portability</li>
-                  <li>Erasure (&quot;Right to be forgotten&quot;)</li>
+                  <li>Restrict or object to processing</li>
+                  <li>Request data portability</li>
+                  <li>Request deletion (&quot;Right to be forgotten&quot;)</li>
                   <li>File a complaint with a data protection authority</li>
                 </ul>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-2">
-                  <strong>Contact:</strong> info@viralfacelessreels.com
+                  To exercise your rights, contact: <strong>info@viralfacelessreels.com</strong>
                 </p>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
                   We respond within 30 days.
@@ -214,8 +223,11 @@ export default function PrivacyPolicyPage() {
 
               <section>
                 <h2 className="text-2xl font-bold mt-8 mb-4 text-zinc-900 dark:text-zinc-100">11. Changes to This Policy</h2>
+                <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-2">
+                  We may update this Privacy Policy from time to time.
+                </p>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                  We may update this policy. Continued use of the Service constitutes acceptance.
+                  Continued use of Viral Faceless Reels constitutes acceptance of any updates.
                 </p>
               </section>
 
