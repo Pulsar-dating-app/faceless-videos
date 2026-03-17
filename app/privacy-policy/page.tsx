@@ -150,9 +150,6 @@ export default function PrivacyPolicyPage() {
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-2">
                   Your data may be transferred and processed outside your country of residence, including the United States and other jurisdictions where our service providers operate.
                 </p>
-                <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                  We ensure appropriate safeguards are in place to protect your data in accordance with applicable laws (such as GDPR).
-                </p>
               </section>
 
               <section>
