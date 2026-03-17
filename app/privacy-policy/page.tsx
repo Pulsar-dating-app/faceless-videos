@@ -87,7 +87,7 @@ export default function PrivacyPolicyPage() {
 
                 <h3 className="text-xl font-semibold mt-6 mb-3 text-zinc-900 dark:text-zinc-100">Social Media Integration (TikTok, YouTube, Instagram)</h3>
                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed mb-2">
-                  If you connect your TikTok account to Viral Faceless Reels, we may access and use certain authorized data (such as account ID, profile information, and access tokens) solely to enable video publishing and platform integration features.
+                  If you connect your Social Media account to Viral Faceless Reels, we may access and use certain authorized data (such as account ID, profile information, and access tokens) solely to enable video publishing and platform integration features.
                 </p>
 
                 <h3 className="text-xl font-semibold mt-6 mb-3 text-zinc-900 dark:text-zinc-100">Testimonials &amp; Social Proof</h3>
