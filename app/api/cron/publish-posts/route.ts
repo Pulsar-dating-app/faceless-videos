@@ -287,7 +287,7 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any, sch
       post_info: {
         // TikTok has a single caption field: "title". Use description + hashtags for the visible caption.
         title: fullDescription || scheduledPost?.title || 'Auto-generated video',
-        privacy_level: 'SELF_ONLY', // Required for unaudited apps
+        privacy_level: 'PUBLIC_TO_EVERYONE',
         disable_duet: false,
         disable_comment: false,
         disable_stitch: false,

@@ -1,11 +1,11 @@
 {
   "crons": [
-    { "path": "/api/cron/schedule-videos", "schedule": "0 0 * * *" },
+    { "path": "/api/cron/schedule-videos", "schedule": "53 16 * * *" },
     { "path": "/api/cron/build-occurrences", "schedule": "0 2 * * *" },
     { "path": "/api/cron/reset-generations", "schedule": "0 0 * * 0" },
-    { "path": "/api/cron/consume-queue", "schedule": "0 0 * * *" },
-    { "path": "/api/cron/queue-scheduler", "schedule": "0 0 * * *" },
-    { "path": "/api/cron/publish-posts", "schedule": "0 0 * * *" }
+    { "path": "/api/cron/consume-queue", "schedule": "56 16 * * *" },
+    { "path": "/api/cron/queue-scheduler", "schedule": "10 17 * * *" },
+    { "path": "/api/cron/publish-posts", "schedule": "12 17 * * *" }
   ],
   "headers": [
     {
