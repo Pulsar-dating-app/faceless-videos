@@ -4,6 +4,7 @@ interface ScheduledPost {
   title?: string | null;
   description?: string | null;
   hashtags?: string[] | null;
+  tiktok_privacy_level?: string | null;
   [key: string]: unknown;
 }
 
@@ -55,6 +56,11 @@ export async function postToTikTok(
     ? `${scheduledPost.description} ${hashtagString}`
     : hashtagString;
 
+  const privacyLevel =
+    scheduledPost?.tiktok_privacy_level ||
+    connection.metadata?.privacy_level_options?.[0] ||
+    'PUBLIC_TO_EVERYONE';
+
   const initResponse = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
     method: 'POST',
     headers: {
@@ -64,7 +70,7 @@ export async function postToTikTok(
     body: JSON.stringify({
       post_info: {
         title: fullDescription || scheduledPost?.title || 'Auto-generated video',
-        privacy_level: 'SELF_ONLY',
+        privacy_level: privacyLevel,
         disable_duet: false,
         disable_comment: false,
         disable_stitch: false,

@@ -33,6 +33,7 @@ interface AutomationPayload {
   background_video?: string;
   art_style?: string;
   social_platforms?: string[];
+  tiktok_privacy_level?: string;
   scheduled_time: string;
   publish_time: string;
   timezone: string;
@@ -120,6 +121,17 @@ export async function GET(request: NextRequest) {
         let audioUrl: string;
         let script: string;
 
+        // Look up tiktok_privacy_level from the automation record if not already in payload
+        let tiktokPrivacyLevel: string | undefined = payload.tiktok_privacy_level;
+        if (!tiktokPrivacyLevel && payload.automation_id) {
+          const { data: automation } = await supabaseAdmin
+            .from("automations")
+            .select("tiktok_privacy_level")
+            .eq("id", payload.automation_id)
+            .single();
+          tiktokPrivacyLevel = automation?.tiktok_privacy_level ?? undefined;
+        }
+
         // Check video_type to determine which flow to use
         if (payload.video_type === "ai-images") {
           console.log(`[consume-queue] Processing AI-images video for job ${msgId}`);
@@ -194,7 +206,8 @@ export async function GET(request: NextRequest) {
               scheduledTime: payload.scheduled_time,
               platforms: payload.social_platforms || [],
               userId: payload.user_uid,
-              metadata, // Add metadata
+              metadata,
+              tiktokPrivacyLevel,
             }),
           });
 
@@ -271,13 +284,13 @@ export async function GET(request: NextRequest) {
             headers: mergeHeaders,
             body: JSON.stringify({
               audioUrl,
-              // Subtitles will be generated later by the FFmpeg worker (Python/stable-ts)
               subtitles: "",
               backgroundVideoUrl: payload.background_video,
               scheduledTime: payload.scheduled_time,
               platforms: payload.social_platforms || [],
               userId: payload.user_uid,
-              metadata, // Add metadata
+              metadata,
+              tiktokPrivacyLevel,
             }),
           });
 

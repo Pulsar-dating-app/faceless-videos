@@ -284,6 +284,11 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any, sch
     ? `${scheduledPost.description} ${hashtagString}`
     : hashtagString;
 
+  const privacyLevel =
+    scheduledPost?.tiktok_privacy_level ||
+    connection.metadata?.privacy_level_options?.[0] ||
+    'PUBLIC_TO_EVERYONE';
+
   const initResponse = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
     method: 'POST',
     headers: {
@@ -293,7 +298,7 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any, sch
     body: JSON.stringify({
       post_info: {
         title: fullDescription || scheduledPost?.title || 'Auto-generated video',
-        privacy_level: 'PUBLIC_TO_EVERYONE',
+        privacy_level: privacyLevel,
         disable_duet: false,
         disable_comment: false,
         disable_stitch: false,

@@ -27,7 +27,8 @@ export async function POST(req: Request) {
       scheduledTime,
       platforms,
       userId,
-      metadata
+      metadata,
+      tiktokPrivacyLevel,
     } = await req.json();
 
     console.log("audioUrl", audioUrl);
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
     // Handle social media posting if video was generated successfully
     if (data.url && scheduledTime && platforms && platforms.length > 0 && userId) {
       try {
-        await handleSocialMediaPosting(userId, data.url, scheduledTime, platforms, metadata);
+        await handleSocialMediaPosting(userId, data.url, scheduledTime, platforms, metadata, tiktokPrivacyLevel);
       } catch (error) {
         console.error('Error in social media posting flow:', error);
         // Don't fail the whole request if posting setup fails
@@ -91,7 +92,8 @@ async function handleSocialMediaPosting(
   videoUrl: string,
   scheduledTime: string,
   platforms: string[],
-  metadata?: { title: string; description: string; hashtags: string[] }
+  metadata?: { title: string; description: string; hashtags: string[] },
+  tiktokPrivacyLevel?: string
 ) {
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -129,6 +131,7 @@ async function handleSocialMediaPosting(
       title: metadata?.title || null,
       description: metadata?.description || null,
       hashtags: metadata?.hashtags || null,
+      tiktok_privacy_level: platformsObj.tiktok ? (tiktokPrivacyLevel || null) : null,
     })
     .select()
     .single();

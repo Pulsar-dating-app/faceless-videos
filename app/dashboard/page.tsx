@@ -145,6 +145,8 @@ export default function Dashboard() {
   const [tiktokConnected, setTiktokConnected] = useState(false);
   const [tiktokUsername, setTiktokUsername] = useState<string | null>(null);
   const [tiktokAvatar, setTiktokAvatar] = useState<string | null>(null);
+  const [tiktokPrivacyOptions, setTiktokPrivacyOptions] = useState<string[]>([]);
+  const [tiktokPrivacyLevel, setTiktokPrivacyLevel] = useState<string>('');
   const [isConnectingTiktok, setIsConnectingTiktok] = useState(false);
   const [isDisconnectingTiktok, setIsDisconnectingTiktok] = useState(false);
   
@@ -504,11 +506,13 @@ export default function Dashboard() {
         setTiktokConnected(true);
         setTiktokUsername(tiktok.account_name);
         setTiktokAvatar(tiktok.metadata?.avatar_url || null);
+        setTiktokPrivacyOptions(tiktok.metadata?.privacy_level_options || []);
         console.log('✅ TikTok conectado:', tiktok.account_name);
       } else {
         setTiktokConnected(false);
         setTiktokUsername(null);
         setTiktokAvatar(null);
+        setTiktokPrivacyOptions([]);
       }
 
       // Instagram
@@ -1086,6 +1090,10 @@ export default function Dashboard() {
         showToast(t.messages.selectOnePlatform);
         return;
       }
+      if (selectedPlatforms.includes('tiktok') && !tiktokPrivacyLevel) {
+        showToast(t.messages.tiktokPrivacyRequired);
+        return;
+      }
 
       const isStarterPlan = userPlanId === "starter";
       const isElitePlan = userPlanId === "elite";
@@ -1120,6 +1128,7 @@ export default function Dashboard() {
             publishDays: userPlanId === "starter" ? publishDays : undefined,
             planId: userPlanId ?? undefined,
             selectedPlatforms: selectedPlatforms,
+            tiktokPrivacyLevel: selectedPlatforms.includes('tiktok') ? tiktokPrivacyLevel : undefined,
             videoType: videoType,
             artStyle: videoType === "ai-images" ? artStyle : undefined,
             backgroundVideo: videoType === "gameplay" ? backgroundVideo : undefined,
@@ -1213,6 +1222,7 @@ export default function Dashboard() {
     setPostDescription("");
     setPostHashtags("#viral #fyp #trending");
     setSelectedPlatforms([]);
+    setTiktokPrivacyLevel('');
     setSeriesName("");
     setPublishTime("09:00");
     setSecondPublishTime("17:00");
@@ -1674,30 +1684,68 @@ export default function Dashboard() {
                   </div>
                 </div>
                 {tiktokConnected ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (selectedPlatforms.includes('tiktok')) {
-                        setSelectedPlatforms(selectedPlatforms.filter(p => p !== 'tiktok'));
-                      } else {
-                        setSelectedPlatforms([...selectedPlatforms, 'tiktok']);
-                      }
-                    }}
-                    className={`w-full px-4 py-2 rounded-lg font-medium transition-colors ${
-                      selectedPlatforms.includes('tiktok')
-                        ? "bg-blue-600 text-white hover:bg-blue-700"
-                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-                    }`}
-                  >
-                    {selectedPlatforms.includes('tiktok') ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <Check className="w-4 h-4" />
-                        Selected
-                      </span>
-                    ) : (
-                      "Select"
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedPlatforms.includes('tiktok')) {
+                          setSelectedPlatforms(selectedPlatforms.filter(p => p !== 'tiktok'));
+                          setTiktokPrivacyLevel('');
+                        } else {
+                          setSelectedPlatforms([...selectedPlatforms, 'tiktok']);
+                        }
+                      }}
+                      className={`w-full px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedPlatforms.includes('tiktok')
+                          ? "bg-blue-600 text-white hover:bg-blue-700"
+                          : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                      }`}
+                    >
+                      {selectedPlatforms.includes('tiktok') ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <Check className="w-4 h-4" />
+                          Selected
+                        </span>
+                      ) : (
+                        "Select"
+                      )}
+                    </button>
+                    {selectedPlatforms.includes('tiktok') && (
+                      <div className="mt-3 space-y-1.5">
+                        <label className="block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                          {t.dashboard.seriesSetup.tiktokPrivacyLabel}
+                          <span className="ml-1 text-red-500">*</span>
+                        </label>
+                        <select
+                          value={tiktokPrivacyLevel}
+                          onChange={(e) => setTiktokPrivacyLevel(e.target.value)}
+                          className={`w-full px-3 py-2 rounded-lg border bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 transition-colors ${
+                            !tiktokPrivacyLevel
+                              ? 'border-red-400 focus:ring-red-500'
+                              : 'border-zinc-300 dark:border-zinc-700 focus:ring-blue-500'
+                          }`}
+                        >
+                          <option value="">{t.dashboard.seriesSetup.tiktokPrivacyPlaceholder}</option>
+                          {tiktokPrivacyOptions.map((option) => {
+                            const privacyLabels: Record<string, string> = {
+                              PUBLIC_TO_EVERYONE: t.dashboard.seriesSetup.tiktokPrivacyPublic,
+                              MUTUAL_FOLLOW_FRIENDS: t.dashboard.seriesSetup.tiktokPrivacyMutualFollowers,
+                              FOLLOWER_OF_CREATOR: t.dashboard.seriesSetup.tiktokPrivacyFollowers,
+                              SELF_ONLY: t.dashboard.seriesSetup.tiktokPrivacyOnlyMe,
+                            };
+                            return (
+                              <option key={option} value={option}>
+                                {privacyLabels[option] || option}
+                              </option>
+                            );
+                          })}
+                        </select>
+                        {!tiktokPrivacyLevel && (
+                          <p className="text-xs text-red-500">{t.messages.tiktokPrivacyRequired}</p>
+                        )}
+                      </div>
                     )}
-                  </button>
+                  </>
                 ) : (
                   <button
                     type="button"
