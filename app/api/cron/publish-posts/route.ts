@@ -79,9 +79,9 @@ export async function GET(request: NextRequest) {
           throw new Error('Scheduled post not found');
         }
 
-        // Skip already-published posts (e.g. user clicked "Publish Now" before cron ran)
-        if (scheduledPost.status === 'published') {
-          console.log(`[publish-posts] Post ${payload.scheduled_post_id} already published, archiving message`);
+        // Skip posts already published or being processed manually ("Publish Now" button)
+        if (scheduledPost.status === 'published' || scheduledPost.status === 'processing') {
+          console.log(`[publish-posts] Post ${payload.scheduled_post_id} is ${scheduledPost.status}, skipping and archiving message`);
           await supabaseAdmin.rpc('pgmq_archive_posting', {
             queue_name: 'posting_queue',
             msg_id: msgId,
