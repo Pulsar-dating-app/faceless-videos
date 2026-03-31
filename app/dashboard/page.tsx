@@ -885,11 +885,15 @@ export default function Dashboard() {
 
   const handleSavePostEdit = async () => {
     if (!user || !publishPreviewPost) return;
+    const hashtags = publishEditData.hashtags
+      ? publishEditData.hashtags.split(',').map((h) => h.trim()).filter(Boolean).slice(0, 5)
+      : [];
+    if (publishEditData.hashtags.split(',').filter((h) => h.trim()).length > 5) {
+      setErrorDialog({ isOpen: true, type: 'error', title: 'Too many hashtags', message: 'Maximum 5 hashtags allowed.' });
+      return;
+    }
     setIsSavingPost(true);
     try {
-      const hashtags = publishEditData.hashtags
-        ? publishEditData.hashtags.split(',').map((h) => h.trim()).filter(Boolean)
-        : [];
       const response = await fetch('/api/update-scheduled-post', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -922,7 +926,7 @@ export default function Dashboard() {
     setPublishPreviewPost(null);
     try {
       const hashtags = editData?.hashtags
-        ? editData.hashtags.split(',').map((h) => h.trim()).filter(Boolean)
+        ? editData.hashtags.split(',').map((h) => h.trim()).filter(Boolean).slice(0, 5)
         : undefined;
       const response = await fetch('/api/publish-post-now', {
         method: 'POST',
@@ -3900,24 +3904,50 @@ export default function Dashboard() {
 
                 {/* Hashtags */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                    Hashtags <span className="normal-case font-normal text-zinc-400">(comma-separated)</span>
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                      Hashtags <span className="normal-case font-normal text-zinc-400">(comma-separated)</span>
+                    </label>
+                    <span className={`text-xs font-medium ${
+                      publishEditData.hashtags.split(',').filter((h) => h.trim()).length > 5
+                        ? 'text-red-500'
+                        : 'text-zinc-400'
+                    }`}>
+                      {publishEditData.hashtags.split(',').filter((h) => h.trim()).length}/5
+                    </span>
+                  </div>
                   <input
                     type="text"
                     value={publishEditData.hashtags}
-                    onChange={(e) => setPublishEditData((d) => ({ ...d, hashtags: e.target.value }))}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const count = value.split(',').filter((h) => h.trim()).length;
+                      if (count <= 5 || value.length < publishEditData.hashtags.length) {
+                        setPublishEditData((d) => ({ ...d, hashtags: value }));
+                      }
+                    }}
                     placeholder="travel, nature, funny..."
-                    className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full px-3 py-2 rounded-lg border bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 transition-colors ${
+                      publishEditData.hashtags.split(',').filter((h) => h.trim()).length > 5
+                        ? 'border-red-400 focus:ring-red-500'
+                        : 'border-zinc-300 dark:border-zinc-700 focus:ring-blue-500'
+                    }`}
                   />
                   {publishEditData.hashtags && (
                     <div className="flex flex-wrap gap-1 pt-1">
-                      {publishEditData.hashtags.split(',').map((h) => h.trim()).filter(Boolean).map((tag) => (
-                        <span key={tag} className="px-2 py-0.5 text-xs rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+                      {publishEditData.hashtags.split(',').map((h) => h.trim()).filter(Boolean).map((tag, i) => (
+                        <span key={tag} className={`px-2 py-0.5 text-xs rounded-full ${
+                          i < 5
+                            ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300'
+                            : 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400'
+                        }`}>
                           #{tag}
                         </span>
                       ))}
                     </div>
+                  )}
+                  {publishEditData.hashtags.split(',').filter((h) => h.trim()).length > 5 && (
+                    <p className="text-xs text-red-500">Maximum 5 hashtags allowed.</p>
                   )}
                 </div>
               </div>
@@ -3947,7 +3977,7 @@ export default function Dashboard() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleSavePostEdit}
-                  disabled={!!isPublishingPost || isSavingPost}
+                  disabled={!!isPublishingPost || isSavingPost || publishEditData.hashtags.split(',').filter((h) => h.trim()).length > 5}
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
                 >
                   {isSavingPost ? (
@@ -3961,7 +3991,7 @@ export default function Dashboard() {
                 </button>
                 <button
                   onClick={() => handlePublishNow(publishPreviewPost.id, publishEditData)}
-                  disabled={!!isPublishingPost || isSavingPost}
+                  disabled={!!isPublishingPost || isSavingPost || publishEditData.hashtags.split(',').filter((h) => h.trim()).length > 5}
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 text-white font-medium text-sm hover:bg-blue-700 transition-colors disabled:opacity-50"
                 >
                   {isPublishingPost === publishPreviewPost.id ? (
