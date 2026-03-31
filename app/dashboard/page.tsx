@@ -198,6 +198,16 @@ export default function Dashboard() {
   const [cancelPostId, setCancelPostId] = useState<string | null>(null);
   const [isDeletingPost, setIsDeletingPost] = useState(false);
   const [isPublishingPost, setIsPublishingPost] = useState<string | null>(null);
+  const [publishPreviewPost, setPublishPreviewPost] = useState<{
+    id: string;
+    video_url: string;
+    title?: string | null;
+    description?: string | null;
+    hashtags?: string[] | null;
+    platforms: { tiktok?: boolean; youtube?: boolean; instagram?: boolean };
+  } | null>(null);
+  const [publishEditData, setPublishEditData] = useState({ title: '', description: '', hashtags: '' });
+  const [isSavingPost, setIsSavingPost] = useState(false);
 
   // Error dialog state
   const [errorDialog, setErrorDialog] = useState<{
@@ -873,14 +883,59 @@ export default function Dashboard() {
     }
   };
 
-  const handlePublishNow = async (postId: string) => {
+  const handleSavePostEdit = async () => {
+    if (!user || !publishPreviewPost) return;
+    setIsSavingPost(true);
+    try {
+      const hashtags = publishEditData.hashtags
+        ? publishEditData.hashtags.split(',').map((h) => h.trim()).filter(Boolean)
+        : [];
+      const response = await fetch('/api/update-scheduled-post', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scheduledPostId: publishPreviewPost.id,
+          userId: user.id,
+          title: publishEditData.title,
+          description: publishEditData.description,
+          hashtags,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to save changes');
+      showToast('Changes saved successfully', { variant: 'success' });
+      setPublishPreviewPost(null);
+      await fetchScheduledPosts();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to save changes';
+      setErrorDialog({ isOpen: true, type: 'error', title: 'Save failed', message: msg });
+    } finally {
+      setIsSavingPost(false);
+    }
+  };
+
+  const handlePublishNow = async (
+    postId: string,
+    editData?: { title: string; description: string; hashtags: string }
+  ) => {
     if (!user) return;
     setIsPublishingPost(postId);
+    setPublishPreviewPost(null);
     try {
+      const hashtags = editData?.hashtags
+        ? editData.hashtags.split(',').map((h) => h.trim()).filter(Boolean)
+        : undefined;
       const response = await fetch('/api/publish-post-now', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scheduledPostId: postId, userId: user.id }),
+        body: JSON.stringify({
+          scheduledPostId: postId,
+          userId: user.id,
+          ...(editData && {
+            title: editData.title,
+            description: editData.description,
+            hashtags,
+          }),
+        }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -2473,7 +2528,14 @@ export default function Dashboard() {
                       </a>
                       {post.status !== 'published' && (
                         <button
-                          onClick={() => handlePublishNow(post.id)}
+                          onClick={() => {
+                            setPublishPreviewPost(post);
+                            setPublishEditData({
+                              title: post.title ?? '',
+                              description: post.description ?? '',
+                              hashtags: post.hashtags?.join(', ') ?? '',
+                            });
+                          }}
                           disabled={isPublishingPost !== null || isDeletingPost}
                           className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
                         >
@@ -2490,6 +2552,20 @@ export default function Dashboard() {
                           )}
                         </button>
                       )}
+                      <button
+                        onClick={() => {
+                          setPublishPreviewPost(post);
+                          setPublishEditData({
+                            title: post.title ?? '',
+                            description: post.description ?? '',
+                            hashtags: post.hashtags?.join(', ') ?? '',
+                          });
+                        }}
+                        disabled={isDeletingPost || isPublishingPost !== null}
+                        className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => setCancelPostId(post.id)}
                         disabled={isDeletingPost || isPublishingPost !== null}
@@ -3743,6 +3819,163 @@ export default function Dashboard() {
                     {t.form?.upgradePlan || "Upgrade Plan"}
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Publish Now — Preview & Edit Modal */}
+      {publishPreviewPost && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => !isPublishingPost && !isSavingPost && setPublishPreviewPost(null)}
+        >
+          <div
+            className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Preview & Publish</h3>
+              <button
+                onClick={() => !isPublishingPost && !isSavingPost && setPublishPreviewPost(null)}
+                disabled={!!isPublishingPost || isSavingPost}
+                className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              >
+                <X className="w-5 h-5 text-zinc-500" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex flex-col md:flex-row gap-0 overflow-hidden flex-1 min-h-0">
+
+              {/* Left — Editable fields */}
+              <div className="md:w-1/2 p-6 overflow-y-auto space-y-5 border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800">
+
+                {/* Platforms badge */}
+                <div className="flex flex-wrap gap-2">
+                  {publishPreviewPost.platforms?.youtube && (
+                    <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">YouTube</span>
+                  )}
+                  {publishPreviewPost.platforms?.tiktok && (
+                    <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">TikTok</span>
+                  )}
+                  {publishPreviewPost.platforms?.instagram && (
+                    <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">Instagram</span>
+                  )}
+                </div>
+
+                {/* Title — only relevant for YouTube */}
+                {publishPreviewPost.platforms?.youtube && (
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                      Title <span className="normal-case text-[10px] font-normal text-red-500 dark:text-red-400">(YouTube)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={publishEditData.title}
+                      onChange={(e) => setPublishEditData((d) => ({ ...d, title: e.target.value }))}
+                      placeholder="Video title..."
+                      maxLength={100}
+                      className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-right text-xs text-zinc-400">{publishEditData.title.length}/100</p>
+                  </div>
+                )}
+
+                {/* Description */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Description
+                  </label>
+                  <textarea
+                    value={publishEditData.description}
+                    onChange={(e) => setPublishEditData((d) => ({ ...d, description: e.target.value }))}
+                    placeholder="Video description..."
+                    rows={5}
+                    className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
+                </div>
+
+                {/* Hashtags */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Hashtags <span className="normal-case font-normal text-zinc-400">(comma-separated)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={publishEditData.hashtags}
+                    onChange={(e) => setPublishEditData((d) => ({ ...d, hashtags: e.target.value }))}
+                    placeholder="travel, nature, funny..."
+                    className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {publishEditData.hashtags && (
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {publishEditData.hashtags.split(',').map((h) => h.trim()).filter(Boolean).map((tag) => (
+                        <span key={tag} className="px-2 py-0.5 text-xs rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right — Video preview */}
+              <div className="md:w-1/2 p-6 flex flex-col gap-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Preview</p>
+                <div className="flex-1 flex items-center justify-center bg-zinc-950 rounded-xl overflow-hidden min-h-[240px]">
+                  <video
+                    src={publishPreviewPost.video_url}
+                    controls
+                    className="max-h-[420px] w-full object-contain"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 shrink-0">
+              <button
+                onClick={() => setPublishPreviewPost(null)}
+                disabled={!!isPublishingPost || isSavingPost}
+                className="px-4 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleSavePostEdit}
+                  disabled={!!isPublishingPost || isSavingPost}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                >
+                  {isSavingPost ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </button>
+                <button
+                  onClick={() => handlePublishNow(publishPreviewPost.id, publishEditData)}
+                  disabled={!!isPublishingPost || isSavingPost}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 text-white font-medium text-sm hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {isPublishingPost === publishPreviewPost.id ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Publishing...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      Publish Now
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>

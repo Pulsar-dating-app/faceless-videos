@@ -9,7 +9,7 @@ export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   try {
-    const { scheduledPostId, userId } = await request.json();
+    const { scheduledPostId, userId, title, description, hashtags } = await request.json();
 
     if (!scheduledPostId || !userId) {
       return NextResponse.json(
@@ -19,6 +19,19 @@ export async function POST(request: NextRequest) {
     }
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Apply metadata edits before publishing if provided
+    if (title !== undefined || description !== undefined || hashtags !== undefined) {
+      const metaUpdate: Record<string, unknown> = {};
+      if (title !== undefined) metaUpdate.title = title || null;
+      if (description !== undefined) metaUpdate.description = description || null;
+      if (hashtags !== undefined) metaUpdate.hashtags = hashtags;
+      await supabaseAdmin
+        .from('scheduled_posts')
+        .update(metaUpdate)
+        .eq('id', scheduledPostId)
+        .eq('user_uid', userId);
+    }
 
     // Fetch scheduled post and verify ownership
     const { data: scheduledPost, error: postError } = await supabaseAdmin
