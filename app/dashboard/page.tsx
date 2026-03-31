@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X, Info, Share2, Send, AlertCircle, CreditCard, List, Edit, Power, Download, Trash2, Star, Lightbulb, Search, Brain, PawPrint, HelpCircle } from "lucide-react";
+import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X, Info, Share2, Send, AlertCircle, CreditCard, List, Edit, Power, Download, Trash2, Star, Lightbulb, Search, Brain, PawPrint, HelpCircle, Settings } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
@@ -148,6 +148,18 @@ export default function Dashboard() {
   const [tiktokPrivacyOptions, setTiktokPrivacyOptions] = useState<string[]>([]);
   const [tiktokPrivacyLevel, setTiktokPrivacyLevel] = useState<string>('');
   const [isConnectingTiktok, setIsConnectingTiktok] = useState(false);
+  const [showTiktokSettingsPopup, setShowTiktokSettingsPopup] = useState(false);
+  const [tiktokCommercialDisclosure, setTiktokCommercialDisclosure] = useState(false);
+  const [tiktokYourBrand, setTiktokYourBrand] = useState(false);
+  const [tiktokBrandedContent, setTiktokBrandedContent] = useState(false);
+  // Interaction abilities — disabled flags come from creator_info API
+  const [tiktokCommentDisabled, setTiktokCommentDisabled] = useState(false);
+  const [tiktokDuetDisabled, setTiktokDuetDisabled] = useState(false);
+  const [tiktokStitchDisabled, setTiktokStitchDisabled] = useState(false);
+  // User's interaction choices (all off by default)
+  const [tiktokAllowComment, setTiktokAllowComment] = useState(false);
+  const [tiktokAllowDuet, setTiktokAllowDuet] = useState(false);
+  const [tiktokAllowStitch, setTiktokAllowStitch] = useState(false);
   const [isDisconnectingTiktok, setIsDisconnectingTiktok] = useState(false);
   
   // Instagram connection states
@@ -507,12 +519,18 @@ export default function Dashboard() {
         setTiktokUsername(tiktok.account_name);
         setTiktokAvatar(tiktok.metadata?.avatar_url || null);
         setTiktokPrivacyOptions(tiktok.metadata?.privacy_level_options || []);
+        setTiktokCommentDisabled(tiktok.metadata?.comment_disabled ?? false);
+        setTiktokDuetDisabled(tiktok.metadata?.duet_disabled ?? false);
+        setTiktokStitchDisabled(tiktok.metadata?.stitch_disabled ?? false);
         console.log('✅ TikTok conectado:', tiktok.account_name);
       } else {
         setTiktokConnected(false);
         setTiktokUsername(null);
         setTiktokAvatar(null);
         setTiktokPrivacyOptions([]);
+        setTiktokCommentDisabled(false);
+        setTiktokDuetDisabled(false);
+        setTiktokStitchDisabled(false);
       }
 
       // Instagram
@@ -1129,6 +1147,11 @@ export default function Dashboard() {
             planId: userPlanId ?? undefined,
             selectedPlatforms: selectedPlatforms,
             tiktokPrivacyLevel: selectedPlatforms.includes('tiktok') ? tiktokPrivacyLevel : undefined,
+            tiktokInteractions: selectedPlatforms.includes('tiktok') ? {
+              allowComment: tiktokAllowComment,
+              allowDuet: videoType !== 'ai-images' ? tiktokAllowDuet : false,
+              allowStitch: videoType !== 'ai-images' ? tiktokAllowStitch : false,
+            } : undefined,
             videoType: videoType,
             artStyle: videoType === "ai-images" ? artStyle : undefined,
             backgroundVideo: videoType === "gameplay" ? backgroundVideo : undefined,
@@ -1223,6 +1246,9 @@ export default function Dashboard() {
     setPostHashtags("#viral #fyp #trending");
     setSelectedPlatforms([]);
     setTiktokPrivacyLevel('');
+    setTiktokAllowComment(false);
+    setTiktokAllowDuet(false);
+    setTiktokAllowStitch(false);
     setSeriesName("");
     setPublishTime("09:00");
     setSecondPublishTime("17:00");
@@ -1655,8 +1681,8 @@ export default function Dashboard() {
               }`}>
                 <div className="flex items-center gap-4 mb-4">
                   {tiktokAvatar ? (
-                    <NextImage 
-                      src={tiktokAvatar} 
+                    <NextImage
+                      src={tiktokAvatar}
                       alt="TikTok Avatar"
                       width={48}
                       height={48}
@@ -1682,6 +1708,16 @@ export default function Dashboard() {
                       </p>
                     )}
                   </div>
+                  {selectedPlatforms.includes('tiktok') && (
+                    <button
+                      type="button"
+                      onClick={() => setShowTiktokSettingsPopup(true)}
+                      className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                      title="TikTok settings"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
                 {tiktokConnected ? (
                   <>
@@ -1691,6 +1727,9 @@ export default function Dashboard() {
                         if (selectedPlatforms.includes('tiktok')) {
                           setSelectedPlatforms(selectedPlatforms.filter(p => p !== 'tiktok'));
                           setTiktokPrivacyLevel('');
+                          setTiktokAllowComment(false);
+                          setTiktokAllowDuet(false);
+                          setTiktokAllowStitch(false);
                         } else {
                           setSelectedPlatforms([...selectedPlatforms, 'tiktok']);
                         }
@@ -1711,7 +1750,8 @@ export default function Dashboard() {
                       )}
                     </button>
                     {selectedPlatforms.includes('tiktok') && (
-                      <div className="mt-3 space-y-1.5">
+                      <div className="mt-3 space-y-3">
+                      <div className="space-y-1.5">
                         <label className="block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                           {t.dashboard.seriesSetup.tiktokPrivacyLabel}
                           <span className="ml-1 text-red-500">*</span>
@@ -1743,6 +1783,70 @@ export default function Dashboard() {
                         {!tiktokPrivacyLevel && (
                           <p className="text-xs text-red-500">{t.messages.tiktokPrivacyRequired}</p>
                         )}
+                      </div>
+
+                      {/* Interaction abilities */}
+                      <div className="mt-3 space-y-1.5">
+                        <label className="block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                          Allow Interactions
+                        </label>
+                        <div className="space-y-2">
+                          {/* Comment */}
+                          <label className={`flex items-center gap-2.5 ${tiktokCommentDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                            <input
+                              type="checkbox"
+                              checked={tiktokAllowComment}
+                              disabled={tiktokCommentDisabled}
+                              onChange={(e) => setTiktokAllowComment(e.target.checked)}
+                              className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
+                            />
+                            <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                              Allow Comment
+                            </span>
+                            {tiktokCommentDisabled && (
+                              <span className="text-xs text-zinc-400 dark:text-zinc-500">(disabled in your TikTok settings)</span>
+                            )}
+                          </label>
+
+                          {/* Duet — not applicable to photo posts */}
+                          {videoType !== 'ai-images' && (
+                            <label className={`flex items-center gap-2.5 ${tiktokDuetDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                              <input
+                                type="checkbox"
+                                checked={tiktokAllowDuet}
+                                disabled={tiktokDuetDisabled}
+                                onChange={(e) => setTiktokAllowDuet(e.target.checked)}
+                                className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
+                              />
+                              <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                                Allow Duet
+                              </span>
+                              {tiktokDuetDisabled && (
+                                <span className="text-xs text-zinc-400 dark:text-zinc-500">(disabled in your TikTok settings)</span>
+                              )}
+                            </label>
+                          )}
+
+                          {/* Stitch — not applicable to photo posts */}
+                          {videoType !== 'ai-images' && (
+                            <label className={`flex items-center gap-2.5 ${tiktokStitchDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                              <input
+                                type="checkbox"
+                                checked={tiktokAllowStitch}
+                                disabled={tiktokStitchDisabled}
+                                onChange={(e) => setTiktokAllowStitch(e.target.checked)}
+                                className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
+                              />
+                              <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                                Allow Stitch
+                              </span>
+                              {tiktokStitchDisabled && (
+                                <span className="text-xs text-zinc-400 dark:text-zinc-500">(disabled in your TikTok settings)</span>
+                              )}
+                            </label>
+                          )}
+                        </div>
+                      </div>
                       </div>
                     )}
                   </>
@@ -4106,6 +4210,135 @@ export default function Dashboard() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* TikTok Commercial Content Settings Popup */}
+      {showTiktokSettingsPopup && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => setShowTiktokSettingsPopup(false)}
+        >
+          <div
+            className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-md p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">TikTok Settings</h2>
+              <button
+                type="button"
+                onClick={() => setShowTiktokSettingsPopup(false)}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Content Disclosure Toggle */}
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <p className="font-medium text-sm text-zinc-900 dark:text-zinc-100">Content Disclosure</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  Indicate whether this content promotes yourself, a brand, product or service.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={tiktokCommercialDisclosure}
+                onClick={() => {
+                  const next = !tiktokCommercialDisclosure;
+                  setTiktokCommercialDisclosure(next);
+                  if (!next) {
+                    setTiktokYourBrand(false);
+                    setTiktokBrandedContent(false);
+                  }
+                }}
+                className={`relative flex-shrink-0 w-10 h-6 rounded-full transition-colors focus:outline-none ${
+                  tiktokCommercialDisclosure ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-zinc-600'
+                }`}
+              >
+                <span
+                  className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                    tiktokCommercialDisclosure ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Brand Options — only shown when toggle is on */}
+            {tiktokCommercialDisclosure && (
+              <div className="space-y-3 border-t border-zinc-200 dark:border-zinc-700 pt-4 mt-2">
+                {/* Your Brand */}
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={tiktokYourBrand}
+                    onChange={(e) => setTiktokYourBrand(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      Your Brand
+                    </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      You are promoting yourself or your own business. This content will be classified as Brand Organic.
+                    </p>
+                  </div>
+                </label>
+
+                {/* Branded Content */}
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={tiktokBrandedContent}
+                    onChange={(e) => setTiktokBrandedContent(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      Branded Content
+                    </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      You are promoting another brand or a third party. This content will be classified as Branded Content.
+                    </p>
+                  </div>
+                </label>
+
+                {/* Label notice */}
+                {(tiktokYourBrand || tiktokBrandedContent) && (
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                    <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      {tiktokYourBrand && tiktokBrandedContent
+                        ? "Your photo/video will be labeled as 'Paid partnership'"
+                        : tiktokBrandedContent
+                        ? "Your photo/video will be labeled as 'Paid partnership'"
+                        : "Your photo/video will be labeled as 'Promotional content'"}
+                    </p>
+                  </div>
+                )}
+
+                {/* Validation warning */}
+                {!tiktokYourBrand && !tiktokBrandedContent && (
+                  <p className="text-xs text-red-500">
+                    At least one option must be selected when content disclosure is enabled.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Done button */}
+            <button
+              type="button"
+              onClick={() => setShowTiktokSettingsPopup(false)}
+              disabled={tiktokCommercialDisclosure && !tiktokYourBrand && !tiktokBrandedContent}
+              className="mt-5 w-full px-4 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+            >
+              Done
+            </button>
           </div>
         </div>
       )}
