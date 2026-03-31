@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { postToTikTok, postToInstagram } from '@/lib/social-posting';
-
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -260,7 +258,6 @@ export async function GET(request: NextRequest) {
 }
 
 async function postToTikTok(userId: string, videoUrl: string, supabase: any, scheduledPost: any) {
-  // Get TikTok connection
   const { data: connection } = await supabase
     .from('social_media_connections')
     .select('*')
@@ -272,7 +269,6 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any, sch
     throw new Error('TikTok not connected');
   }
 
-  // Download video
   const videoResponse = await fetch(videoUrl);
   if (!videoResponse.ok) {
     throw new Error(`Failed to download video: ${videoResponse.statusText}`);
@@ -283,14 +279,11 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any, sch
 
   console.log(`[TikTok] Downloaded video: ${videoBuffer.length} bytes`);
 
-  // Format description with hashtags
   const hashtagString = scheduledPost?.hashtags?.map((tag: string) => `#${tag}`).join(' ') || '';
-  const fullDescription = scheduledPost?.description 
+  const fullDescription = scheduledPost?.description
     ? `${scheduledPost.description} ${hashtagString}`
     : hashtagString;
 
-  // TikTok API: Initialize upload
-  // For unaudited apps, use inbox endpoint and SELF_ONLY privacy
   const initResponse = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
     method: 'POST',
     headers: {
@@ -299,7 +292,6 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any, sch
     },
     body: JSON.stringify({
       post_info: {
-        // TikTok has a single caption field: "title". Use description + hashtags for the visible caption.
         title: fullDescription || scheduledPost?.title || 'Auto-generated video',
         privacy_level: 'PUBLIC_TO_EVERYONE',
         disable_duet: false,
@@ -322,7 +314,7 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any, sch
   }
 
   const initData = await initResponse.json();
-  
+
   if (!initData.data || !initData.data.upload_url) {
     throw new Error('TikTok init response missing upload_url');
   }
@@ -332,11 +324,9 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any, sch
 
   console.log(`[TikTok] Upload initialized: ${publishId}`);
 
-  // TikTok requires Content-Range for the upload PUT request
   const totalBytes = videoBuffer.length;
   const contentRange = `bytes 0-${totalBytes - 1}/${totalBytes}`;
 
-  // Upload video
   const uploadResponse = await fetch(uploadUrl, {
     method: 'PUT',
     headers: {
@@ -356,11 +346,10 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any, sch
 
   console.log(`[TikTok] Upload successful: ${publishId}`);
 
-  return { publishId, success: true };
+  return { publishId, success: true as const };
 }
 
 async function postToInstagram(userId: string, videoUrl: string, supabase: any, scheduledPost: any) {
-  // Get Instagram connection
   const { data: connection } = await supabase
     .from('social_media_connections')
     .select('*')
@@ -380,21 +369,16 @@ async function postToInstagram(userId: string, videoUrl: string, supabase: any, 
 
   console.log(`[Instagram] Creating media container for account: ${accountId}`);
 
-  // Format caption with hashtags (Instagram uses caption, not title)
   const hashtagString = scheduledPost?.hashtags?.map((tag: string) => `#${tag}`).join(' ') || '';
-  const caption = scheduledPost?.description 
+  const caption = scheduledPost?.description
     ? `${scheduledPost.description}\n\n${hashtagString}`
     : hashtagString;
 
-  // Instagram requires publicly accessible URL
-  // Create media container
   const containerResponse = await fetch(
     `https://graph.instagram.com/v21.0/${accountId}/media`,
     {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         video_url: videoUrl,
         media_type: 'REELS',
@@ -414,14 +398,13 @@ async function postToInstagram(userId: string, videoUrl: string, supabase: any, 
 
   console.log(`[Instagram] Media container created: ${containerId}`);
 
-  // Wait for Instagram to process the video by checking status
   let statusCheckAttempts = 0;
-  const maxStatusChecks = 30; // Max 5 minutes (30 * 10s)
+  const maxStatusChecks = 30;
   let isReady = false;
 
   while (statusCheckAttempts < maxStatusChecks && !isReady) {
-    await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds between checks
-    
+    await new Promise(resolve => setTimeout(resolve, 10000));
+
     const statusResponse = await fetch(
       `https://graph.instagram.com/v21.0/${containerId}?fields=status_code&access_token=${connection.access_token}`,
       { method: 'GET' }
@@ -430,15 +413,14 @@ async function postToInstagram(userId: string, videoUrl: string, supabase: any, 
     if (statusResponse.ok) {
       const statusData = await statusResponse.json();
       console.log(`[Instagram] Container status: ${statusData.status_code}`);
-      
+
       if (statusData.status_code === 'FINISHED') {
         isReady = true;
       } else if (statusData.status_code === 'ERROR') {
         throw new Error('Instagram video processing failed');
       }
-      // PUBLISHED, IN_PROGRESS, EXPIRED - keep waiting
     }
-    
+
     statusCheckAttempts++;
   }
 
@@ -448,14 +430,11 @@ async function postToInstagram(userId: string, videoUrl: string, supabase: any, 
 
   console.log(`[Instagram] Container ready, publishing...`);
 
-  // Publish media
   const publishResponse = await fetch(
     `https://graph.instagram.com/v21.0/${accountId}/media_publish`,
     {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         creation_id: containerId,
         access_token: connection.access_token,
@@ -472,5 +451,5 @@ async function postToInstagram(userId: string, videoUrl: string, supabase: any, 
 
   console.log(`[Instagram] Published: ${publishData.id}`);
 
-  return { mediaId: publishData.id, success: true };
+  return { mediaId: publishData.id, success: true as const };
 }
