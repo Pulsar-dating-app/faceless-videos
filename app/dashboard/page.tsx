@@ -2562,10 +2562,6 @@ export default function Dashboard() {
 
   const renderScheduledPostsPage = () => {
     const scheduledT = (t.dashboard as { scheduledPosts?: Record<string, string> }).scheduledPosts;
-    const formatScheduledDate = (dateStr: string) => {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    };
     return (
       <div className="max-w-6xl w-full">
         <div className="space-y-6">
@@ -2594,19 +2590,23 @@ export default function Dashboard() {
               {scheduledPosts.map((post) => (
                 <div
                   key={post.id}
-                  className="p-6 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all bg-white dark:bg-zinc-900"
+                  className="relative p-6 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-all bg-white dark:bg-zinc-900"
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 mb-2">
-                        <Clock className="w-4 h-4 shrink-0" />
-                        <span className="font-medium">{scheduledT?.publishTime ?? "Publish time"}:</span>
-                      </div>
-                      <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                        {formatScheduledDate(post.scheduled_time)}
-                      </p>
-                    </div>
-                  </div>
+                  <button
+                    onClick={() => {
+                      setPublishPreviewPost(post);
+                      setPublishEditData({
+                        title: post.title ?? '',
+                        description: post.description ?? '',
+                        hashtags: post.hashtags?.join(', ') ?? '',
+                      });
+                      setPublishConsent(false);
+                    }}
+                    disabled={isDeletingPost || isPublishingPost !== null}
+                    className="absolute top-3 right-3 inline-flex items-center justify-center p-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
 
                   <div className="space-y-3 text-sm">
                     <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
@@ -2711,27 +2711,12 @@ export default function Dashboard() {
                         </button>
                       )}
                       <button
-                        onClick={() => {
-                          setPublishPreviewPost(post);
-                          setPublishEditData({
-                            title: post.title ?? '',
-                            description: post.description ?? '',
-                            hashtags: post.hashtags?.join(', ') ?? '',
-                          });
-                          setPublishConsent(false);
-                        }}
-                        disabled={isDeletingPost || isPublishingPost !== null}
-                        className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
                         onClick={() => setCancelPostId(post.id)}
                         disabled={isDeletingPost || isPublishingPost !== null}
                         className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
                       >
                         <Trash2 className="w-4 h-4" />
-                        {scheduledT?.cancel ?? "Cancel"}
+                        {scheduledT?.delete ?? "Delete"}
                       </button>
                     </div>
                   </div>
