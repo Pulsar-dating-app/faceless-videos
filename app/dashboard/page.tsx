@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X, Info, Share2, Send, AlertCircle, CreditCard, List, Edit, Power, Download, Trash2, Star, Lightbulb, Search, Brain, PawPrint, HelpCircle, Settings } from "lucide-react";
+import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X, Info, Share2, Send, AlertCircle, CreditCard, List, Edit, Power, Download, Trash2, Star, Lightbulb, Search, Brain, PawPrint, HelpCircle, Settings, CheckCircle2, XCircle } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
@@ -223,6 +223,12 @@ export default function Dashboard() {
   const [publishEditData, setPublishEditData] = useState({ title: '', description: '', hashtags: '' });
   const [isSavingPost, setIsSavingPost] = useState(false);
   const [publishConsent, setPublishConsent] = useState(false);
+  const [tiktokPostStatus, setTiktokPostStatus] = useState<{
+    publishId: string;
+    status: 'PROCESSING_UPLOAD' | 'PROCESSING_DOWNLOAD' | 'SEND_TO_USER_INBOX' | 'PUBLISH_COMPLETE' | 'FAILED' | null;
+    failReason?: string;
+  } | null>(null);
+  const tiktokPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Error dialog state
   const [errorDialog, setErrorDialog] = useState<{
@@ -829,6 +835,13 @@ export default function Dashboard() {
     }
   }, [activeSection, user]);
 
+  // Cleanup TikTok polling on unmount
+  useEffect(() => {
+    return () => {
+      if (tiktokPollRef.current) clearInterval(tiktokPollRef.current);
+    };
+  }, []);
+
   const fetchSeries = async () => {
     if (!user) return;
     
@@ -940,6 +953,43 @@ export default function Dashboard() {
     }
   };
 
+  const startTikTokStatusPolling = (publishId: string) => {
+    if (tiktokPollRef.current) clearInterval(tiktokPollRef.current);
+    setTiktokPostStatus({ publishId, status: null });
+
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/tiktok-post-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ publishId, userId: user?.id }),
+        });
+        const data = await res.json();
+        const status = data?.data?.status ?? null;
+        const failReason = data?.data?.fail_reason;
+        setTiktokPostStatus({ publishId, status, failReason });
+
+        if (status === 'PUBLISH_COMPLETE' || status === 'FAILED') {
+          if (tiktokPollRef.current) {
+            clearInterval(tiktokPollRef.current);
+            tiktokPollRef.current = null;
+          }
+          if (status === 'PUBLISH_COMPLETE') {
+            setTimeout(() => {
+              setTiktokPostStatus(null);
+              fetchScheduledPosts();
+            }, 4000);
+          }
+        }
+      } catch (err) {
+        console.error('[TikTok status poll] error:', err);
+      }
+    };
+
+    poll();
+    tiktokPollRef.current = setInterval(poll, 5000);
+  };
+
   const handlePublishNow = async (
     postId: string,
     editData?: { title: string; description: string; hashtags: string }
@@ -968,9 +1018,14 @@ export default function Dashboard() {
       if (!response.ok) {
         throw new Error(data?.error ?? 'Failed to publish post');
       }
-      const scheduledT = (t.dashboard as { scheduledPosts?: Record<string, string> }).scheduledPosts;
-      showToast(scheduledT?.publishSuccess ?? 'Video published successfully!', { variant: 'success' });
-      await fetchScheduledPosts();
+      const tiktokPublishId = data?.results?.tiktok?.publishId;
+      if (tiktokPublishId) {
+        startTikTokStatusPolling(tiktokPublishId);
+      } else {
+        const scheduledT = (t.dashboard as { scheduledPosts?: Record<string, string> }).scheduledPosts;
+        showToast(scheduledT?.publishSuccess ?? 'Video published successfully!', { variant: 'success' });
+        await fetchScheduledPosts();
+      }
     } catch (err: unknown) {
       console.error('Error publishing post now:', err);
       const scheduledT = (t.dashboard as { scheduledPosts?: Record<string, string> }).scheduledPosts;
@@ -4213,6 +4268,91 @@ export default function Dashboard() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* TikTok Post Status Modal */}
+      {tiktokPostStatus !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden max-w-sm w-full animate-in fade-in zoom-in-95 duration-200 p-8 flex flex-col items-center text-center gap-5">
+
+            {/* Status icon */}
+            {tiktokPostStatus.status === 'PUBLISH_COMPLETE' ? (
+              <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                <CheckCircle2 className="w-9 h-9 text-green-600 dark:text-green-400" />
+              </div>
+            ) : tiktokPostStatus.status === 'FAILED' ? (
+              <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <XCircle className="w-9 h-9 text-red-600 dark:text-red-400" />
+              </div>
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <Loader2 className="w-9 h-9 text-blue-600 dark:text-blue-400 animate-spin" />
+              </div>
+            )}
+
+            {/* Title */}
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                {tiktokPostStatus.status === 'PUBLISH_COMPLETE'
+                  ? (((t.dashboard as Record<string, unknown>).scheduledPosts as Record<string, string>)?.tiktokStatusComplete ?? 'Published to TikTok!')
+                  : tiktokPostStatus.status === 'FAILED'
+                    ? (((t.dashboard as Record<string, unknown>).scheduledPosts as Record<string, string>)?.tiktokStatusFailed ?? 'Publishing Failed')
+                    : (((t.dashboard as Record<string, unknown>).scheduledPosts as Record<string, string>)?.tiktokStatusProcessing ?? 'Publishing to TikTok...')}
+              </h3>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                {tiktokPostStatus.status === 'PUBLISH_COMPLETE'
+                  ? (((t.dashboard as Record<string, unknown>).scheduledPosts as Record<string, string>)?.tiktokStatusCompleteDesc ?? 'Your video is now live on TikTok.')
+                  : tiktokPostStatus.status === 'FAILED'
+                    ? (tiktokPostStatus.failReason
+                        ? `${(((t.dashboard as Record<string, unknown>).scheduledPosts as Record<string, string>)?.tiktokStatusFailedReason ?? 'Reason')}: ${tiktokPostStatus.failReason}`
+                        : (((t.dashboard as Record<string, unknown>).scheduledPosts as Record<string, string>)?.tiktokStatusFailedDesc ?? 'An error occurred while publishing your video.'))
+                    : tiktokPostStatus.status === 'PROCESSING_UPLOAD'
+                      ? (((t.dashboard as Record<string, unknown>).scheduledPosts as Record<string, string>)?.tiktokStatusUpload ?? 'Uploading your video to TikTok...')
+                      : tiktokPostStatus.status === 'PROCESSING_DOWNLOAD'
+                        ? (((t.dashboard as Record<string, unknown>).scheduledPosts as Record<string, string>)?.tiktokStatusDownload ?? 'TikTok is downloading your video...')
+                        : tiktokPostStatus.status === 'SEND_TO_USER_INBOX'
+                          ? (((t.dashboard as Record<string, unknown>).scheduledPosts as Record<string, string>)?.tiktokStatusInbox ?? 'Video sent to your TikTok inbox.')
+                          : (((t.dashboard as Record<string, unknown>).scheduledPosts as Record<string, string>)?.tiktokStatusWaiting ?? 'Waiting for TikTok to process...')}
+              </p>
+            </div>
+
+            {/* Progress dots for processing states */}
+            {tiktokPostStatus.status !== 'PUBLISH_COMPLETE' && tiktokPostStatus.status !== 'FAILED' && (
+              <div className="flex gap-1.5">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="w-2 h-2 rounded-full bg-blue-400 dark:bg-blue-500 animate-pulse"
+                    style={{ animationDelay: `${i * 200}ms` }}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Close / action button */}
+            {(tiktokPostStatus.status === 'PUBLISH_COMPLETE' || tiktokPostStatus.status === 'FAILED') && (
+              <button
+                onClick={() => {
+                  setTiktokPostStatus(null);
+                  if (tiktokPollRef.current) {
+                    clearInterval(tiktokPollRef.current);
+                    tiktokPollRef.current = null;
+                  }
+                  fetchScheduledPosts();
+                }}
+                className={`px-6 py-2.5 rounded-lg font-medium text-sm transition-colors ${
+                  tiktokPostStatus.status === 'PUBLISH_COMPLETE'
+                    ? 'bg-green-600 text-white hover:bg-green-700'
+                    : 'bg-zinc-800 text-white hover:bg-zinc-700 dark:bg-zinc-700 dark:hover:bg-zinc-600'
+                }`}
+              >
+                {tiktokPostStatus.status === 'PUBLISH_COMPLETE'
+                  ? (((t.dashboard as Record<string, unknown>).scheduledPosts as Record<string, string>)?.tiktokStatusDone ?? 'Done')
+                  : (((t.dashboard as Record<string, unknown>).scheduledPosts as Record<string, string>)?.tiktokStatusClose ?? 'Close')}
+              </button>
+            )}
           </div>
         </div>
       )}
