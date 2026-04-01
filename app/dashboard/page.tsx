@@ -222,6 +222,7 @@ export default function Dashboard() {
   } | null>(null);
   const [publishEditData, setPublishEditData] = useState({ title: '', description: '', hashtags: '' });
   const [isSavingPost, setIsSavingPost] = useState(false);
+  const [publishConsent, setPublishConsent] = useState(false);
 
   // Error dialog state
   const [errorDialog, setErrorDialog] = useState<{
@@ -2691,6 +2692,7 @@ export default function Dashboard() {
                               description: post.description ?? '',
                               hashtags: post.hashtags?.join(', ') ?? '',
                             });
+                            setPublishConsent(false);
                           }}
                           disabled={isPublishingPost !== null || isDeletingPost}
                           className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
@@ -2716,6 +2718,7 @@ export default function Dashboard() {
                             description: post.description ?? '',
                             hashtags: post.hashtags?.join(', ') ?? '',
                           });
+                          setPublishConsent(false);
                         }}
                         disabled={isDeletingPost || isPublishingPost !== null}
                         className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
@@ -3122,7 +3125,7 @@ export default function Dashboard() {
 
               {/* Post to Social Media Button */}
               <button
-                onClick={() => setShowPostPanel(!showPostPanel)}
+                onClick={() => { setShowPostPanel(!showPostPanel); setPublishConsent(false); }}
                 className="w-full h-12 flex items-center justify-center gap-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium transition-all shadow-sm"
               >
                 <Share2 className="w-5 h-5" />
@@ -3178,9 +3181,9 @@ export default function Dashboard() {
                     {/* TikTok */}
                     <button
                       onClick={() => handlePostToSocial('tiktok')}
-                      disabled={!tiktokConnected || postingTo !== null}
+                      disabled={!publishConsent || !tiktokConnected || postingTo !== null}
                       className={`p-4 rounded-lg border-2 transition-all ${
-                        tiktokConnected
+                        tiktokConnected && publishConsent
                           ? 'border-zinc-300 dark:border-zinc-700 hover:border-black dark:hover:border-white hover:bg-zinc-50 dark:hover:bg-zinc-800'
                           : 'border-zinc-200 dark:border-zinc-800 opacity-50 cursor-not-allowed'
                       }`}
@@ -3211,9 +3214,9 @@ export default function Dashboard() {
                     {/* YouTube */}
                     <button
                       onClick={() => handlePostToSocial('youtube')}
-                      disabled={!youtubeConnected || postingTo !== null}
+                      disabled={!publishConsent || !youtubeConnected || postingTo !== null}
                       className={`p-4 rounded-lg border-2 transition-all ${
-                        youtubeConnected
+                        youtubeConnected && publishConsent
                           ? 'border-zinc-300 dark:border-zinc-700 hover:border-red-500 hover:bg-red-50 dark:hover:bg-red-900/10'
                           : 'border-zinc-200 dark:border-zinc-800 opacity-50 cursor-not-allowed'
                       }`}
@@ -3244,9 +3247,9 @@ export default function Dashboard() {
                     {/* Instagram */}
                     <button
                       onClick={() => handlePostToSocial('instagram')}
-                      disabled={!instagramConnected || postingTo !== null}
+                      disabled={!publishConsent || !instagramConnected || postingTo !== null}
                       className={`p-4 rounded-lg border-2 transition-all ${
-                        instagramConnected
+                        instagramConnected && publishConsent
                           ? 'border-zinc-300 dark:border-zinc-700 hover:border-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/10'
                           : 'border-zinc-200 dark:border-zinc-800 opacity-50 cursor-not-allowed'
                       }`}
@@ -3289,6 +3292,36 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </button>
+                  </div>
+
+                  <div className="space-y-3 pt-3 border-t border-blue-200 dark:border-blue-800/40">
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={publishConsent}
+                        onChange={(e) => setPublishConsent(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
+                      />
+                      <span className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-300 transition-colors">
+                        {((t.dashboard as any).scheduledPosts as any)?.musicUsageConsentPrefix ?? "By posting, you agree to TikTok's "}
+                        <a
+                          href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300"
+                        >
+                          {((t.dashboard as any).scheduledPosts as any)?.musicUsageConsentLink ?? "Music Usage Confirmation"}
+                        </a>
+                        {((t.dashboard as any).scheduledPosts as any)?.musicUsageConsentSuffix ?? "."}
+                      </span>
+                    </label>
+
+                    <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 px-3 py-2.5">
+                      <Clock className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                      <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-400">
+                        {((t.dashboard as any).scheduledPosts as any)?.processingNotice ?? "After publishing, it may take a few minutes for your content to process and become visible on your profile."}
+                      </p>
+                    </div>
                   </div>
 
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center pt-2">
@@ -4117,8 +4150,39 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Consent & Notice */}
+            <div className="px-6 pt-4 space-y-3 border-t border-zinc-200 dark:border-zinc-800">
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={publishConsent}
+                  onChange={(e) => setPublishConsent(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
+                />
+                <span className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-300 transition-colors">
+                  {((t.dashboard as any).scheduledPosts as any)?.musicUsageConsentPrefix ?? "By posting, you agree to TikTok's "}
+                  <a
+                    href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 dark:text-blue-400 underline hover:text-blue-700 dark:hover:text-blue-300"
+                  >
+                    {((t.dashboard as any).scheduledPosts as any)?.musicUsageConsentLink ?? "Music Usage Confirmation"}
+                  </a>
+                  {((t.dashboard as any).scheduledPosts as any)?.musicUsageConsentSuffix ?? "."}
+                </span>
+              </label>
+
+              <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 px-3 py-2.5">
+                <Clock className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-400">
+                  {((t.dashboard as any).scheduledPosts as any)?.processingNotice ?? "After publishing, it may take a few minutes for your content to process and become visible on your profile."}
+                </p>
+              </div>
+            </div>
+
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 shrink-0">
+            <div className="px-6 py-4 flex items-center justify-between gap-3 shrink-0">
               <button
                 onClick={() => setPublishPreviewPost(null)}
                 disabled={!!isPublishingPost || isSavingPost}
@@ -4143,8 +4207,12 @@ export default function Dashboard() {
                 </button>
                 <button
                   onClick={() => handlePublishNow(publishPreviewPost.id, publishEditData)}
-                  disabled={!!isPublishingPost || isSavingPost || publishEditData.hashtags.split(',').filter((h) => h.trim()).length > 5}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 text-white font-medium text-sm hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  disabled={!publishConsent || !!isPublishingPost || isSavingPost || publishEditData.hashtags.split(',').filter((h) => h.trim()).length > 5}
+                  className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm transition-colors disabled:opacity-50 ${
+                    publishConsent
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400 cursor-not-allowed'
+                  }`}
                 >
                   {isPublishingPost === publishPreviewPost.id ? (
                     <>
