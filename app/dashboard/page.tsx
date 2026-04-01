@@ -4311,13 +4311,53 @@ export default function Dashboard() {
                 {(tiktokYourBrand || tiktokBrandedContent) && (
                   <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
                     <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-blue-700 dark:text-blue-300">
-                      {tiktokYourBrand && tiktokBrandedContent
-                        ? "Your photo/video will be labeled as 'Paid partnership'"
-                        : tiktokBrandedContent
-                        ? "Your photo/video will be labeled as 'Paid partnership'"
-                        : "Your photo/video will be labeled as 'Promotional content'"}
-                    </p>
+                    <div className="space-y-1.5">
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                        {tiktokYourBrand && tiktokBrandedContent
+                          ? "Your photo/video will be labeled as 'Paid partnership'"
+                          : tiktokBrandedContent
+                          ? "Your photo/video will be labeled as 'Paid partnership'"
+                          : "Your photo/video will be labeled as 'Promotional content'"}
+                      </p>
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                        {tiktokBrandedContent ? (
+                          <>
+                            By posting, you agree to TikTok&apos;s{" "}
+                            <a
+                              href="https://www.tiktok.com/legal/page/global/bc-policy/en"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline hover:text-blue-900 dark:hover:text-blue-100"
+                            >
+                              Branded Content Policy
+                            </a>
+                            {" "}and{" "}
+                            <a
+                              href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline hover:text-blue-900 dark:hover:text-blue-100"
+                            >
+                              Music Usage Confirmation
+                            </a>
+                            .
+                          </>
+                        ) : (
+                          <>
+                            By posting, you agree to TikTok&apos;s{" "}
+                            <a
+                              href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline hover:text-blue-900 dark:hover:text-blue-100"
+                            >
+                              Music Usage Confirmation
+                            </a>
+                            .
+                          </>
+                        )}
+                      </p>
+                    </div>
                   </div>
                 )}
 
