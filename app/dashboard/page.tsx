@@ -1202,8 +1202,8 @@ export default function Dashboard() {
             tiktokPrivacyLevel: selectedPlatforms.includes('tiktok') ? tiktokPrivacyLevel : undefined,
             tiktokInteractions: selectedPlatforms.includes('tiktok') ? {
               allowComment: tiktokAllowComment,
-              allowDuet: videoType !== 'ai-images' ? tiktokAllowDuet : false,
-              allowStitch: videoType !== 'ai-images' ? tiktokAllowStitch : false,
+              allowDuet: tiktokAllowDuet,
+              allowStitch: tiktokAllowStitch,
             } : undefined,
             videoType: videoType,
             artStyle: videoType === "ai-images" ? artStyle : undefined,
@@ -1861,43 +1861,39 @@ export default function Dashboard() {
                             )}
                           </label>
 
-                          {/* Duet — not applicable to photo posts */}
-                          {videoType !== 'ai-images' && (
-                            <label className={`flex items-center gap-2.5 ${tiktokDuetDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-                              <input
-                                type="checkbox"
-                                checked={tiktokAllowDuet}
-                                disabled={tiktokDuetDisabled}
-                                onChange={(e) => setTiktokAllowDuet(e.target.checked)}
-                                className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
-                              />
-                              <span className="text-sm text-zinc-700 dark:text-zinc-300">
-                                Allow Duet
-                              </span>
-                              {tiktokDuetDisabled && (
-                                <span className="text-xs text-zinc-400 dark:text-zinc-500">(disabled in your TikTok settings)</span>
-                              )}
-                            </label>
-                          )}
+                          {/* Duet */}
+                          <label className={`flex items-center gap-2.5 ${tiktokDuetDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                            <input
+                              type="checkbox"
+                              checked={tiktokAllowDuet}
+                              disabled={tiktokDuetDisabled}
+                              onChange={(e) => setTiktokAllowDuet(e.target.checked)}
+                              className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
+                            />
+                            <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                              Allow Duet
+                            </span>
+                            {tiktokDuetDisabled && (
+                              <span className="text-xs text-zinc-400 dark:text-zinc-500">(disabled in your TikTok settings)</span>
+                            )}
+                          </label>
 
-                          {/* Stitch — not applicable to photo posts */}
-                          {videoType !== 'ai-images' && (
-                            <label className={`flex items-center gap-2.5 ${tiktokStitchDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-                              <input
-                                type="checkbox"
-                                checked={tiktokAllowStitch}
-                                disabled={tiktokStitchDisabled}
-                                onChange={(e) => setTiktokAllowStitch(e.target.checked)}
-                                className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
-                              />
-                              <span className="text-sm text-zinc-700 dark:text-zinc-300">
-                                Allow Stitch
-                              </span>
-                              {tiktokStitchDisabled && (
-                                <span className="text-xs text-zinc-400 dark:text-zinc-500">(disabled in your TikTok settings)</span>
-                              )}
-                            </label>
-                          )}
+                          {/* Stitch */}
+                          <label className={`flex items-center gap-2.5 ${tiktokStitchDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                            <input
+                              type="checkbox"
+                              checked={tiktokAllowStitch}
+                              disabled={tiktokStitchDisabled}
+                              onChange={(e) => setTiktokAllowStitch(e.target.checked)}
+                              className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
+                            />
+                            <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                              Allow Stitch
+                            </span>
+                            {tiktokStitchDisabled && (
+                              <span className="text-xs text-zinc-400 dark:text-zinc-500">(disabled in your TikTok settings)</span>
+                            )}
+                          </label>
                         </div>
                       </div>
                       </div>
