@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X, Info, Share2, Send, AlertCircle, CreditCard, List, Edit, Power, Download, Trash2, Star, Lightbulb, Search, Brain, PawPrint, HelpCircle, Settings, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowRight, ArrowLeft, Sparkles, Loader2, Video, Wand2, Image, Gamepad2, Volume2, Check, Laugh, Zap, Ghost, BookOpen, MessageCircle, Heart, Clock, DollarSign, Link2, Menu, X, Info, Share2, Send, AlertCircle, CreditCard, List, Edit, Power, Download, Trash2, Star, Lightbulb, Search, Brain, PawPrint, HelpCircle, Settings, CheckCircle2, XCircle, ChevronDown } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
@@ -147,6 +147,7 @@ export default function Dashboard() {
   const [tiktokAvatar, setTiktokAvatar] = useState<string | null>(null);
   const [tiktokPrivacyOptions, setTiktokPrivacyOptions] = useState<string[]>([]);
   const [tiktokPrivacyLevel, setTiktokPrivacyLevel] = useState<string>('');
+  const [privacyDropdownOpen, setPrivacyDropdownOpen] = useState(false);
   const [isConnectingTiktok, setIsConnectingTiktok] = useState(false);
   const [showTiktokSettingsPopup, setShowTiktokSettingsPopup] = useState(false);
   const [tiktokCommercialDisclosure, setTiktokCommercialDisclosure] = useState(false);
@@ -1809,30 +1810,75 @@ export default function Dashboard() {
                           {t.dashboard.seriesSetup.tiktokPrivacyLabel}
                           <span className="ml-1 text-red-500">*</span>
                         </label>
-                        <select
-                          value={tiktokPrivacyLevel}
-                          onChange={(e) => setTiktokPrivacyLevel(e.target.value)}
-                          className={`w-full px-3 py-2 rounded-lg border bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 transition-colors ${
-                            !tiktokPrivacyLevel
-                              ? 'border-red-400 focus:ring-red-500'
-                              : 'border-zinc-300 dark:border-zinc-700 focus:ring-blue-500'
-                          }`}
-                        >
-                          <option value="">{t.dashboard.seriesSetup.tiktokPrivacyPlaceholder}</option>
-                          {tiktokPrivacyOptions.map((option) => {
-                            const privacyLabels: Record<string, string> = {
-                              PUBLIC_TO_EVERYONE: t.dashboard.seriesSetup.tiktokPrivacyPublic,
-                              MUTUAL_FOLLOW_FRIENDS: t.dashboard.seriesSetup.tiktokPrivacyMutualFollowers,
-                              FOLLOWER_OF_CREATOR: t.dashboard.seriesSetup.tiktokPrivacyFollowers,
-                              SELF_ONLY: t.dashboard.seriesSetup.tiktokPrivacyOnlyMe,
-                            };
-                            return (
-                              <option key={option} value={option}>
-                                {privacyLabels[option] || option}
-                              </option>
-                            );
-                          })}
-                        </select>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setPrivacyDropdownOpen((o) => !o)}
+                            onBlur={() => setTimeout(() => setPrivacyDropdownOpen(false), 150)}
+                            className={`w-full px-3 py-2 rounded-lg border bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 transition-colors text-left flex items-center justify-between ${
+                              !tiktokPrivacyLevel
+                                ? 'border-red-400 focus:ring-red-500'
+                                : 'border-zinc-300 dark:border-zinc-700 focus:ring-blue-500'
+                            }`}
+                          >
+                            <span className={!tiktokPrivacyLevel ? 'text-zinc-400 dark:text-zinc-500' : ''}>
+                              {(() => {
+                                const privacyLabels: Record<string, string> = {
+                                  PUBLIC_TO_EVERYONE: t.dashboard.seriesSetup.tiktokPrivacyPublic,
+                                  MUTUAL_FOLLOW_FRIENDS: t.dashboard.seriesSetup.tiktokPrivacyMutualFollowers,
+                                  FOLLOWER_OF_CREATOR: t.dashboard.seriesSetup.tiktokPrivacyFollowers,
+                                  SELF_ONLY: t.dashboard.seriesSetup.tiktokPrivacyOnlyMe,
+                                };
+                                return tiktokPrivacyLevel
+                                  ? (privacyLabels[tiktokPrivacyLevel] || tiktokPrivacyLevel)
+                                  : t.dashboard.seriesSetup.tiktokPrivacyPlaceholder;
+                              })()}
+                            </span>
+                            <ChevronDown className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+                          </button>
+
+                          {privacyDropdownOpen && (
+                            <div className="absolute z-20 w-full mt-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg overflow-hidden">
+                              <div
+                                onClick={() => { setTiktokPrivacyLevel(''); setPrivacyDropdownOpen(false); }}
+                                className="px-3 py-2 text-sm text-zinc-400 dark:text-zinc-500 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                              >
+                                {t.dashboard.seriesSetup.tiktokPrivacyPlaceholder}
+                              </div>
+                              {tiktokPrivacyOptions.map((option) => {
+                                const privacyLabels: Record<string, string> = {
+                                  PUBLIC_TO_EVERYONE: t.dashboard.seriesSetup.tiktokPrivacyPublic,
+                                  MUTUAL_FOLLOW_FRIENDS: t.dashboard.seriesSetup.tiktokPrivacyMutualFollowers,
+                                  FOLLOWER_OF_CREATOR: t.dashboard.seriesSetup.tiktokPrivacyFollowers,
+                                  SELF_ONLY: t.dashboard.seriesSetup.tiktokPrivacyOnlyMe,
+                                };
+                                const label = privacyLabels[option] || option;
+                                const isDisabled = option === 'SELF_ONLY' && tiktokBrandedContent;
+                                return (
+                                  <div
+                                    key={option}
+                                    title={isDisabled ? 'Branded content visibility cannot be set to private.' : undefined}
+                                    onClick={() => {
+                                      if (!isDisabled) {
+                                        setTiktokPrivacyLevel(option);
+                                        setPrivacyDropdownOpen(false);
+                                      }
+                                    }}
+                                    className={`px-3 py-2 text-sm transition-colors ${
+                                      isDisabled
+                                        ? 'text-zinc-400 dark:text-zinc-500 cursor-not-allowed bg-zinc-50 dark:bg-zinc-900/50'
+                                        : option === tiktokPrivacyLevel
+                                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 cursor-pointer'
+                                          : 'text-zinc-900 dark:text-zinc-100 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700'
+                                    }`}
+                                  >
+                                    {label}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                         {!tiktokPrivacyLevel && (
                           <p className="text-xs text-red-500">{t.messages.tiktokPrivacyRequired}</p>
                         )}
