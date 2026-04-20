@@ -4485,15 +4485,16 @@ export default function Dashboard() {
                 </label>
 
                 {/* Branded Content */}
-                <label className="flex items-start gap-3 cursor-pointer group">
+                <label className={`flex items-start gap-3 ${tiktokPrivacyLevel === 'SELF_ONLY' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer group'}`}>
                   <input
                     type="checkbox"
                     checked={tiktokBrandedContent}
+                    disabled={tiktokPrivacyLevel === 'SELF_ONLY'}
                     onChange={(e) => setTiktokBrandedContent(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
+                    className="mt-0.5 w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed"
                   />
                   <div>
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    <p className={`text-sm font-medium text-zinc-900 dark:text-zinc-100 transition-colors ${tiktokPrivacyLevel !== 'SELF_ONLY' ? 'group-hover:text-blue-600 dark:group-hover:text-blue-400' : ''}`}>
                       Branded Content
                     </p>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -4501,6 +4502,14 @@ export default function Dashboard() {
                     </p>
                   </div>
                 </label>
+                {tiktokPrivacyLevel === 'SELF_ONLY' && (
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                    <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                      Branded Content is not available when visibility is set to &quot;Only me&quot;. Change your privacy level to enable this option.
+                    </p>
+                  </div>
+                )}
 
                 {/* Label notice */}
                 {(tiktokYourBrand || tiktokBrandedContent) && (
