@@ -351,6 +351,7 @@ export const translations = {
         disconnectSuccess: "Successfully disconnected from {platform}",
         connectError: "Failed to connect to {platform}",
         disconnectError: "Failed to disconnect from {platform}",
+        comingSoon: "Coming soon",
       },
       seriesManagement: {
         title: "Manage Your Series",
@@ -765,6 +766,7 @@ export const translations = {
         disconnectSuccess: "Desconectado exitosamente de {platform}",
         connectError: "Error al conectar con {platform}",
         disconnectError: "Error al desconectar de {platform}",
+        comingSoon: "Próximamente",
       },
       seriesManagement: {
         title: "Gestiona tus Series",
@@ -1179,6 +1181,7 @@ export const translations = {
         disconnectSuccess: "Déconnecté avec succès de {platform}",
         connectError: "Échec de la connexion à {platform}",
         disconnectError: "Échec de la déconnexion de {platform}",
+        comingSoon: "Bientôt disponible",
       },
       seriesManagement: {
         title: "Gérez vos Séries",
@@ -1593,6 +1596,7 @@ export const translations = {
         disconnectSuccess: "Desconectado com sucesso do {platform}",
         connectError: "Falha ao conectar ao {platform}",
         disconnectError: "Falha ao desconectar do {platform}",
+        comingSoon: "Em breve",
       },
       seriesManagement: {
         title: "Gerencie suas Séries",
@@ -2007,6 +2011,7 @@ export const translations = {
         disconnectSuccess: "Erfolgreich von {platform} getrennt",
         connectError: "Fehler beim Verbinden mit {platform}",
         disconnectError: "Fehler beim Trennen von {platform}",
+        comingSoon: "Demnächst",
       },
       seriesManagement: {
         title: "Verwalte deine Serien",

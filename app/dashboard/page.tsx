@@ -1545,85 +1545,25 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* TikTok */}
-              <div className={`p-6 rounded-xl border-2 transition-all ${
-                selectedPlatforms.includes('tiktok')
-                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                  : tiktokConnected
-                    ? "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
-                    : "border-zinc-200 dark:border-zinc-700 opacity-60"
-              }`}>
+              <div className="p-6 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 opacity-60">
                 <div className="flex items-center gap-4 mb-4">
-                  {tiktokAvatar ? (
-                    <NextImage 
-                      src={tiktokAvatar} 
-                      alt="TikTok Avatar"
-                      width={48}
-                      height={48}
-                      className="w-12 h-12 rounded-lg object-cover"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-lg">TT</span>
-                    </div>
-                  )}
+                  <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-lg">TT</span>
+                  </div>
                   <div className="flex-1">
                     <h3 className="font-semibold text-lg">TikTok</h3>
-                    {tiktokConnected ? (
-                      <div className="flex items-center gap-2">
-                        <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
-                        <p className="text-sm text-green-600 dark:text-green-400 font-medium">
-                          @{tiktokUsername}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                        Not connected
-                      </p>
-                    )}
+                    <p className="text-sm text-orange-600 dark:text-orange-400">
+                      {t.dashboard.socialMedia.comingSoon}
+                    </p>
                   </div>
                 </div>
-                {tiktokConnected ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (selectedPlatforms.includes('tiktok')) {
-                        setSelectedPlatforms(selectedPlatforms.filter(p => p !== 'tiktok'));
-                      } else {
-                        setSelectedPlatforms([...selectedPlatforms, 'tiktok']);
-                      }
-                    }}
-                    className={`w-full px-4 py-2 rounded-lg font-medium transition-colors ${
-                      selectedPlatforms.includes('tiktok')
-                        ? "bg-blue-600 text-white hover:bg-blue-700"
-                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-                    }`}
-                  >
-                    {selectedPlatforms.includes('tiktok') ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <Check className="w-4 h-4" />
-                        Selected
-                      </span>
-                    ) : (
-                      "Select"
-                    )}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleConnectTiktok()}
-                    disabled={isConnectingTiktok}
-                    className="w-full px-4 py-2 rounded-lg bg-black text-white font-medium hover:bg-zinc-800 transition-colors disabled:opacity-50"
-                  >
-                    {isConnectingTiktok ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Connecting...
-                      </span>
-                    ) : (
-                      "Connect TikTok"
-                    )}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  disabled
+                  className="w-full px-4 py-2 rounded-lg bg-zinc-300 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400 font-medium cursor-not-allowed"
+                >
+                  {t.dashboard.socialMedia.comingSoon}
+                </button>
               </div>
 
               {/* Instagram */}
@@ -2110,72 +2050,24 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* TikTok */}
-          <div className={`p-6 rounded-xl border-2 transition-all ${
-            tiktokConnected 
-              ? "border-green-500 dark:border-green-500 bg-green-50 dark:bg-green-900/10" 
-              : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
-          }`}>
+          <div className="p-6 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 opacity-60">
             <div className="flex items-center gap-4 mb-4">
-              {tiktokAvatar ? (
-                <NextImage 
-                  src={tiktokAvatar} 
-                  alt="TikTok Avatar"
-                  width={48}
-                  height={48}
-                  className="w-12 h-12 rounded-lg object-cover"
-                />
-              ) : (
-                <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">TT</span>
-                </div>
-              )}
+              <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-lg">TT</span>
+              </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-lg">TikTok</h3>
-                {tiktokConnected ? (
-                  <div className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <p className="text-sm text-green-600 dark:text-green-400 font-medium">
-                      @{tiktokUsername}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                    {t.dashboard.socialMedia.notConnected}
-                  </p>
-                )}
+                <p className="text-sm text-orange-600 dark:text-orange-400">
+                  {t.dashboard.socialMedia.comingSoon}
+                </p>
               </div>
             </div>
-            {tiktokConnected ? (
-              <button 
-                onClick={handleDisconnectTiktok}
-                disabled={isDisconnectingTiktok}
-                className="w-full px-4 py-2 rounded-lg border-2 border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
-              >
-                {isDisconnectingTiktok ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {t.dashboard.socialMedia.disconnecting}
-                  </span>
-                ) : (
-                  t.dashboard.socialMedia.disconnect
-                )}
-              </button>
-            ) : (
-              <button 
-                onClick={handleConnectTiktok}
-                disabled={isConnectingTiktok}
-                className="w-full px-4 py-2 rounded-lg bg-black text-white font-medium hover:bg-zinc-800 transition-colors disabled:opacity-50"
-              >
-                {isConnectingTiktok ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {t.dashboard.socialMedia.connecting}
-                  </span>
-                ) : (
-                  t.dashboard.socialMedia.connect
-                )}
-              </button>
-            )}
+            <button 
+              disabled
+              className="w-full px-4 py-2 rounded-lg bg-zinc-300 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400 font-medium cursor-not-allowed"
+            >
+              {t.dashboard.socialMedia.comingSoon}
+            </button>
           </div>
 
           {/* Instagram */}
@@ -3223,15 +3115,25 @@ export default function Dashboard() {
                   {["tiktok", "instagram", "youtube"].map((platform) => (
                     <label
                       key={platform}
-                      className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer"
+                      className={`flex items-center gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 ${
+                        platform === 'tiktok' 
+                          ? 'opacity-50 cursor-not-allowed' 
+                          : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer'
+                      }`}
                     >
                       <input
                         type="checkbox"
                         defaultChecked={Array.isArray(editingSeries.social_platforms) && editingSeries.social_platforms.includes(platform)}
                         value={platform}
-                        className="edit-platform-checkbox rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
+                        disabled={platform === 'tiktok'}
+                        className="edit-platform-checkbox rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                       <span className="text-sm capitalize">{platform}</span>
+                      {platform === 'tiktok' && (
+                        <span className="text-xs text-orange-600 dark:text-orange-400 ml-auto">
+                          {t.dashboard.socialMedia.comingSoon}
+                        </span>
+                      )}
                     </label>
                   ))}
                 </div>
