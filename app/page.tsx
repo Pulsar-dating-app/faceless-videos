@@ -14,10 +14,11 @@ const CAROUSEL_MAX_WIDTH = "1300px"; // Easy to configure - max width of the car
 // Video URLs from local public folder
 const CAROUSEL_VIDEOS = [
   "/videos/showcases/preview_background.mp4",
+  "/videos/showcases/home_video3.mp4",
+  "/videos/showcases/home_video2.mp4",
+  "/videos/showcases/home_video1.mp4",
   "/videos/showcases/preview_full_ai.mp4",
-  "/videos/showcases/preview_full_ai.mp4",
-  "/videos/showcases/preview_full_ai.mp4",
-  "/videos/showcases/preview_full_ai.mp4",
+  "/videos/showcases/home_video4.mp4",
 ];
 
 // Reviews - Easy to edit and add new ones
