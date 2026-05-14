@@ -147,10 +147,7 @@ export const translations = {
       horror: "Horror",
       realistic: "Realistic",
       anime: "Anime",
-      cinematic: "Cinematic",
-      "3d-render": "3D Render",
       cyberpunk: "Cyberpunk",
-      "oil-painting": "Oil Painting",
     },
     // Durations
     durations: {
@@ -573,10 +570,7 @@ export const translations = {
       horror: "Terror",
       realistic: "Realista",
       anime: "Anime",
-      cinematic: "Cinemático",
-      "3d-render": "Render 3D",
       cyberpunk: "Cyberpunk",
-      "oil-painting": "Pintura al Óleo",
     },
     durations: {
       "30": "Corto",
@@ -989,10 +983,7 @@ export const translations = {
       horror: "Horreur",
       realistic: "Réaliste",
       anime: "Anime",
-      cinematic: "Cinématique",
-      "3d-render": "Rendu 3D",
       cyberpunk: "Cyberpunk",
-      "oil-painting": "Peinture à l'Huile",
     },
     durations: {
       "30": "Court",
@@ -1405,10 +1396,7 @@ export const translations = {
       horror: "Terror",
       realistic: "Realista",
       anime: "Anime",
-      cinematic: "Cinemático",
-      "3d-render": "Render 3D",
       cyberpunk: "Cyberpunk",
-      "oil-painting": "Pintura a Óleo",
     },
     durations: {
       "30": "Curto",
@@ -1821,10 +1809,7 @@ export const translations = {
       horror: "Horror",
       realistic: "Realistisch",
       anime: "Anime",
-      cinematic: "Filmisch",
-      "3d-render": "3D-Render",
       cyberpunk: "Cyberpunk",
-      "oil-painting": "Ölgemälde",
     },
     durations: {
       "30": "Kurz",

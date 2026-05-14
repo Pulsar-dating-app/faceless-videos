@@ -46,10 +46,7 @@ const ART_STYLES = [
   { value: "cartoon", preview: "/images/cartoon_preview.png" },
   { value: "horror", preview: "/images/horror_preview.png" },
   { value: "realistic", preview: "/images/realistic_preview.png" },
-  { value: "cinematic", preview: "/images/cinematic_preview.png" },
-  { value: "3d-render", preview: "/images/3d_render_preview.png" },
   { value: "cyberpunk", preview: "/images/cyberpunk_preview.png" },
-  { value: "oil-painting", preview: "/images/oil_painting_preview.png" },
 ];
 
 // Background videos with preview images and URLs
