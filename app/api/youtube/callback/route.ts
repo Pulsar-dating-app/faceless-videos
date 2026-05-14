@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
       
       // Check if it's a permission denied error
       if (data?.error === 'permission_denied') {
+        console.log('Permission denied - redirecting with specific error');
         const dashboardUrl = `${APP_URL}/dashboard?error=youtube_permission_denied&section=social-media`;
         return NextResponse.redirect(dashboardUrl);
       }
