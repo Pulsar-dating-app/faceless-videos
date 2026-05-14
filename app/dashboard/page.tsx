@@ -447,6 +447,7 @@ export default function Dashboard() {
         'oauth_failed': oauthErrors?.oauth_failed ?? 'Failed to connect to social media',
         'access_denied': oauthErrors?.access_denied ?? 'You denied access',
         'publish_scope_required': oauthErrors?.publish_scope_required ?? 'You must allow posting permission to connect. Please try again and enable posting when asked.',
+        'youtube_permission_denied': oauthErrors?.youtube_permission_denied ?? 'YouTube video upload permission is required. Please allow "Manage your YouTube videos" when connecting your account.',
       };
       const unknownError = (t.messages as { unknownError?: string }).unknownError ?? 'Unknown error occurred';
       setToast({

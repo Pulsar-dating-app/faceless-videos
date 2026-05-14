@@ -36,8 +36,15 @@ export async function GET(request: NextRequest) {
     });
 
     if (functionError || !data?.success) {
-      console.error('❌ YouTube callback error:', functionError);
-      const dashboardUrl = `${APP_URL}/dashboard?error=oauth_failed`;
+      console.error('❌ YouTube callback error:', functionError, data);
+      
+      // Check if it's a permission denied error
+      if (data?.error === 'permission_denied') {
+        const dashboardUrl = `${APP_URL}/dashboard?error=youtube_permission_denied&section=social-media`;
+        return NextResponse.redirect(dashboardUrl);
+      }
+      
+      const dashboardUrl = `${APP_URL}/dashboard?error=oauth_failed&section=social-media`;
       return NextResponse.redirect(dashboardUrl);
     }
 
