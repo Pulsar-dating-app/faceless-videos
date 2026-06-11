@@ -3305,6 +3305,7 @@ export default function Dashboard() {
                     language,
                     voice,
                     duration,
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
                   };
 
                   const secondPublishEl = document.getElementById("edit-second-publish-time") as HTMLSelectElement | null;
