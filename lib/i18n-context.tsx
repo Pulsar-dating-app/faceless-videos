@@ -339,6 +339,8 @@ export const translations = {
         notConnected: "Not connected",
         connecting: "Connecting...",
         disconnecting: "Disconnecting...",
+        select: "Select",
+        selected: "Selected",
         description: "Connect your social media accounts to automatically upload your generated series. This feature will be available soon.",
         disconnectConfirmTitle: "Disconnect {platform}?",
         disconnectConfirm: "Are you sure you want to disconnect {platform}?",
@@ -752,6 +754,8 @@ export const translations = {
         notConnected: "No conectado",
         connecting: "Conectando...",
         disconnecting: "Desconectando...",
+        select: "Seleccionar",
+        selected: "Seleccionado",
         description: "Conecta tus cuentas de redes sociales para subir automáticamente tus series generadas. Esta función estará disponible pronto.",
         disconnectConfirmTitle: "¿Desconectar {platform}?",
         disconnectConfirm: "¿Estás seguro de que quieres desconectar {platform}?",
@@ -1165,6 +1169,8 @@ export const translations = {
         notConnected: "Non connecté",
         connecting: "Connexion...",
         disconnecting: "Déconnexion...",
+        select: "Sélectionner",
+        selected: "Sélectionné",
         description: "Connectez vos comptes de réseaux sociaux pour télécharger automatiquement vos vidéos générées. Cette fonctionnalité sera bientôt disponible.",
         disconnectConfirmTitle: "Déconnecter {platform} ?",
         disconnectConfirm: "Êtes-vous sûr de vouloir déconnecter {platform}?",
@@ -1578,6 +1584,8 @@ export const translations = {
         notConnected: "Não conectado",
         connecting: "Conectando...",
         disconnecting: "Desconectando...",
+        select: "Selecionar",
+        selected: "Selecionado",
         description: "Conecte suas contas de redes sociais para fazer upload automático dos seus vídeos gerados. Esta funcionalidade estará disponível em breve.",
         disconnectConfirmTitle: "Desconectar {platform}?",
         disconnectConfirm: "Tem certeza de que deseja desconectar {platform}?",
@@ -1991,6 +1999,8 @@ export const translations = {
         notConnected: "Nicht verbunden",
         connecting: "Verbinde...",
         disconnecting: "Trenne...",
+        select: "Auswählen",
+        selected: "Ausgewählt",
         description: "Verknüpfe deine Social Media Konten, um deine generierten Serien automatisch hochzuladen. Diese Funktion wird bald verfügbar sein.",
         disconnectConfirmTitle: "{platform} trennen?",
         disconnectConfirm: "Bist du sicher, dass du {platform} trennen möchtest?",
@@ -2105,11 +2115,23 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   // (avoid reading localStorage during render to prevent hydration mismatch)
   const [language, setLanguageState] = useState<Language>("en");
 
-  // After hydration, load saved language (client-only)
+  // After hydration, load saved language or detect from browser (client-only)
   useEffect(() => {
     const savedLang = localStorage.getItem("app-language") as Language | null;
-    if (savedLang && translations[savedLang] && savedLang !== language) {
-      setLanguageState(savedLang);
+    if (savedLang && translations[savedLang]) {
+      if (savedLang !== language) setLanguageState(savedLang);
+      return;
+    }
+
+    // No saved preference — detect from browser/device
+    const browserLangs = navigator.languages?.length ? navigator.languages : [navigator.language];
+    const supported = Object.keys(translations) as Language[];
+    for (const bl of browserLangs) {
+      const code = bl.split("-")[0].toLowerCase() as Language;
+      if (supported.includes(code)) {
+        setLanguageState(code);
+        break;
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
