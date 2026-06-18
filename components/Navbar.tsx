@@ -77,7 +77,7 @@ export function Navbar({ onLogoClick }: NavbarProps) {
       <Link 
         href="/" 
         onClick={handleLogoClick}
-        className="flex items-center gap-2 font-bold text-xl cursor-pointer z-50"
+        className="flex items-center gap-2 font-bold text-xl cursor-pointer"
       >
         <Image 
           src="/images/logo.png" 

@@ -29,8 +29,10 @@ export default function LoginPage() {
         throw error;
       }
       
-      // Redirect to home after successful login
-      window.location.href = "/";
+      // Redirect to pricing if coming from new signup, otherwise home
+      const redirectTo = sessionStorage.getItem("redirectAfterLogin") ?? "/";
+      sessionStorage.removeItem("redirectAfterLogin");
+      window.location.href = redirectTo;
     } catch (err: any) {
       setError(err.message || "Failed to sign in. Please check your credentials.");
     } finally {

@@ -1587,7 +1587,7 @@ export default function Dashboard() {
                       </div>
                     ) : (
                       <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                        Not connected
+                        {t.dashboard.socialMedia.notConnected}
                       </p>
                     )}
                   </div>
@@ -1611,10 +1611,10 @@ export default function Dashboard() {
                     {selectedPlatforms.includes('instagram') ? (
                       <span className="flex items-center justify-center gap-2">
                         <Check className="w-4 h-4" />
-                        Selected
+                        {t.dashboard.socialMedia.selected}
                       </span>
                     ) : (
-                      "Select"
+                      t.dashboard.socialMedia.select
                     )}
                   </button>
                 ) : (
@@ -1627,10 +1627,10 @@ export default function Dashboard() {
                     {isConnectingInstagram ? (
                       <span className="flex items-center justify-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Connecting...
+                        {t.dashboard.socialMedia.connecting}
                       </span>
                     ) : (
-                      "Connect Instagram"
+                      `${t.dashboard.socialMedia.connect} Instagram`
                     )}
                   </button>
                 )}
@@ -1669,7 +1669,7 @@ export default function Dashboard() {
                       </div>
                     ) : (
                       <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                        Not connected
+                        {t.dashboard.socialMedia.notConnected}
                       </p>
                     )}
                   </div>
@@ -1693,10 +1693,10 @@ export default function Dashboard() {
                     {selectedPlatforms.includes('youtube') ? (
                       <span className="flex items-center justify-center gap-2">
                         <Check className="w-4 h-4" />
-                        Selected
+                        {t.dashboard.socialMedia.selected}
                       </span>
                     ) : (
-                      "Select"
+                      t.dashboard.socialMedia.select
                     )}
                   </button>
                 ) : (
@@ -1709,10 +1709,10 @@ export default function Dashboard() {
                     {isConnectingYoutube ? (
                       <span className="flex items-center justify-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Connecting...
+                        {t.dashboard.socialMedia.connecting}
                       </span>
                     ) : (
-                      "Connect YouTube"
+                      `${t.dashboard.socialMedia.connect} YouTube`
                     )}
                   </button>
                 )}
@@ -2808,7 +2808,7 @@ export default function Dashboard() {
                               <div className="text-xs text-green-600 dark:text-green-400">Connected</div>
                             )
                           ) : (
-                            <div className="text-xs text-zinc-500">Not connected</div>
+                            <div className="text-xs text-zinc-500">{t.dashboard.socialMedia.notConnected}</div>
                           )}
                         </div>
                         {tiktokConnected && postingTo !== 'tiktok' && <Send className="w-4 h-4 text-zinc-400" />}
@@ -2841,7 +2841,7 @@ export default function Dashboard() {
                               <div className="text-xs text-green-600 dark:text-green-400">Connected</div>
                             )
                           ) : (
-                            <div className="text-xs text-zinc-500">Not connected</div>
+                            <div className="text-xs text-zinc-500">{t.dashboard.socialMedia.notConnected}</div>
                           )}
                         </div>
                         {youtubeConnected && postingTo !== 'youtube' && <Send className="w-4 h-4 text-zinc-400" />}
@@ -2874,7 +2874,7 @@ export default function Dashboard() {
                               <div className="text-xs text-orange-600 dark:text-orange-400">Coming soon</div>
                             )
                           ) : (
-                            <div className="text-xs text-zinc-500">Not connected</div>
+                            <div className="text-xs text-zinc-500">{t.dashboard.socialMedia.notConnected}</div>
                           )}
                         </div>
                         {instagramConnected && postingTo !== 'instagram' && <Send className="w-4 h-4 text-zinc-400 opacity-50" />}
