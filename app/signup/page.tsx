@@ -49,11 +49,12 @@ export default function SignupPage() {
         throw error;
       }
       
-      // Redirect to home after successful signup when email confirmation is disabled
+      // Redirect to pricing after successful signup when email confirmation is disabled
       if (data.session) {
-        window.location.href = "/";
+        window.location.href = "/pricing";
       } else {
-        // If email confirmation is enabled, show a nice dialog instead of a browser alert
+        // If email confirmation is enabled, flag so login redirects to pricing after verification
+        sessionStorage.setItem("redirectAfterLogin", "/pricing");
         setShowSuccessDialog(true);
       }
 
