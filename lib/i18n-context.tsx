@@ -316,6 +316,8 @@ export const translations = {
         cancelButton: "Cancel",
         cancelFailed: "Cancel Failed",
         cancelPostFailedMessage: "Failed to cancel scheduled post.",
+        loadError: "Failed to Load Scheduled Videos",
+        loadErrorMessage: "An error occurred while loading scheduled videos.",
       },
       subscription: {
         title: "My Subscription",
@@ -376,6 +378,9 @@ export const translations = {
         updating: "Updating...",
         updateSuccess: "Series updated successfully!",
         updateError: "Failed to update series",
+        loadSeriesError: "Failed to Load Series",
+        loadSeriesErrorMessage: "An error occurred while loading your series. Please try again.",
+        createSeriesError: "Failed to Create Series",
         errors: {
           MISSING_AUTH_HEADER: "Please sign in again to update your series.",
           INVALID_TOKEN: "Your session may have expired. Please sign in again.",
@@ -731,6 +736,8 @@ export const translations = {
         cancelButton: "Cancelar",
         cancelFailed: "Error al cancelar",
         cancelPostFailedMessage: "Error al cancelar la publicación programada.",
+        loadError: "Error al cargar los videos programados",
+        loadErrorMessage: "Ocurrió un error al cargar los videos programados.",
       },
       subscription: {
         title: "Mi Suscripción",
@@ -791,6 +798,9 @@ export const translations = {
         updating: "Actualizando...",
         updateSuccess: "¡Serie actualizada exitosamente!",
         updateError: "Error al actualizar la serie",
+        loadSeriesError: "Error al cargar las series",
+        loadSeriesErrorMessage: "Ocurrió un error al cargar tus series. Por favor, inténtalo de nuevo.",
+        createSeriesError: "Error al crear la serie",
         errors: {
           MISSING_AUTH_HEADER: "Inicia sesión de nuevo para actualizar tu serie.",
           INVALID_TOKEN: "Tu sesión puede haber expirado. Inicia sesión de nuevo.",
@@ -1146,6 +1156,8 @@ export const translations = {
         cancelButton: "Annuler",
         cancelFailed: "Échec de l'annulation",
         cancelPostFailedMessage: "Échec de l'annulation de la publication programmée.",
+        loadError: "Échec du chargement des vidéos programmées",
+        loadErrorMessage: "Une erreur s'est produite lors du chargement des vidéos programmées.",
       },
       subscription: {
         title: "Mon Abonnement",
@@ -1206,6 +1218,9 @@ export const translations = {
         updating: "Mise à jour...",
         updateSuccess: "Série mise à jour avec succès!",
         updateError: "Échec de la mise à jour de la série",
+        loadSeriesError: "Échec du chargement des séries",
+        loadSeriesErrorMessage: "Une erreur s'est produite lors du chargement de vos séries. Veuillez réessayer.",
+        createSeriesError: "Échec de la création de la série",
         errors: {
           MISSING_AUTH_HEADER: "Veuillez vous reconnecter pour mettre à jour votre série.",
           INVALID_TOKEN: "Votre session a peut-être expiré. Veuillez vous reconnecter.",
@@ -1561,6 +1576,8 @@ export const translations = {
         cancelButton: "Cancelar",
         cancelFailed: "Falha ao cancelar",
         cancelPostFailedMessage: "Falha ao cancelar a publicação agendada.",
+        loadError: "Falha ao carregar vídeos agendados",
+        loadErrorMessage: "Ocorreu um erro ao carregar os vídeos agendados.",
       },
       subscription: {
         title: "Minha Assinatura",
@@ -1621,6 +1638,9 @@ export const translations = {
         updating: "Atualizando...",
         updateSuccess: "Série atualizada com sucesso!",
         updateError: "Falha ao atualizar a série",
+        loadSeriesError: "Falha ao carregar séries",
+        loadSeriesErrorMessage: "Ocorreu um erro ao carregar suas séries. Por favor, tente novamente.",
+        createSeriesError: "Falha ao criar série",
         errors: {
           MISSING_AUTH_HEADER: "Faça login novamente para atualizar sua série.",
           INVALID_TOKEN: "Sua sessão pode ter expirado. Faça login novamente.",
@@ -1976,6 +1996,8 @@ export const translations = {
         cancelButton: "Abbrechen",
         cancelFailed: "Abbrechen fehlgeschlagen",
         cancelPostFailedMessage: "Geplanten Beitrag konnte nicht abgebrochen werden.",
+        loadError: "Fehler beim Laden geplanter Videos",
+        loadErrorMessage: "Beim Laden der geplanten Videos ist ein Fehler aufgetreten.",
       },
       subscription: {
         title: "Mein Abonnement",
@@ -2036,6 +2058,9 @@ export const translations = {
         updating: "Aktualisiere...",
         updateSuccess: "Serie erfolgreich aktualisiert!",
         updateError: "Fehler beim Aktualisieren der Serie",
+        loadSeriesError: "Fehler beim Laden der Serien",
+        loadSeriesErrorMessage: "Beim Laden deiner Serien ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+        createSeriesError: "Fehler beim Erstellen der Serie",
         errors: {
           MISSING_AUTH_HEADER: "Bitte melden Sie sich erneut an, um Ihre Serie zu aktualisieren.",
           INVALID_TOKEN: "Ihre Sitzung ist möglicherweise abgelaufen. Bitte melden Sie sich erneut an.",

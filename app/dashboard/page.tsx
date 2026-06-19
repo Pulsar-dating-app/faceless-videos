@@ -814,8 +814,8 @@ export default function Dashboard() {
       setErrorDialog({
         isOpen: true,
         type: "error",
-        title: "Failed to Load Series",
-        message: errorMessage || "An error occurred while loading your series. Please try again.",
+        title: t.dashboard.seriesManagement.loadSeriesError,
+        message: errorMessage || t.dashboard.seriesManagement.loadSeriesErrorMessage,
       });
     } finally {
       setIsLoadingSeries(false);
@@ -836,8 +836,8 @@ export default function Dashboard() {
       setErrorDialog({
         isOpen: true,
         type: "error",
-        title: "Failed to Load Scheduled Videos",
-        message: errorMessage || "An error occurred while loading scheduled videos.",
+        title: t.dashboard.scheduledPosts.loadError,
+        message: errorMessage || t.dashboard.scheduledPosts.loadErrorMessage,
       });
     } finally {
       setIsLoadingScheduledPosts(false);
@@ -1053,11 +1053,11 @@ export default function Dashboard() {
           const message =
             responseBody?.errorCode && errors && typeof errors[responseBody.errorCode] === "string"
               ? errors[responseBody.errorCode]
-              : (responseBody?.error as string) || (error instanceof Error ? error.message : String(error)) || (errors?.SERVER_ERROR ?? "An error occurred while creating your series. Please try again.");
+              : (responseBody?.error as string) || (error instanceof Error ? error.message : String(error)) || (errors?.SERVER_ERROR ?? t.dashboard.seriesManagement.loadSeriesErrorMessage);
           setErrorDialog({
             isOpen: true,
             type: "error",
-            title: "Failed to Create Series",
+            title: t.dashboard.seriesManagement.createSeriesError,
             message,
           });
           return;
@@ -1076,11 +1076,11 @@ export default function Dashboard() {
         const errors = (t.dashboard.seriesManagement as { errors?: Record<string, string> }).errors;
         const errorMessage = error instanceof Error ? error.message : String(error);
         const message =
-          errors?.SERVER_ERROR ?? "An error occurred while creating your series. Please try again.";
+          errors?.SERVER_ERROR ?? t.dashboard.seriesManagement.loadSeriesErrorMessage;
         setErrorDialog({
           isOpen: true,
           type: "error",
-          title: "Failed to Create Series",
+          title: t.dashboard.seriesManagement.createSeriesError,
           message: errorMessage || message,
         });
       } finally {
