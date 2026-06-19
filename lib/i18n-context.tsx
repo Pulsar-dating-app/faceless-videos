@@ -2131,6 +2131,7 @@ interface I18nContextType {
   setLanguage: (lang: Language) => void;
   t: TranslationKeys;
   formatMessage: (message: string, params?: Record<string, string | number>) => string;
+  isLanguageReady: boolean;
 }
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
@@ -2139,12 +2140,14 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   // IMPORTANT: keep initial render consistent between server & client
   // (avoid reading localStorage during render to prevent hydration mismatch)
   const [language, setLanguageState] = useState<Language>("en");
+  const [isLanguageReady, setIsLanguageReady] = useState(false);
 
   // After hydration, load saved language or detect from browser (client-only)
   useEffect(() => {
     const savedLang = localStorage.getItem("app-language") as Language | null;
     if (savedLang && translations[savedLang]) {
       if (savedLang !== language) setLanguageState(savedLang);
+      setIsLanguageReady(true);
       return;
     }
 
@@ -2158,6 +2161,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
         break;
       }
     }
+    setIsLanguageReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -2168,7 +2172,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   const formatMessage = (message: string, params?: Record<string, string | number>): string => {
     if (!params) return message;
-    
+
     let formatted = message;
     Object.entries(params).forEach(([key, value]) => {
       formatted = formatted.replace(`{{${key}}}`, String(value));
@@ -2181,6 +2185,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     setLanguage,
     t: translations[language],
     formatMessage,
+    isLanguageReady,
   };
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

@@ -106,7 +106,7 @@ type DashboardSection = "video-creation" | "social-media" | "series-management" 
 export default function Dashboard() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
-  const { t, formatMessage, language: siteLanguage } = useI18n();
+  const { t, formatMessage, language: siteLanguage, isLanguageReady } = useI18n();
   const [activeSection, setActiveSection] = useState<DashboardSection>("video-creation");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -193,6 +193,12 @@ export default function Dashboard() {
   const [isLoadingScheduledPosts, setIsLoadingScheduledPosts] = useState(false);
   const [cancelPostId, setCancelPostId] = useState<string | null>(null);
   const [isDeletingPost, setIsDeletingPost] = useState(false);
+
+  // Pending OAuth notification — deferred until language is ready
+  const [pendingOAuthCallback, setPendingOAuthCallback] = useState<{
+    connected?: string;
+    error?: string;
+  } | null>(null);
 
   // Error dialog state
   const [errorDialog, setErrorDialog] = useState<{
@@ -376,8 +382,7 @@ export default function Dashboard() {
       window.history.replaceState({}, '', '/dashboard');
     }
 
-    if (connected === 'tiktok') {
-      showSocialSuccess("TikTok");
+    if (connected) {
       fetchSocialConnections();
       if (step === '5') {
         restoreWizardState();
@@ -386,43 +391,40 @@ export default function Dashboard() {
       } else if (section === 'social-media') {
         setActiveSection('social-media');
       }
-      window.history.replaceState({}, '', '/dashboard');
-    }
-
-    if (connected === 'instagram') {
-      showSocialSuccess("Instagram");
-      fetchSocialConnections();
-      if (step === '5') {
-        restoreWizardState();
-        setActiveSection('video-creation');
-        setCurrentStep(5);
-      } else if (section === 'social-media') {
-        setActiveSection('social-media');
-      }
-      window.history.replaceState({}, '', '/dashboard');
-    }
-
-    if (connected === 'youtube') {
-      showSocialSuccess("YouTube");
-      fetchSocialConnections();
-      if (step === '5') {
-        restoreWizardState();
-        setActiveSection('video-creation');
-        setCurrentStep(5);
-      } else if (section === 'social-media') {
-        setActiveSection('social-media');
-      }
+      setPendingOAuthCallback({ connected });
       window.history.replaceState({}, '', '/dashboard');
     }
 
     if (error) {
+      if (step === '5') {
+        restoreWizardState();
+        setActiveSection('video-creation');
+        setCurrentStep(5);
+      }
+      setPendingOAuthCallback({ error });
+      window.history.replaceState({}, '', '/dashboard');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // Show OAuth toast only after language has loaded to avoid English flash
+  useEffect(() => {
+    if (!pendingOAuthCallback || !isLanguageReady) return;
+
+    const { connected, error } = pendingOAuthCallback;
+
+    if (connected === 'tiktok') showSocialSuccess("TikTok");
+    if (connected === 'instagram') showSocialSuccess("Instagram");
+    if (connected === 'youtube') showSocialSuccess("YouTube");
+
+    if (error) {
       const oauthErrors = (t.messages as { oauthErrors?: Record<string, string> }).oauthErrors;
       const errorMessages: { [key: string]: string } = {
-        'missing_params': oauthErrors?.missing_params ?? 'OAuth parameters missing',
-        'oauth_failed': oauthErrors?.oauth_failed ?? 'Failed to connect to social media',
-        'access_denied': oauthErrors?.access_denied ?? 'You denied access',
-        'publish_scope_required': oauthErrors?.publish_scope_required ?? 'You must allow posting permission to connect. Please try again and enable posting when asked.',
-        'youtube_permission_denied': oauthErrors?.youtube_permission_denied ?? 'YouTube video upload permission is required. Please allow "Manage your YouTube videos" when connecting your account.',
+        missing_params: oauthErrors?.missing_params ?? 'OAuth parameters missing',
+        oauth_failed: oauthErrors?.oauth_failed ?? 'Failed to connect to social media',
+        access_denied: oauthErrors?.access_denied ?? 'You denied access',
+        publish_scope_required: oauthErrors?.publish_scope_required ?? 'You must allow posting permission to connect. Please try again and enable posting when asked.',
+        youtube_permission_denied: oauthErrors?.youtube_permission_denied ?? 'YouTube video upload permission is required. Please allow "Manage your YouTube videos" when connecting your account.',
       };
       const unknownError = (t.messages as { unknownError?: string }).unknownError ?? 'Unknown error occurred';
       setToast({
@@ -431,15 +433,11 @@ export default function Dashboard() {
         title: t.messages.connectionFailed,
         message: formatMessageLoose((t.messages as { oauthErrorFormat?: string }).oauthErrorFormat ?? 'Error: {{error}}', { error: errorMessages[error] || unknownError }),
       });
-      if (step === '5') {
-        restoreWizardState();
-        setActiveSection('video-creation');
-        setCurrentStep(5);
-      }
-      window.history.replaceState({}, '', '/dashboard');
     }
+
+    setPendingOAuthCallback(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [pendingOAuthCallback, isLanguageReady]);
 
   // Fetch social media connections from database
   const fetchSocialConnections = async () => {
