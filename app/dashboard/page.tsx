@@ -377,67 +377,45 @@ export default function Dashboard() {
     }
 
     if (connected === 'tiktok') {
-      // Show success message
       showSocialSuccess("TikTok");
-      fetchSocialConnections(); // Refresh connections from database
-      
-      // Switch to social media section if specified
-      if (section === 'social-media') {
-        setActiveSection('social-media');
-      }
-      
-      // Return to step 5 if connecting from step 5
+      fetchSocialConnections();
       if (step === '5') {
+        restoreWizardState();
         setActiveSection('video-creation');
         setCurrentStep(5);
+      } else if (section === 'social-media') {
+        setActiveSection('social-media');
       }
-      
-      // Clean up URL
       window.history.replaceState({}, '', '/dashboard');
     }
 
     if (connected === 'instagram') {
-      // Show success message
       showSocialSuccess("Instagram");
-      fetchSocialConnections(); // Refresh connections from database
-      
-      // Switch to social media section if specified
-      if (section === 'social-media') {
-        setActiveSection('social-media');
-      }
-      
-      // Return to step 5 if connecting from step 5
+      fetchSocialConnections();
       if (step === '5') {
+        restoreWizardState();
         setActiveSection('video-creation');
         setCurrentStep(5);
+      } else if (section === 'social-media') {
+        setActiveSection('social-media');
       }
-      
-      // Clean up URL
       window.history.replaceState({}, '', '/dashboard');
     }
 
     if (connected === 'youtube') {
-      // Show success message
       showSocialSuccess("YouTube");
-      fetchSocialConnections(); // Refresh connections from database
-      
-      // Switch to social media section if specified
-      if (section === 'social-media') {
-        setActiveSection('social-media');
-      }
-      
-      // Return to step 5 if connecting from step 5
+      fetchSocialConnections();
       if (step === '5') {
+        restoreWizardState();
         setActiveSection('video-creation');
         setCurrentStep(5);
+      } else if (section === 'social-media') {
+        setActiveSection('social-media');
       }
-      
-      // Clean up URL
       window.history.replaceState({}, '', '/dashboard');
     }
-    
+
     if (error) {
-      // Show error message
       const oauthErrors = (t.messages as { oauthErrors?: Record<string, string> }).oauthErrors;
       const errorMessages: { [key: string]: string } = {
         'missing_params': oauthErrors?.missing_params ?? 'OAuth parameters missing',
@@ -453,8 +431,11 @@ export default function Dashboard() {
         title: t.messages.connectionFailed,
         message: formatMessageLoose((t.messages as { oauthErrorFormat?: string }).oauthErrorFormat ?? 'Error: {{error}}', { error: errorMessages[error] || unknownError }),
       });
-      
-      // Clean up URL
+      if (step === '5') {
+        restoreWizardState();
+        setActiveSection('video-creation');
+        setCurrentStep(5);
+      }
       window.history.replaceState({}, '', '/dashboard');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -605,30 +586,58 @@ export default function Dashboard() {
     }
   };
 
+  const saveWizardState = () => {
+    const state = {
+      videoType, category, duration, language, voice,
+      artStyle, backgroundVideo, script,
+      selectedPlatforms, seriesName, publishTime, secondPublishTime, publishDays,
+    };
+    sessionStorage.setItem('wizard_oauth_state', JSON.stringify(state));
+  };
+
+  const restoreWizardState = () => {
+    const raw = sessionStorage.getItem('wizard_oauth_state');
+    if (!raw) return;
+    try {
+      const s = JSON.parse(raw);
+      if (s.videoType) setVideoType(s.videoType);
+      if (s.category) setCategory(s.category);
+      if (s.duration) setDuration(s.duration);
+      if (s.language) setLanguage(s.language);
+      if (s.voice) setVoice(s.voice);
+      if (s.artStyle) setArtStyle(s.artStyle);
+      if (s.backgroundVideo) setBackgroundVideo(s.backgroundVideo);
+      if (s.script) setScript(s.script);
+      if (s.selectedPlatforms) setSelectedPlatforms(s.selectedPlatforms);
+      if (s.seriesName) setSeriesName(s.seriesName);
+      if (s.publishTime) setPublishTime(s.publishTime);
+      if (s.secondPublishTime) setSecondPublishTime(s.secondPublishTime);
+      if (s.publishDays) setPublishDays(s.publishDays);
+    } catch { /* ignore */ }
+    sessionStorage.removeItem('wizard_oauth_state');
+  };
+
   const handleConnectTiktok = () => {
     if (!user) return;
-    
     setIsConnectingTiktok(true);
-    // Redirect to TikTok OAuth, include step parameter if on step 5
     const stepParam = currentStep === 5 ? '&step=5' : '';
+    if (currentStep === 5) saveWizardState();
     window.location.href = `/api/tiktok/auth?user_id=${user.id}${stepParam}`;
   };
 
   const handleConnectInstagram = () => {
     if (!user) return;
-    
     setIsConnectingInstagram(true);
-    // Redirect to Instagram OAuth, include step parameter if on step 5
     const stepParam = currentStep === 5 ? '&step=5' : '';
+    if (currentStep === 5) saveWizardState();
     window.location.href = `/api/instagram/auth?user_id=${user.id}${stepParam}`;
   };
 
   const handleConnectYoutube = () => {
     if (!user) return;
-    
     setIsConnectingYoutube(true);
-    // Redirect to YouTube OAuth, include step parameter if on step 5
     const stepParam = currentStep === 5 ? '&step=5' : '';
+    if (currentStep === 5) saveWizardState();
     window.location.href = `/api/youtube/auth?user_id=${user.id}${stepParam}`;
   };
 
