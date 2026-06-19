@@ -316,6 +316,8 @@ export const translations = {
         cancelButton: "Cancel",
         cancelFailed: "Cancel Failed",
         cancelPostFailedMessage: "Failed to cancel scheduled post.",
+        loadError: "Failed to Load Scheduled Videos",
+        loadErrorMessage: "An error occurred while loading scheduled videos.",
       },
       subscription: {
         title: "My Subscription",
@@ -376,6 +378,9 @@ export const translations = {
         updating: "Updating...",
         updateSuccess: "Series updated successfully!",
         updateError: "Failed to update series",
+        loadSeriesError: "Failed to Load Series",
+        loadSeriesErrorMessage: "An error occurred while loading your series. Please try again.",
+        createSeriesError: "Failed to Create Series",
         errors: {
           MISSING_AUTH_HEADER: "Please sign in again to update your series.",
           INVALID_TOKEN: "Your session may have expired. Please sign in again.",
@@ -398,6 +403,7 @@ export const translations = {
         backgroundVideoStep: "Background Video",
         publishingPlatformsTitle: "Choose Publishing Platforms",
         publishingPlatformsSubtitle: "Select which social media platforms you want to publish your series to",
+        permissionsHint: "Important: when connecting your account, make sure to allow all requested permissions so we can publish videos on your behalf.",
         seriesConfigurationTitle: "Series Configuration",
         seriesConfigurationSubtitle: "Enter your series name and select when videos should be published",
         seriesNameLabel: "Series Name",
@@ -731,6 +737,8 @@ export const translations = {
         cancelButton: "Cancelar",
         cancelFailed: "Error al cancelar",
         cancelPostFailedMessage: "Error al cancelar la publicación programada.",
+        loadError: "Error al cargar los videos programados",
+        loadErrorMessage: "Ocurrió un error al cargar los videos programados.",
       },
       subscription: {
         title: "Mi Suscripción",
@@ -791,6 +799,9 @@ export const translations = {
         updating: "Actualizando...",
         updateSuccess: "¡Serie actualizada exitosamente!",
         updateError: "Error al actualizar la serie",
+        loadSeriesError: "Error al cargar las series",
+        loadSeriesErrorMessage: "Ocurrió un error al cargar tus series. Por favor, inténtalo de nuevo.",
+        createSeriesError: "Error al crear la serie",
         errors: {
           MISSING_AUTH_HEADER: "Inicia sesión de nuevo para actualizar tu serie.",
           INVALID_TOKEN: "Tu sesión puede haber expirado. Inicia sesión de nuevo.",
@@ -813,6 +824,7 @@ export const translations = {
         backgroundVideoStep: "Video de Fondo",
         publishingPlatformsTitle: "Elige las Plataformas de Publicación",
         publishingPlatformsSubtitle: "Selecciona en qué redes sociales quieres publicar tu serie",
+        permissionsHint: "Importante: al conectar tu cuenta, asegúrate de permitir todos los permisos solicitados para que podamos publicar videos en tu nombre.",
         seriesConfigurationTitle: "Configuración de la Serie",
         seriesConfigurationSubtitle: "Ingresa el nombre de tu serie y selecciona cuándo se publicarán los videos",
         seriesNameLabel: "Nombre de la Serie",
@@ -1146,6 +1158,8 @@ export const translations = {
         cancelButton: "Annuler",
         cancelFailed: "Échec de l'annulation",
         cancelPostFailedMessage: "Échec de l'annulation de la publication programmée.",
+        loadError: "Échec du chargement des vidéos programmées",
+        loadErrorMessage: "Une erreur s'est produite lors du chargement des vidéos programmées.",
       },
       subscription: {
         title: "Mon Abonnement",
@@ -1206,6 +1220,9 @@ export const translations = {
         updating: "Mise à jour...",
         updateSuccess: "Série mise à jour avec succès!",
         updateError: "Échec de la mise à jour de la série",
+        loadSeriesError: "Échec du chargement des séries",
+        loadSeriesErrorMessage: "Une erreur s'est produite lors du chargement de vos séries. Veuillez réessayer.",
+        createSeriesError: "Échec de la création de la série",
         errors: {
           MISSING_AUTH_HEADER: "Veuillez vous reconnecter pour mettre à jour votre série.",
           INVALID_TOKEN: "Votre session a peut-être expiré. Veuillez vous reconnecter.",
@@ -1228,6 +1245,7 @@ export const translations = {
         backgroundVideoStep: "Vidéo de Fond",
         publishingPlatformsTitle: "Choisir les Plateformes de Publication",
         publishingPlatformsSubtitle: "Sélectionnez sur quels réseaux sociaux vous souhaitez publier votre série",
+        permissionsHint: "Important : lors de la connexion de votre compte, assurez-vous d'autoriser toutes les autorisations demandées afin que nous puissions publier des vidéos en votre nom.",
         seriesConfigurationTitle: "Configuration de la Série",
         seriesConfigurationSubtitle: "Entrez le nom de votre série et choisissez quand les vidéos seront publiées",
         seriesNameLabel: "Nom de la Série",
@@ -1561,6 +1579,8 @@ export const translations = {
         cancelButton: "Cancelar",
         cancelFailed: "Falha ao cancelar",
         cancelPostFailedMessage: "Falha ao cancelar a publicação agendada.",
+        loadError: "Falha ao carregar vídeos agendados",
+        loadErrorMessage: "Ocorreu um erro ao carregar os vídeos agendados.",
       },
       subscription: {
         title: "Minha Assinatura",
@@ -1621,6 +1641,9 @@ export const translations = {
         updating: "Atualizando...",
         updateSuccess: "Série atualizada com sucesso!",
         updateError: "Falha ao atualizar a série",
+        loadSeriesError: "Falha ao carregar séries",
+        loadSeriesErrorMessage: "Ocorreu um erro ao carregar suas séries. Por favor, tente novamente.",
+        createSeriesError: "Falha ao criar série",
         errors: {
           MISSING_AUTH_HEADER: "Faça login novamente para atualizar sua série.",
           INVALID_TOKEN: "Sua sessão pode ter expirado. Faça login novamente.",
@@ -1643,6 +1666,7 @@ export const translations = {
         backgroundVideoStep: "Vídeo de Fundo",
         publishingPlatformsTitle: "Escolha as Plataformas de Publicação",
         publishingPlatformsSubtitle: "Selecione em quais redes sociais você deseja publicar sua série",
+        permissionsHint: "Importante: ao conectar sua conta, certifique-se de permitir todas as permissões solicitadas para que possamos publicar vídeos em seu nome.",
         seriesConfigurationTitle: "Configuração da Série",
         seriesConfigurationSubtitle: "Informe o nome da série e escolha quando os vídeos serão publicados",
         seriesNameLabel: "Nome da Série",
@@ -1976,6 +2000,8 @@ export const translations = {
         cancelButton: "Abbrechen",
         cancelFailed: "Abbrechen fehlgeschlagen",
         cancelPostFailedMessage: "Geplanten Beitrag konnte nicht abgebrochen werden.",
+        loadError: "Fehler beim Laden geplanter Videos",
+        loadErrorMessage: "Beim Laden der geplanten Videos ist ein Fehler aufgetreten.",
       },
       subscription: {
         title: "Mein Abonnement",
@@ -2036,6 +2062,9 @@ export const translations = {
         updating: "Aktualisiere...",
         updateSuccess: "Serie erfolgreich aktualisiert!",
         updateError: "Fehler beim Aktualisieren der Serie",
+        loadSeriesError: "Fehler beim Laden der Serien",
+        loadSeriesErrorMessage: "Beim Laden deiner Serien ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+        createSeriesError: "Fehler beim Erstellen der Serie",
         errors: {
           MISSING_AUTH_HEADER: "Bitte melden Sie sich erneut an, um Ihre Serie zu aktualisieren.",
           INVALID_TOKEN: "Ihre Sitzung ist möglicherweise abgelaufen. Bitte melden Sie sich erneut an.",
@@ -2058,6 +2087,7 @@ export const translations = {
         backgroundVideoStep: "Hintergrundvideo",
         publishingPlatformsTitle: "Veröffentlichungsplattformen wählen",
         publishingPlatformsSubtitle: "Wähle, auf welchen Social-Media-Plattformen deine Serie veröffentlicht werden soll",
+        permissionsHint: "Wichtig: Stelle beim Verbinden deines Kontos sicher, dass du alle angeforderten Berechtigungen erteilst, damit wir Videos in deinem Namen veröffentlichen können.",
         seriesConfigurationTitle: "Serienkonfiguration",
         seriesConfigurationSubtitle: "Gib den Namen deiner Serie ein und wähle, wann die Videos veröffentlicht werden sollen",
         seriesNameLabel: "Serienname",
@@ -2106,6 +2136,7 @@ interface I18nContextType {
   setLanguage: (lang: Language) => void;
   t: TranslationKeys;
   formatMessage: (message: string, params?: Record<string, string | number>) => string;
+  isLanguageReady: boolean;
 }
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
@@ -2114,12 +2145,14 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   // IMPORTANT: keep initial render consistent between server & client
   // (avoid reading localStorage during render to prevent hydration mismatch)
   const [language, setLanguageState] = useState<Language>("en");
+  const [isLanguageReady, setIsLanguageReady] = useState(false);
 
   // After hydration, load saved language or detect from browser (client-only)
   useEffect(() => {
     const savedLang = localStorage.getItem("app-language") as Language | null;
     if (savedLang && translations[savedLang]) {
       if (savedLang !== language) setLanguageState(savedLang);
+      setIsLanguageReady(true);
       return;
     }
 
@@ -2133,6 +2166,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
         break;
       }
     }
+    setIsLanguageReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -2143,7 +2177,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   const formatMessage = (message: string, params?: Record<string, string | number>): string => {
     if (!params) return message;
-    
+
     let formatted = message;
     Object.entries(params).forEach(([key, value]) => {
       formatted = formatted.replace(`{{${key}}}`, String(value));
@@ -2156,6 +2190,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     setLanguage,
     t: translations[language],
     formatMessage,
+    isLanguageReady,
   };
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

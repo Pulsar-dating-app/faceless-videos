@@ -106,7 +106,7 @@ type DashboardSection = "video-creation" | "social-media" | "series-management" 
 export default function Dashboard() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
-  const { t, formatMessage, language: siteLanguage } = useI18n();
+  const { t, formatMessage, language: siteLanguage, isLanguageReady } = useI18n();
   const [activeSection, setActiveSection] = useState<DashboardSection>("video-creation");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -193,6 +193,12 @@ export default function Dashboard() {
   const [isLoadingScheduledPosts, setIsLoadingScheduledPosts] = useState(false);
   const [cancelPostId, setCancelPostId] = useState<string | null>(null);
   const [isDeletingPost, setIsDeletingPost] = useState(false);
+
+  // Pending OAuth notification — deferred until language is ready
+  const [pendingOAuthCallback, setPendingOAuthCallback] = useState<{
+    connected?: string;
+    error?: string;
+  } | null>(null);
 
   // Error dialog state
   const [errorDialog, setErrorDialog] = useState<{
@@ -368,7 +374,7 @@ export default function Dashboard() {
     const connected = params.get('connected');
     const error = params.get('error');
     const section = params.get('section');
-    const step = params.get('step');
+
 
     // Redirect from pricing: open subscription section and clean URL
     if (section === 'subscription' && !connected && !error) {
@@ -376,75 +382,51 @@ export default function Dashboard() {
       window.history.replaceState({}, '', '/dashboard');
     }
 
-    if (connected === 'tiktok') {
-      // Show success message
-      showSocialSuccess("TikTok");
-      fetchSocialConnections(); // Refresh connections from database
-      
-      // Switch to social media section if specified
-      if (section === 'social-media') {
-        setActiveSection('social-media');
-      }
-      
-      // Return to step 5 if connecting from step 5
-      if (step === '5') {
+    if (connected) {
+      fetchSocialConnections();
+      const hasWizardState = !!sessionStorage.getItem('wizard_oauth_state');
+      if (hasWizardState) {
+        restoreWizardState();
         setActiveSection('video-creation');
         setCurrentStep(5);
+      } else if (section === 'social-media') {
+        setActiveSection('social-media');
       }
-      
-      // Clean up URL
+      setPendingOAuthCallback({ connected });
       window.history.replaceState({}, '', '/dashboard');
     }
 
-    if (connected === 'instagram') {
-      // Show success message
-      showSocialSuccess("Instagram");
-      fetchSocialConnections(); // Refresh connections from database
-      
-      // Switch to social media section if specified
-      if (section === 'social-media') {
-        setActiveSection('social-media');
-      }
-      
-      // Return to step 5 if connecting from step 5
-      if (step === '5') {
-        setActiveSection('video-creation');
-        setCurrentStep(5);
-      }
-      
-      // Clean up URL
-      window.history.replaceState({}, '', '/dashboard');
-    }
-
-    if (connected === 'youtube') {
-      // Show success message
-      showSocialSuccess("YouTube");
-      fetchSocialConnections(); // Refresh connections from database
-      
-      // Switch to social media section if specified
-      if (section === 'social-media') {
-        setActiveSection('social-media');
-      }
-      
-      // Return to step 5 if connecting from step 5
-      if (step === '5') {
-        setActiveSection('video-creation');
-        setCurrentStep(5);
-      }
-      
-      // Clean up URL
-      window.history.replaceState({}, '', '/dashboard');
-    }
-    
     if (error) {
-      // Show error message
+      const hasWizardState = !!sessionStorage.getItem('wizard_oauth_state');
+      if (hasWizardState) {
+        restoreWizardState();
+        setActiveSection('video-creation');
+        setCurrentStep(5);
+      }
+      setPendingOAuthCallback({ error });
+      window.history.replaceState({}, '', '/dashboard');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // Show OAuth toast only after language has loaded to avoid English flash
+  useEffect(() => {
+    if (!pendingOAuthCallback || !isLanguageReady) return;
+
+    const { connected, error } = pendingOAuthCallback;
+
+    if (connected === 'tiktok') showSocialSuccess("TikTok");
+    if (connected === 'instagram') showSocialSuccess("Instagram");
+    if (connected === 'youtube') showSocialSuccess("YouTube");
+
+    if (error) {
       const oauthErrors = (t.messages as { oauthErrors?: Record<string, string> }).oauthErrors;
       const errorMessages: { [key: string]: string } = {
-        'missing_params': oauthErrors?.missing_params ?? 'OAuth parameters missing',
-        'oauth_failed': oauthErrors?.oauth_failed ?? 'Failed to connect to social media',
-        'access_denied': oauthErrors?.access_denied ?? 'You denied access',
-        'publish_scope_required': oauthErrors?.publish_scope_required ?? 'You must allow posting permission to connect. Please try again and enable posting when asked.',
-        'youtube_permission_denied': oauthErrors?.youtube_permission_denied ?? 'YouTube video upload permission is required. Please allow "Manage your YouTube videos" when connecting your account.',
+        missing_params: oauthErrors?.missing_params ?? 'OAuth parameters missing',
+        oauth_failed: oauthErrors?.oauth_failed ?? 'Failed to connect to social media',
+        access_denied: oauthErrors?.access_denied ?? 'You denied access',
+        publish_scope_required: oauthErrors?.publish_scope_required ?? 'You must allow posting permission to connect. Please try again and enable posting when asked.',
+        youtube_permission_denied: oauthErrors?.youtube_permission_denied ?? 'YouTube video upload permission is required. Please allow "Manage your YouTube videos" when connecting your account.',
       };
       const unknownError = (t.messages as { unknownError?: string }).unknownError ?? 'Unknown error occurred';
       setToast({
@@ -453,12 +435,11 @@ export default function Dashboard() {
         title: t.messages.connectionFailed,
         message: formatMessageLoose((t.messages as { oauthErrorFormat?: string }).oauthErrorFormat ?? 'Error: {{error}}', { error: errorMessages[error] || unknownError }),
       });
-      
-      // Clean up URL
-      window.history.replaceState({}, '', '/dashboard');
     }
+
+    setPendingOAuthCallback(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [pendingOAuthCallback, isLanguageReady]);
 
   // Fetch social media connections from database
   const fetchSocialConnections = async () => {
@@ -605,31 +586,56 @@ export default function Dashboard() {
     }
   };
 
+  const saveWizardState = () => {
+    const state = {
+      videoType, category, duration, language, voice,
+      artStyle, backgroundVideo, script,
+      selectedPlatforms, seriesName, publishTime, secondPublishTime, publishDays,
+    };
+    sessionStorage.setItem('wizard_oauth_state', JSON.stringify(state));
+  };
+
+  const restoreWizardState = () => {
+    const raw = sessionStorage.getItem('wizard_oauth_state');
+    if (!raw) return;
+    try {
+      const s = JSON.parse(raw);
+      if (s.videoType) setVideoType(s.videoType);
+      if (s.category) setCategory(s.category);
+      if (s.duration) setDuration(s.duration);
+      if (s.language) setLanguage(s.language);
+      if (s.voice) setVoice(s.voice);
+      if (s.artStyle) setArtStyle(s.artStyle);
+      if (s.backgroundVideo) setBackgroundVideo(s.backgroundVideo);
+      if (s.script) setScript(s.script);
+      if (s.selectedPlatforms) setSelectedPlatforms(s.selectedPlatforms);
+      if (s.seriesName) setSeriesName(s.seriesName);
+      if (s.publishTime) setPublishTime(s.publishTime);
+      if (s.secondPublishTime) setSecondPublishTime(s.secondPublishTime);
+      if (s.publishDays) setPublishDays(s.publishDays);
+    } catch { /* ignore */ }
+    sessionStorage.removeItem('wizard_oauth_state');
+  };
+
   const handleConnectTiktok = () => {
     if (!user) return;
-    
     setIsConnectingTiktok(true);
-    // Redirect to TikTok OAuth, include step parameter if on step 5
-    const stepParam = currentStep === 5 ? '&step=5' : '';
-    window.location.href = `/api/tiktok/auth?user_id=${user.id}${stepParam}`;
+    if (currentStep === 5) saveWizardState();
+    window.location.href = `/api/tiktok/auth?user_id=${user.id}`;
   };
 
   const handleConnectInstagram = () => {
     if (!user) return;
-    
     setIsConnectingInstagram(true);
-    // Redirect to Instagram OAuth, include step parameter if on step 5
-    const stepParam = currentStep === 5 ? '&step=5' : '';
-    window.location.href = `/api/instagram/auth?user_id=${user.id}${stepParam}`;
+    if (currentStep === 5) saveWizardState();
+    window.location.href = `/api/instagram/auth?user_id=${user.id}`;
   };
 
   const handleConnectYoutube = () => {
     if (!user) return;
-    
     setIsConnectingYoutube(true);
-    // Redirect to YouTube OAuth, include step parameter if on step 5
-    const stepParam = currentStep === 5 ? '&step=5' : '';
-    window.location.href = `/api/youtube/auth?user_id=${user.id}${stepParam}`;
+    if (currentStep === 5) saveWizardState();
+    window.location.href = `/api/youtube/auth?user_id=${user.id}`;
   };
 
   const handleDisconnectTiktok = async () => {
@@ -814,8 +820,8 @@ export default function Dashboard() {
       setErrorDialog({
         isOpen: true,
         type: "error",
-        title: "Failed to Load Series",
-        message: errorMessage || "An error occurred while loading your series. Please try again.",
+        title: t.dashboard.seriesManagement.loadSeriesError,
+        message: errorMessage || t.dashboard.seriesManagement.loadSeriesErrorMessage,
       });
     } finally {
       setIsLoadingSeries(false);
@@ -836,8 +842,8 @@ export default function Dashboard() {
       setErrorDialog({
         isOpen: true,
         type: "error",
-        title: "Failed to Load Scheduled Videos",
-        message: errorMessage || "An error occurred while loading scheduled videos.",
+        title: t.dashboard.scheduledPosts.loadError,
+        message: errorMessage || t.dashboard.scheduledPosts.loadErrorMessage,
       });
     } finally {
       setIsLoadingScheduledPosts(false);
@@ -985,6 +991,11 @@ export default function Dashboard() {
 
     // Validate step 6 requirements
     if (currentStep === 6) {
+      if (!userPlanId) {
+        router.push("/pricing");
+        return;
+      }
+
       if (!seriesName.trim()) {
         showToast(t.messages.seriesNameRequired);
         return;
@@ -1053,11 +1064,11 @@ export default function Dashboard() {
           const message =
             responseBody?.errorCode && errors && typeof errors[responseBody.errorCode] === "string"
               ? errors[responseBody.errorCode]
-              : (responseBody?.error as string) || (error instanceof Error ? error.message : String(error)) || (errors?.SERVER_ERROR ?? "An error occurred while creating your series. Please try again.");
+              : (responseBody?.error as string) || (error instanceof Error ? error.message : String(error)) || (errors?.SERVER_ERROR ?? t.dashboard.seriesManagement.loadSeriesErrorMessage);
           setErrorDialog({
             isOpen: true,
             type: "error",
-            title: "Failed to Create Series",
+            title: t.dashboard.seriesManagement.createSeriesError,
             message,
           });
           return;
@@ -1076,11 +1087,11 @@ export default function Dashboard() {
         const errors = (t.dashboard.seriesManagement as { errors?: Record<string, string> }).errors;
         const errorMessage = error instanceof Error ? error.message : String(error);
         const message =
-          errors?.SERVER_ERROR ?? "An error occurred while creating your series. Please try again.";
+          errors?.SERVER_ERROR ?? t.dashboard.seriesManagement.loadSeriesErrorMessage;
         setErrorDialog({
           isOpen: true,
           type: "error",
-          title: "Failed to Create Series",
+          title: t.dashboard.seriesManagement.createSeriesError,
           message: errorMessage || message,
         });
       } finally {
@@ -1534,10 +1545,17 @@ export default function Dashboard() {
       case 5:
         return (
           <div className="space-y-6">
-            <div className="text-center space-y-2 mb-8">
+            <div className="text-center space-y-2 mb-6">
               <h3 className="text-xl font-semibold">{t.dashboard.seriesSetup.publishingPlatformsTitle}</h3>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
                 {t.dashboard.seriesSetup.publishingPlatformsSubtitle}
+              </p>
+            </div>
+
+            <div className="flex items-start gap-3 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 mb-2">
+              <AlertCircle className="w-4 h-4 text-amber-500 dark:text-amber-400 mt-0.5 shrink-0" />
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                {(t.dashboard.seriesSetup as { permissionsHint?: string }).permissionsHint}
               </p>
             </div>
 
