@@ -1545,10 +1545,17 @@ export default function Dashboard() {
       case 5:
         return (
           <div className="space-y-6">
-            <div className="text-center space-y-2 mb-8">
+            <div className="text-center space-y-2 mb-6">
               <h3 className="text-xl font-semibold">{t.dashboard.seriesSetup.publishingPlatformsTitle}</h3>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
                 {t.dashboard.seriesSetup.publishingPlatformsSubtitle}
+              </p>
+            </div>
+
+            <div className="flex items-start gap-3 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 mb-2">
+              <AlertCircle className="w-4 h-4 text-amber-500 dark:text-amber-400 mt-0.5 shrink-0" />
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                {(t.dashboard.seriesSetup as { permissionsHint?: string }).permissionsHint}
               </p>
             </div>
 
