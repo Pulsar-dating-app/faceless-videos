@@ -374,7 +374,7 @@ export default function Dashboard() {
     const connected = params.get('connected');
     const error = params.get('error');
     const section = params.get('section');
-    const step = params.get('step');
+
 
     // Redirect from pricing: open subscription section and clean URL
     if (section === 'subscription' && !connected && !error) {
@@ -384,7 +384,8 @@ export default function Dashboard() {
 
     if (connected) {
       fetchSocialConnections();
-      if (step === '5') {
+      const hasWizardState = !!sessionStorage.getItem('wizard_oauth_state');
+      if (hasWizardState) {
         restoreWizardState();
         setActiveSection('video-creation');
         setCurrentStep(5);
@@ -396,7 +397,8 @@ export default function Dashboard() {
     }
 
     if (error) {
-      if (step === '5') {
+      const hasWizardState = !!sessionStorage.getItem('wizard_oauth_state');
+      if (hasWizardState) {
         restoreWizardState();
         setActiveSection('video-creation');
         setCurrentStep(5);
@@ -618,25 +620,22 @@ export default function Dashboard() {
   const handleConnectTiktok = () => {
     if (!user) return;
     setIsConnectingTiktok(true);
-    const stepParam = currentStep === 5 ? '&step=5' : '';
     if (currentStep === 5) saveWizardState();
-    window.location.href = `/api/tiktok/auth?user_id=${user.id}${stepParam}`;
+    window.location.href = `/api/tiktok/auth?user_id=${user.id}`;
   };
 
   const handleConnectInstagram = () => {
     if (!user) return;
     setIsConnectingInstagram(true);
-    const stepParam = currentStep === 5 ? '&step=5' : '';
     if (currentStep === 5) saveWizardState();
-    window.location.href = `/api/instagram/auth?user_id=${user.id}${stepParam}`;
+    window.location.href = `/api/instagram/auth?user_id=${user.id}`;
   };
 
   const handleConnectYoutube = () => {
     if (!user) return;
     setIsConnectingYoutube(true);
-    const stepParam = currentStep === 5 ? '&step=5' : '';
     if (currentStep === 5) saveWizardState();
-    window.location.href = `/api/youtube/auth?user_id=${user.id}${stepParam}`;
+    window.location.href = `/api/youtube/auth?user_id=${user.id}`;
   };
 
   const handleDisconnectTiktok = async () => {
