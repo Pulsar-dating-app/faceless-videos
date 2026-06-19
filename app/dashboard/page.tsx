@@ -991,6 +991,11 @@ export default function Dashboard() {
 
     // Validate step 6 requirements
     if (currentStep === 6) {
+      if (!userPlanId) {
+        router.push("/pricing");
+        return;
+      }
+
       if (!seriesName.trim()) {
         showToast(t.messages.seriesNameRequired);
         return;
