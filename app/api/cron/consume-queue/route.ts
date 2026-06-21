@@ -116,6 +116,25 @@ export async function GET(request: NextRequest) {
       );
 
       try {
+        // Idempotency check: skip if occurrence was already processed
+        if (payload.occurrence_id) {
+          const { data: existing } = await supabaseAdmin
+            .from('scheduled_posts')
+            .select('id')
+            .eq('occurrence_id', payload.occurrence_id)
+            .maybeSingle();
+
+          if (existing) {
+            console.log(`[consume-queue] Occurrence ${payload.occurrence_id} already processed, archiving msg ${msgId}`);
+            await supabaseAdmin.rpc('pgmq_archive_video', {
+              queue_name: 'video_generation_queue',
+              msg_id: msgId,
+            });
+            results.push({ msgId, skipped: true, reason: 'already processed' });
+            continue;
+          }
+        }
+
         let videoUrl: string;
         let audioUrl: string;
         let script: string;
@@ -194,7 +213,8 @@ export async function GET(request: NextRequest) {
               scheduledTime: payload.scheduled_time,
               platforms: payload.social_platforms || [],
               userId: payload.user_uid,
-              metadata, // Add metadata
+              metadata,
+              occurrenceId: payload.occurrence_id,
             }),
           });
 
@@ -271,13 +291,13 @@ export async function GET(request: NextRequest) {
             headers: mergeHeaders,
             body: JSON.stringify({
               audioUrl,
-              // Subtitles will be generated later by the FFmpeg worker (Python/stable-ts)
               subtitles: "",
               backgroundVideoUrl: payload.background_video,
               scheduledTime: payload.scheduled_time,
               platforms: payload.social_platforms || [],
               userId: payload.user_uid,
-              metadata, // Add metadata
+              metadata,
+              occurrenceId: payload.occurrence_id,
             }),
           });
 
