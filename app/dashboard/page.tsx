@@ -1561,25 +1561,52 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* TikTok */}
-              <div className="p-6 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 opacity-60">
+              <div className={`p-6 rounded-xl border-2 transition-all ${
+                selectedPlatforms.includes('tiktok')
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                  : tiktokConnected
+                    ? "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+                    : "border-zinc-200 dark:border-zinc-700 opacity-60"
+              }`}>
                 <div className="flex items-center gap-4 mb-4">
                   <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
                     <span className="text-white font-bold text-lg">TT</span>
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold text-lg">TikTok</h3>
-                    <p className="text-sm text-orange-600 dark:text-orange-400">
-                      {t.dashboard.socialMedia.comingSoon}
-                    </p>
+                    {tiktokConnected ? (
+                      <div className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                          @{tiktokUsername}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                        {t.dashboard.socialMedia.notConnected}
+                      </p>
+                    )}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  disabled
-                  className="w-full px-4 py-2 rounded-lg bg-zinc-300 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400 font-medium cursor-not-allowed"
-                >
-                  {t.dashboard.socialMedia.comingSoon}
-                </button>
+                {tiktokConnected ? (
+                  <button
+                    type="button"
+                    onClick={handleDisconnectTiktok}
+                    disabled={isDisconnectingTiktok}
+                    className="w-full px-4 py-2 rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isDisconnectingTiktok ? t.dashboard.socialMedia.disconnecting : t.dashboard.socialMedia.disconnect}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleConnectTiktok}
+                    disabled={isConnectingTiktok}
+                    className="w-full px-4 py-2 rounded-lg bg-black text-white font-medium hover:bg-zinc-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isConnectingTiktok ? t.dashboard.socialMedia.connecting : t.dashboard.socialMedia.connect}
+                  </button>
+                )}
               </div>
 
               {/* Instagram */}
@@ -2066,24 +2093,48 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* TikTok */}
-          <div className="p-6 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 opacity-60">
+          <div className={`p-6 rounded-xl border-2 transition-all ${
+            tiktokConnected
+              ? "border-green-500 dark:border-green-500 bg-green-50 dark:bg-green-900/10"
+              : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600"
+          }`}>
             <div className="flex items-center gap-4 mb-4">
               <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-lg">TT</span>
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-lg">TikTok</h3>
-                <p className="text-sm text-orange-600 dark:text-orange-400">
-                  {t.dashboard.socialMedia.comingSoon}
-                </p>
+                {tiktokConnected ? (
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                      @{tiktokUsername}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    {t.dashboard.socialMedia.notConnected}
+                  </p>
+                )}
               </div>
             </div>
-            <button 
-              disabled
-              className="w-full px-4 py-2 rounded-lg bg-zinc-300 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400 font-medium cursor-not-allowed"
-            >
-              {t.dashboard.socialMedia.comingSoon}
-            </button>
+            {tiktokConnected ? (
+              <button
+                onClick={handleDisconnectTiktok}
+                disabled={isDisconnectingTiktok}
+                className="w-full px-4 py-2 rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDisconnectingTiktok ? t.dashboard.socialMedia.disconnecting : t.dashboard.socialMedia.disconnect}
+              </button>
+            ) : (
+              <button
+                onClick={handleConnectTiktok}
+                disabled={isConnectingTiktok}
+                className="w-full px-4 py-2 rounded-lg bg-black text-white font-medium hover:bg-zinc-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isConnectingTiktok ? t.dashboard.socialMedia.connecting : t.dashboard.socialMedia.connect}
+              </button>
+            )}
           </div>
 
           {/* Instagram */}
@@ -3131,25 +3182,15 @@ export default function Dashboard() {
                   {["tiktok", "instagram", "youtube"].map((platform) => (
                     <label
                       key={platform}
-                      className={`flex items-center gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 ${
-                        platform === 'tiktok' 
-                          ? 'opacity-50 cursor-not-allowed' 
-                          : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer'
-                      }`}
+                      className="flex items-center gap-3 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer"
                     >
                       <input
                         type="checkbox"
                         defaultChecked={Array.isArray(editingSeries.social_platforms) && editingSeries.social_platforms.includes(platform)}
                         value={platform}
-                        disabled={platform === 'tiktok'}
-                        className="edit-platform-checkbox rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="edit-platform-checkbox rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
                       />
                       <span className="text-sm capitalize">{platform}</span>
-                      {platform === 'tiktok' && (
-                        <span className="text-xs text-orange-600 dark:text-orange-400 ml-auto">
-                          {t.dashboard.socialMedia.comingSoon}
-                        </span>
-                      )}
                     </label>
                   ))}
                 </div>
