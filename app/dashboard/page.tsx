@@ -38,7 +38,7 @@ const LANGUAGE_FLAGS: { [key: string]: string } = {
   'ro': '🇷🇴',
 };
 
-const VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+const VOICES = ['Freeman', 'Alfred', 'Finn', 'Raquel', 'Holly', 'Brittney'];
 
 // Art styles with preview images
 const ART_STYLES = [
@@ -119,7 +119,7 @@ export default function Dashboard() {
   const [category, setCategory] = useState("joke");
   const [duration, setDuration] = useState("30");
   const [language, setLanguage] = useState("en");
-  const [voice, setVoice] = useState("alloy");
+  const [voice, setVoice] = useState("Alfred");
   const [artStyle, setArtStyle] = useState("cartoon");
   const [backgroundVideo, setBackgroundVideo] = useState(BACKGROUND_VIDEOS[0]?.url ?? "");
   const [script, setScript] = useState("");

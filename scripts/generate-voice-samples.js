@@ -5,15 +5,22 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-const OPENAI_API_KEY = "";
+const ELEVENLABS_API_KEY = "sk_945038b586aad42af177bcdf87a2d5e62e743369a165fcd6";
 
-if (!OPENAI_API_KEY) {
-  console.error('Error: OPENAI_API_KEY environment variable not set');
+if (!ELEVENLABS_API_KEY) {
+  console.error('Error: ELEVENLABS_API_KEY environment variable not set');
   process.exit(1);
 }
 
-// OpenAI TTS voices
-const voices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+// ElevenLabs voice configurations
+const voices = {
+  'Freeman': '5lrBPYY4YvMbKHTo8kvZ',
+  'Alfred': 'NOpBlnGInO9m6vDvFkFC',
+  'Finn': 'vBKc2FfBKJfcZNyEt1n6',
+  'Raquel': 'GDzHdQOi6jjf8zaXhCYD',
+  'Holly': 'B9PDs7mcHTMxHUw5U8Cf',
+  'Brittney': 'kPzsL2i3teMYv0FxEYQ6',
+};
 
 // Language configurations with sample text
 const languages = {
@@ -51,21 +58,24 @@ if (!fs.existsSync(outputBaseDir)) {
   fs.mkdirSync(outputBaseDir, { recursive: true });
 }
 
-async function generateVoiceSample(voice, language, sampleText) {
+async function generateVoiceSample(voiceName, voiceId, language, sampleText) {
   return new Promise((resolve, reject) => {
     const postData = JSON.stringify({
-      model: 'tts-1',
-      input: sampleText,
-      voice: voice,
+      text: sampleText,
+      model_id: 'eleven_multilingual_v2',
+      voice_settings: {
+        stability: 0.5,
+        similarity_boost: 0.75,
+      },
     });
 
     const options = {
-      hostname: 'api.openai.com',
+      hostname: 'api.elevenlabs.io',
       port: 443,
-      path: '/v1/audio/speech',
+      path: `/v1/text-to-speech/${voiceId}`,
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'xi-api-key': ELEVENLABS_API_KEY,
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(postData),
       },
@@ -78,13 +88,13 @@ async function generateVoiceSample(voice, language, sampleText) {
         fs.mkdirSync(langDir, { recursive: true });
       }
 
-      const outputPath = path.join(langDir, `${voice}.mp3`);
+      const outputPath = path.join(langDir, `${voiceName}.mp3`);
       const writeStream = fs.createWriteStream(outputPath);
 
       res.pipe(writeStream);
 
       writeStream.on('finish', () => {
-        console.log(`✓ Generated ${language}/${voice}`);
+        console.log(`✓ Generated ${language}/${voiceName}`);
         resolve();
       });
 
@@ -100,32 +110,33 @@ async function generateVoiceSample(voice, language, sampleText) {
 async function generateAllSamples() {
   console.log('🎙️  Generating voice samples for all languages...\n');
   
-  const totalSamples = Object.keys(languages).length * voices.length;
+  const voiceEntries = Object.entries(voices);
+  const totalSamples = Object.keys(languages).length * voiceEntries.length;
   let generatedCount = 0;
   let skippedCount = 0;
   
   for (const [langCode, langConfig] of Object.entries(languages)) {
     console.log(`\n📢 Processing ${langConfig.name} (${langCode})...`);
     
-    for (const voice of voices) {
+    for (const [voiceName, voiceId] of voiceEntries) {
       const langDir = path.join(outputBaseDir, langCode);
-      const outputPath = path.join(langDir, `${voice}.mp3`);
+      const outputPath = path.join(langDir, `${voiceName}.mp3`);
       
       // Skip if file already exists
       if (fs.existsSync(outputPath)) {
-        console.log(`  ⊘ Skipping ${voice} (already exists)`);
+        console.log(`  ⊘ Skipping ${voiceName} (already exists)`);
         skippedCount++;
         continue;
       }
       
       try {
-        await generateVoiceSample(voice, langCode, langConfig.text);
+        await generateVoiceSample(voiceName, voiceId, langCode, langConfig.text);
         generatedCount++;
         
         // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 500));
       } catch (error) {
-        console.error(`  ✗ Failed to generate ${voice}:`, error.message);
+        console.error(`  ✗ Failed to generate ${voiceName}:`, error.message);
       }
     }
   }
@@ -136,7 +147,7 @@ async function generateAllSamples() {
   console.log(`   Generated: ${generatedCount}`);
   console.log(`   Skipped: ${skippedCount}`);
   console.log(`   Languages: ${Object.keys(languages).length}`);
-  console.log(`   Voices per language: ${voices.length}`);
+  console.log(`   Voices per language: ${voiceEntries.length}`);
   console.log('='.repeat(50));
 }
 
