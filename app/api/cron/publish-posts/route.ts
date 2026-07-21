@@ -349,8 +349,15 @@ async function processInstagramPlatform(
         throw new Error('Instagram not connected');
       }
 
+      const containerId = scheduledPost.instagram_container_id;
       const accountId = connection.metadata?.instagram_user_id || connection.account_id;
-      const statusCode = await checkInstagramContainerStatus(scheduledPost.instagram_container_id, connection.access_token);
+      const accessToken = await getValidInstagramAccessToken(supabase, payload.user_uid, connection);
+      const statusCode = await withInstagramTokenRetry(
+        supabase,
+        payload.user_uid,
+        (token) => checkInstagramContainerStatus(containerId, token),
+        accessToken
+      );
 
       if (statusCode === 'PUBLISHED') {
         await supabase
@@ -364,7 +371,12 @@ async function processInstagramPlatform(
       }
 
       if (statusCode === 'FINISHED') {
-        const { mediaId } = await publishInstagramContainer(accountId, scheduledPost.instagram_container_id, connection.access_token);
+        const { mediaId } = await withInstagramTokenRetry(
+          supabase,
+          payload.user_uid,
+          (token) => publishInstagramContainer(accountId, containerId, token),
+          accessToken
+        );
         await supabase
           .from('scheduled_posts')
           .update({
@@ -618,6 +630,82 @@ async function uploadTikTokVideo(uploadUrl: string, videoBuffer: Buffer) {
   console.log('[TikTok] Upload successful');
 }
 
+interface InstagramConnection {
+  access_token: string;
+  expires_at?: string | null;
+}
+
+// Instagram (Graph API via Instagram Login) has no separate OAuth refresh_token — the
+// long-lived access token refreshes itself, but only while it's still valid (not expired).
+async function refreshInstagramToken(
+  accessToken: string,
+  userId: string,
+  supabase: SupabaseAdmin
+): Promise<string> {
+  const response = await fetch(
+    `https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${accessToken}`
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to refresh Instagram token: ${await response.text()}`);
+  }
+
+  const data = await response.json();
+  const newAccessToken = data.access_token;
+  const expiresIn = data.expires_in || 60 * 24 * 60 * 60; // ~60 days
+  const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+  await supabase
+    .from('social_media_connections')
+    .update({ access_token: newAccessToken, expires_at: expiresAt })
+    .eq('user_uid', userId)
+    .eq('platform', 'instagram');
+
+  console.log('[Instagram] Token refreshed');
+
+  return newAccessToken;
+}
+
+// Proactive refresh: the token lasts ~60 days, refresh well ahead of expiry.
+async function getValidInstagramAccessToken(
+  supabase: SupabaseAdmin,
+  userId: string,
+  connection: InstagramConnection
+): Promise<string> {
+  if (connection.expires_at) {
+    const expiresAt = new Date(connection.expires_at).getTime();
+    if (expiresAt - Date.now() < 5 * 24 * 60 * 60 * 1000) {
+      try {
+        return await refreshInstagramToken(connection.access_token, userId, supabase);
+      } catch (error) {
+        console.error('[Instagram] Proactive refresh failed, using existing token:', error);
+      }
+    }
+  }
+  return connection.access_token;
+}
+
+// Reactive refresh: retry once on an OAuthException (expired/invalid token). Only works if
+// the token hasn't already expired — an already-expired session needs a manual reconnect.
+async function withInstagramTokenRetry<T>(
+  supabase: SupabaseAdmin,
+  userId: string,
+  run: (accessToken: string) => Promise<T>,
+  accessToken: string
+): Promise<T> {
+  try {
+    return await run(accessToken);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg.includes('OAuthException') || msg.includes('"code":190')) {
+      console.log('[Instagram] Access token invalid, attempting refresh and retry...');
+      const freshToken = await refreshInstagramToken(accessToken, userId, supabase);
+      return run(freshToken);
+    }
+    throw error;
+  }
+}
+
 async function createInstagramContainer(userId: string, videoUrl: string, supabase: SupabaseAdmin, scheduledPost: ScheduledPostRow) {
   const { data: connection } = await supabase
     .from('social_media_connections')
@@ -643,7 +731,9 @@ async function createInstagramContainer(userId: string, videoUrl: string, supaba
     ? `${scheduledPost.description}\n\n${hashtagString}`
     : hashtagString;
 
-  const containerResponse = await fetch(
+  const accessToken = await getValidInstagramAccessToken(supabase, userId, connection);
+
+  const createContainer = (token: string) => fetch(
     `https://graph.instagram.com/v21.0/${accountId}/media`,
     {
       method: 'POST',
@@ -654,21 +744,35 @@ async function createInstagramContainer(userId: string, videoUrl: string, supaba
         video_url: videoUrl,
         media_type: 'REELS',
         caption: caption || 'Auto-generated video',
-        access_token: connection.access_token,
+        access_token: token,
       }),
     }
   );
 
+  let containerResponse = await createContainer(accessToken);
+  let finalAccessToken = accessToken;
+
   if (!containerResponse.ok) {
     const errorText = await containerResponse.text();
-    throw new Error(`Instagram container failed: ${errorText}`);
+
+    if (errorText.includes('OAuthException') || errorText.includes('"code":190')) {
+      console.log('[Instagram] Access token invalid during container creation, refreshing and retrying...');
+      finalAccessToken = await refreshInstagramToken(accessToken, userId, supabase);
+      containerResponse = await createContainer(finalAccessToken);
+
+      if (!containerResponse.ok) {
+        throw new Error(`Instagram container failed after refresh: ${await containerResponse.text()}`);
+      }
+    } else {
+      throw new Error(`Instagram container failed: ${errorText}`);
+    }
   }
 
   const containerData = await containerResponse.json();
 
   console.log(`[Instagram] Media container created: ${containerData.id}`);
 
-  return { containerId: containerData.id as string, accountId: accountId as string, accessToken: connection.access_token as string };
+  return { containerId: containerData.id as string, accountId: accountId as string, accessToken: finalAccessToken };
 }
 
 async function waitForInstagramContainer(containerId: string, accessToken: string) {
