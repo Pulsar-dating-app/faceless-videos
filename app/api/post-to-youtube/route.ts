@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
           'Content-Type': `multipart/related; boundary=${boundary}`,
           'Content-Length': multipartBody.length.toString(),
         },
-        body: multipartBody,
+        body: multipartBody as unknown as BodyInit,
       }
     );
 
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
               'Content-Type': `multipart/related; boundary=${boundary}`,
               'Content-Length': multipartBody.length.toString(),
             },
-            body: multipartBody,
+            body: multipartBody as unknown as BodyInit,
           }
         );
 

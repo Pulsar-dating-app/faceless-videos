@@ -490,7 +490,7 @@ async function uploadTikTokVideo(uploadUrl: string, videoBuffer: Buffer) {
       'Content-Length': totalBytes.toString(),
       'Content-Range': contentRange,
     },
-    body: videoBuffer,
+    body: videoBuffer as unknown as BodyInit,
   });
 
   if (!uploadResponse.ok) {
