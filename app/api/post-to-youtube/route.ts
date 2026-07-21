@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { checkYouTubeVideoStatus } from '@/lib/social-status';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -9,8 +10,11 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
 export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
+  let scheduledPostIdForErrorHandling: string | undefined;
+
   try {
     const { userId, videoUrl, scheduledTime, scheduledPostId, hasTikTokOrInstagram = false } = await request.json();
+    scheduledPostIdForErrorHandling = scheduledPostId;
 
     if (!userId || !videoUrl || !scheduledTime || !scheduledPostId) {
       return NextResponse.json(
@@ -24,7 +28,7 @@ export async function POST(request: NextRequest) {
     // Fetch scheduled post to get metadata
     const { data: scheduledPost } = await supabaseAdmin
       .from('scheduled_posts')
-      .select('title, description, hashtags')
+      .select('title, description, hashtags, youtube_video_id')
       .eq('id', scheduledPostId)
       .single();
 
@@ -41,6 +45,24 @@ export async function POST(request: NextRequest) {
     }
 
     let accessToken = connection.access_token;
+
+    // Idempotency: if this post already has a YouTube video, ask YouTube whether it's real
+    // before uploading again — a saved id alone isn't proof the row's own update ever landed.
+    if (scheduledPost?.youtube_video_id) {
+      try {
+        const uploadStatus = await checkYouTubeVideoStatus(scheduledPost.youtube_video_id, accessToken);
+        if (uploadStatus === 'uploaded' || uploadStatus === 'processed') {
+          console.log(`[post-to-youtube] Video ${scheduledPost.youtube_video_id} already exists, skipping upload`);
+          return NextResponse.json({
+            success: true,
+            videoId: scheduledPost.youtube_video_id,
+            url: `https://www.youtube.com/watch?v=${scheduledPost.youtube_video_id}`,
+          });
+        }
+      } catch (error) {
+        console.error('[post-to-youtube] Status check failed, proceeding with re-upload:', error);
+      }
+    }
 
     // Check if token needs refresh
     if (connection.expires_at) {
@@ -171,10 +193,24 @@ export async function POST(request: NextRequest) {
       url: `https://www.youtube.com/watch?v=${uploadData.id}`,
     });
 
-  } catch (error: any) {
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
     console.error('Error posting to YouTube:', error);
+
+    if (scheduledPostIdForErrorHandling) {
+      try {
+        const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        await supabaseAdmin
+          .from('scheduled_posts')
+          .update({ youtube_status: 'failed', youtube_last_error: msg })
+          .eq('id', scheduledPostIdForErrorHandling);
+      } catch (updateError) {
+        console.error('Error recording YouTube failure:', updateError);
+      }
+    }
+
     return NextResponse.json(
-      { error: error.message || 'Failed to post to YouTube' },
+      { error: msg || 'Failed to post to YouTube' },
       { status: 500 }
     );
   }
@@ -183,7 +219,7 @@ export async function POST(request: NextRequest) {
 async function refreshYouTubeToken(
   refreshToken: string,
   userId: string,
-  supabase: any
+  supabase: SupabaseClient
 ): Promise<string> {
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -223,7 +259,7 @@ async function refreshYouTubeToken(
 }
 
 async function updateScheduledPost(
-  supabase: any,
+  supabase: SupabaseClient,
   scheduledPostId: string,
   videoId: string,
   hasTikTokOrInstagram: boolean
@@ -231,8 +267,9 @@ async function updateScheduledPost(
   const update: Record<string, unknown> = {
     youtube_video_id: videoId,
     youtube_posted_at: new Date().toISOString(),
+    youtube_status: 'published',
   };
-  // Only set status to published when YouTube is the only platform; otherwise publish-posts will set it
+  // Only set the overall status when YouTube is the only platform; otherwise publish-posts owns it
   if (!hasTikTokOrInstagram) {
     update.status = 'published';
   }

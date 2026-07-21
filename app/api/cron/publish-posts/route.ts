@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { checkTikTokStatus, checkInstagramContainerStatus } from '@/lib/social-status';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const CRON_SECRET = process.env.CRON_SECRET;
+
+// scheduled_posts has no retry_count/max_retries columns — each platform tracks its own
+// attempts independently via tiktok_retry_count / instagram_retry_count.
+const MAX_RETRIES = 3;
 
 interface PostingQueueMessage {
   scheduled_post_id: string;
@@ -16,11 +21,30 @@ interface PostingQueueMessage {
   };
 }
 
+type PlatformResult = { terminal: boolean; success: boolean };
+type SupabaseAdmin = SupabaseClient;
+
+interface ScheduledPostRow {
+  id: string;
+  hashtags?: string[] | null;
+  description?: string | null;
+  title?: string | null;
+  tiktok_status?: string | null;
+  tiktok_retry_count?: number | null;
+  tiktok_publish_id?: string | null;
+  tiktok_posted_at?: string | null;
+  instagram_status?: string | null;
+  instagram_retry_count?: number | null;
+  instagram_container_id?: string | null;
+  instagram_media_id?: string | null;
+  instagram_posted_at?: string | null;
+  [key: string]: unknown;
+}
+
 export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
   try {
-    // Verify cron secret
     if (CRON_SECRET) {
       const authHeader = request.headers.get('authorization');
       const cronSecret = request.nextUrl.searchParams.get('secret');
@@ -34,7 +58,6 @@ export async function GET(request: NextRequest) {
 
     console.log('[publish-posts] Starting cronjob...');
 
-    // Read messages from posting queue
     const { data: messages, error: readError } = await supabaseAdmin.rpc('pgmq_read_posting', {
       queue_name: 'posting_queue',
       visibility_timeout: 1200, // 20 min visibility timeout
@@ -67,7 +90,6 @@ export async function GET(request: NextRequest) {
       try {
         console.log(`[publish-posts] Processing message ${msgId}`);
 
-        // Get scheduled post from database
         const { data: scheduledPost, error: postError } = await supabaseAdmin
           .from('scheduled_posts')
           .select('*')
@@ -78,13 +100,27 @@ export async function GET(request: NextRequest) {
           throw new Error('Scheduled post not found');
         }
 
-        // Check retry count
-        if (scheduledPost.retry_count >= scheduledPost.max_retries) {
-          console.log(`[publish-posts] Max retries exceeded for ${msgId}`);
-          
+        const tiktokResult: PlatformResult = payload.platforms.tiktok
+          ? await processTikTokPlatform(supabaseAdmin, scheduledPost, payload)
+          : { terminal: true, success: true };
+
+        const instagramResult: PlatformResult = payload.platforms.instagram
+          ? await processInstagramPlatform(supabaseAdmin, scheduledPost, payload)
+          : { terminal: true, success: true };
+
+        const bothTerminal = tiktokResult.terminal && instagramResult.terminal;
+        const bothSuccess = tiktokResult.success && instagramResult.success;
+
+        if (bothTerminal) {
+          const overallStatus = bothSuccess
+            ? 'published'
+            : (!tiktokResult.success && !instagramResult.success)
+              ? 'failed'
+              : 'partial';
+
           await supabaseAdmin
             .from('scheduled_posts')
-            .update({ status: 'failed', last_error: 'Max retries exceeded' })
+            .update({ status: overallStatus })
             .eq('id', payload.scheduled_post_id);
 
           await supabaseAdmin.rpc('pgmq_archive_posting', {
@@ -92,140 +128,32 @@ export async function GET(request: NextRequest) {
             msg_id: msgId,
           });
 
-          errors.push({ msgId, error: 'Max retries exceeded' });
-          continue;
-        }
-
-        // Update status to processing
-        await supabaseAdmin
-          .from('scheduled_posts')
-          .update({ status: 'processing' })
-          .eq('id', payload.scheduled_post_id);
-
-        // Post to platforms
-        const postResults = {
-          tiktok: null as any,
-          instagram: null as any,
-        };
-
-        if (payload.platforms.tiktok) {
-          console.log(`[publish-posts] Posting to TikTok for ${msgId}`);
-          try {
-            postResults.tiktok = await postToTikTok(
-              payload.user_uid,
-              payload.video_url,
-              supabaseAdmin,
-              scheduledPost
-            );
-            console.log(`[publish-posts] ✅ TikTok post successful`);
-          } catch (error: any) {
-            console.error('[publish-posts] TikTok post failed:', error);
-            postResults.tiktok = { error: error.message };
+          if (bothSuccess) {
+            console.log(`[publish-posts] All platforms successful for ${msgId}`);
+            results.push({ msgId, scheduledPostId: payload.scheduled_post_id, success: true });
+          } else {
+            console.log(`[publish-posts] Terminal state (partial/failed) for ${msgId}`);
+            errors.push({
+              msgId,
+              scheduledPostId: payload.scheduled_post_id,
+              error: `tiktok=${tiktokResult.success ? 'ok' : 'failed'}, instagram=${instagramResult.success ? 'ok' : 'failed'}`,
+            });
           }
-        }
-
-        if (payload.platforms.instagram) {
-          console.log(`[publish-posts] Posting to Instagram for ${msgId}`);
-          try {
-            postResults.instagram = await postToInstagram(
-              payload.user_uid,
-              payload.video_url,
-              supabaseAdmin,
-              scheduledPost
-            );
-            console.log(`[publish-posts] ✅ Instagram post successful`);
-          } catch (error: any) {
-            console.error('[publish-posts] Instagram post failed:', error);
-            postResults.instagram = { error: error.message };
-          }
-        }
-
-        // Check if all posts succeeded
-        const tiktokSuccess = !payload.platforms.tiktok || !postResults.tiktok?.error;
-        const instagramSuccess = !payload.platforms.instagram || !postResults.instagram?.error;
-        const allSuccess = tiktokSuccess && instagramSuccess;
-
-        if (allSuccess) {
-          console.log(`[publish-posts] All platforms successful for ${msgId}`);
-          
-          // Update scheduled_posts with success
-          await supabaseAdmin
-            .from('scheduled_posts')
-            .update({
-              status: 'published',
-              tiktok_publish_id: postResults.tiktok?.publishId || null,
-              tiktok_posted_at: postResults.tiktok ? new Date().toISOString() : null,
-              instagram_media_id: postResults.instagram?.mediaId || null,
-              instagram_posted_at: postResults.instagram ? new Date().toISOString() : null,
-            })
-            .eq('id', payload.scheduled_post_id);
-
-          // Archive the message
-          await supabaseAdmin.rpc('pgmq_archive_posting', {
-            queue_name: 'posting_queue',
-            msg_id: msgId,
-          });
-
-          results.push({ msgId, scheduledPostId: payload.scheduled_post_id, success: true });
         } else {
-          console.log(`[publish-posts] Partial failure for ${msgId}, will retry`);
-          
-          // Increment retry count
+          console.log(`[publish-posts] Still processing ${msgId}, will recheck next run`);
           await supabaseAdmin
             .from('scheduled_posts')
-            .update({
-              status: 'pending',
-              retry_count: scheduledPost.retry_count + 1,
-              last_error: JSON.stringify({
-                tiktok: postResults.tiktok?.error || null,
-                instagram: postResults.instagram?.error || null,
-              }),
-            })
+            .update({ status: 'processing' })
             .eq('id', payload.scheduled_post_id);
 
-          // Message will be visible again after visibility timeout
-          errors.push({
-            msgId,
-            scheduledPostId: payload.scheduled_post_id,
-            error: 'Partial failure, will retry',
-          });
+          // Message stays in the queue and reappears after the visibility timeout.
+          errors.push({ msgId, scheduledPostId: payload.scheduled_post_id, error: 'Still processing, will retry' });
         }
 
-      } catch (error: any) {
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
         console.error(`[publish-posts] Error processing post ${msgId}:`, error);
-
-        // Increment retry count
-        const { data: scheduledPost } = await supabaseAdmin
-          .from('scheduled_posts')
-          .select('retry_count, max_retries')
-          .eq('id', payload.scheduled_post_id)
-          .single();
-
-        if (scheduledPost && scheduledPost.retry_count < scheduledPost.max_retries) {
-          await supabaseAdmin
-            .from('scheduled_posts')
-            .update({
-              status: 'pending',
-              retry_count: scheduledPost.retry_count + 1,
-              last_error: error.message,
-            })
-            .eq('id', payload.scheduled_post_id);
-        } else {
-          await supabaseAdmin
-            .from('scheduled_posts')
-            .update({
-              status: 'failed',
-              last_error: error.message,
-            })
-            .eq('id', payload.scheduled_post_id);
-
-          await supabaseAdmin.rpc('pgmq_archive_posting', {
-            queue_name: 'posting_queue',
-            msg_id: msgId,
-          });
-        }
-
-        errors.push({ msgId, error: error.message });
+        errors.push({ msgId, error: msg });
       }
     }
 
@@ -239,14 +167,251 @@ export async function GET(request: NextRequest) {
       errors,
     });
 
-  } catch (error: any) {
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
     console.error('[publish-posts] Unexpected error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
-async function postToTikTok(userId: string, videoUrl: string, supabase: any, scheduledPost: any) {
-  // Get TikTok connection
+async function recordTikTokFailure(
+  supabase: SupabaseAdmin,
+  postId: string,
+  currentRetryCount: number,
+  message: string
+): Promise<PlatformResult> {
+  const newRetryCount = currentRetryCount + 1;
+  const nowFailed = newRetryCount >= MAX_RETRIES;
+  await supabase
+    .from('scheduled_posts')
+    .update({
+      tiktok_retry_count: newRetryCount,
+      tiktok_last_error: message,
+      tiktok_status: nowFailed ? 'failed' : 'pending',
+    })
+    .eq('id', postId);
+  return { terminal: nowFailed, success: false };
+}
+
+async function processTikTokPlatform(
+  supabase: SupabaseAdmin,
+  scheduledPost: ScheduledPostRow,
+  payload: PostingQueueMessage
+): Promise<PlatformResult> {
+  if (scheduledPost.tiktok_status === 'published') {
+    return { terminal: true, success: true };
+  }
+  if (scheduledPost.tiktok_status === 'failed') {
+    return { terminal: true, success: false };
+  }
+
+  const retryCount = scheduledPost.tiktok_retry_count || 0;
+  if (retryCount >= MAX_RETRIES) {
+    await supabase
+      .from('scheduled_posts')
+      .update({ tiktok_status: 'failed', tiktok_last_error: 'Max retries exceeded' })
+      .eq('id', scheduledPost.id);
+    return { terminal: true, success: false };
+  }
+
+  // Already attempted before — ask TikTok what actually happened instead of trusting local state.
+  if (scheduledPost.tiktok_publish_id) {
+    const { data: connection } = await supabase
+      .from('social_media_connections')
+      .select('access_token')
+      .eq('user_uid', payload.user_uid)
+      .eq('platform', 'tiktok')
+      .single();
+
+    if (!connection) {
+      return recordTikTokFailure(supabase, scheduledPost.id, retryCount, 'TikTok not connected');
+    }
+
+    try {
+      const { status, failReason } = await checkTikTokStatus(scheduledPost.tiktok_publish_id, connection.access_token);
+
+      if (status === 'PUBLISH_COMPLETE' || status === 'SEND_TO_USER_INBOX') {
+        await supabase
+          .from('scheduled_posts')
+          .update({
+            tiktok_status: 'published',
+            tiktok_posted_at: scheduledPost.tiktok_posted_at || new Date().toISOString(),
+          })
+          .eq('id', scheduledPost.id);
+        return { terminal: true, success: true };
+      }
+
+      if (status === 'FAILED') {
+        await supabase.from('scheduled_posts').update({ tiktok_publish_id: null }).eq('id', scheduledPost.id);
+        return recordTikTokFailure(supabase, scheduledPost.id, retryCount, failReason || 'TikTok publish failed');
+      }
+
+      // PROCESSING_UPLOAD / PROCESSING_DOWNLOAD — still in flight, recheck next run
+      await supabase.from('scheduled_posts').update({ tiktok_status: 'processing' }).eq('id', scheduledPost.id);
+      return { terminal: false, success: false };
+    } catch (error) {
+      console.error('[publish-posts] TikTok status check failed:', error);
+      return { terminal: false, success: false };
+    }
+  }
+
+  // Never attempted — post fresh
+  try {
+    const { publishId, uploadUrl, videoBuffer } = await initTikTokUpload(
+      payload.user_uid,
+      payload.video_url,
+      supabase,
+      scheduledPost
+    );
+
+    // Save the id before transferring content — closes the "posted but not recorded" window.
+    await supabase
+      .from('scheduled_posts')
+      .update({ tiktok_publish_id: publishId, tiktok_status: 'processing' })
+      .eq('id', scheduledPost.id);
+
+    await uploadTikTokVideo(uploadUrl, videoBuffer);
+
+    await supabase
+      .from('scheduled_posts')
+      .update({ tiktok_status: 'published', tiktok_posted_at: new Date().toISOString() })
+      .eq('id', scheduledPost.id);
+
+    console.log(`[publish-posts] ✅ TikTok post successful for ${scheduledPost.id}`);
+    return { terminal: true, success: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[publish-posts] TikTok post failed:', error);
+    return recordTikTokFailure(supabase, scheduledPost.id, retryCount, msg);
+  }
+}
+
+async function recordInstagramFailure(
+  supabase: SupabaseAdmin,
+  postId: string,
+  currentRetryCount: number,
+  message: string
+): Promise<PlatformResult> {
+  const newRetryCount = currentRetryCount + 1;
+  const nowFailed = newRetryCount >= MAX_RETRIES;
+  await supabase
+    .from('scheduled_posts')
+    .update({
+      instagram_retry_count: newRetryCount,
+      instagram_last_error: message,
+      instagram_status: nowFailed ? 'failed' : 'pending',
+    })
+    .eq('id', postId);
+  return { terminal: nowFailed, success: false };
+}
+
+async function processInstagramPlatform(
+  supabase: SupabaseAdmin,
+  scheduledPost: ScheduledPostRow,
+  payload: PostingQueueMessage
+): Promise<PlatformResult> {
+  if (scheduledPost.instagram_status === 'published') {
+    return { terminal: true, success: true };
+  }
+  if (scheduledPost.instagram_status === 'failed') {
+    return { terminal: true, success: false };
+  }
+
+  const retryCount = scheduledPost.instagram_retry_count || 0;
+  if (retryCount >= MAX_RETRIES) {
+    await supabase
+      .from('scheduled_posts')
+      .update({ instagram_status: 'failed', instagram_last_error: 'Max retries exceeded' })
+      .eq('id', scheduledPost.id);
+    return { terminal: true, success: false };
+  }
+
+  try {
+    if (scheduledPost.instagram_container_id) {
+      const { data: connection } = await supabase
+        .from('social_media_connections')
+        .select('*')
+        .eq('user_uid', payload.user_uid)
+        .eq('platform', 'instagram')
+        .single();
+
+      if (!connection) {
+        throw new Error('Instagram not connected');
+      }
+
+      const accountId = connection.metadata?.instagram_user_id || connection.account_id;
+      const statusCode = await checkInstagramContainerStatus(scheduledPost.instagram_container_id, connection.access_token);
+
+      if (statusCode === 'PUBLISHED') {
+        await supabase
+          .from('scheduled_posts')
+          .update({
+            instagram_status: 'published',
+            instagram_posted_at: scheduledPost.instagram_posted_at || new Date().toISOString(),
+          })
+          .eq('id', scheduledPost.id);
+        return { terminal: true, success: true };
+      }
+
+      if (statusCode === 'FINISHED') {
+        const { mediaId } = await publishInstagramContainer(accountId, scheduledPost.instagram_container_id, connection.access_token);
+        await supabase
+          .from('scheduled_posts')
+          .update({
+            instagram_status: 'published',
+            instagram_media_id: mediaId,
+            instagram_posted_at: new Date().toISOString(),
+          })
+          .eq('id', scheduledPost.id);
+        return { terminal: true, success: true };
+      }
+
+      if (statusCode === 'IN_PROGRESS') {
+        await supabase.from('scheduled_posts').update({ instagram_status: 'processing' }).eq('id', scheduledPost.id);
+        return { terminal: false, success: false };
+      }
+
+      // EXPIRED or ERROR — the container is unusable, clear it and try again from scratch
+      await supabase.from('scheduled_posts').update({ instagram_container_id: null }).eq('id', scheduledPost.id);
+      throw new Error(`Instagram container ${statusCode}`);
+    }
+
+    // Never attempted — create a fresh container
+    const { containerId, accountId, accessToken } = await createInstagramContainer(
+      payload.user_uid,
+      payload.video_url,
+      supabase,
+      scheduledPost
+    );
+
+    // Save the container id before waiting/publishing — closes the "posted but not recorded" window.
+    await supabase
+      .from('scheduled_posts')
+      .update({ instagram_container_id: containerId, instagram_status: 'processing' })
+      .eq('id', scheduledPost.id);
+
+    await waitForInstagramContainer(containerId, accessToken);
+    const { mediaId } = await publishInstagramContainer(accountId, containerId, accessToken);
+
+    await supabase
+      .from('scheduled_posts')
+      .update({
+        instagram_status: 'published',
+        instagram_media_id: mediaId,
+        instagram_posted_at: new Date().toISOString(),
+      })
+      .eq('id', scheduledPost.id);
+
+    console.log(`[publish-posts] ✅ Instagram post successful for ${scheduledPost.id}`);
+    return { terminal: true, success: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[publish-posts] Instagram post failed:', error);
+    return recordInstagramFailure(supabase, scheduledPost.id, retryCount, msg);
+  }
+}
+
+async function initTikTokUpload(userId: string, videoUrl: string, supabase: SupabaseAdmin, scheduledPost: ScheduledPostRow) {
   const { data: connection } = await supabase
     .from('social_media_connections')
     .select('*')
@@ -258,7 +423,6 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any, sch
     throw new Error('TikTok not connected');
   }
 
-  // Download video
   const videoResponse = await fetch(videoUrl);
   if (!videoResponse.ok) {
     throw new Error(`Failed to download video: ${videoResponse.statusText}`);
@@ -269,13 +433,11 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any, sch
 
   console.log(`[TikTok] Downloaded video: ${videoBuffer.length} bytes`);
 
-  // Format description with hashtags
   const hashtagString = scheduledPost?.hashtags?.map((tag: string) => `#${tag}`).join(' ') || '';
-  const fullDescription = scheduledPost?.description 
+  const fullDescription = scheduledPost?.description
     ? `${scheduledPost.description} ${hashtagString}`
     : hashtagString;
 
-  // TikTok API: Initialize upload
   // For unaudited apps, use inbox endpoint and SELF_ONLY privacy
   const initResponse = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
     method: 'POST',
@@ -285,7 +447,6 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any, sch
     },
     body: JSON.stringify({
       post_info: {
-        // TikTok has a single caption field: "title". Use description + hashtags for the visible caption.
         title: fullDescription || scheduledPost?.title || 'Auto-generated video',
         privacy_level: 'PUBLIC_TO_EVERYONE',
         disable_duet: false,
@@ -308,21 +469,20 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any, sch
   }
 
   const initData = await initResponse.json();
-  
+
   if (!initData.data || !initData.data.upload_url) {
     throw new Error('TikTok init response missing upload_url');
   }
 
-  const uploadUrl = initData.data.upload_url;
-  const publishId = initData.data.publish_id;
+  console.log(`[TikTok] Upload initialized: ${initData.data.publish_id}`);
 
-  console.log(`[TikTok] Upload initialized: ${publishId}`);
+  return { publishId: initData.data.publish_id as string, uploadUrl: initData.data.upload_url as string, videoBuffer };
+}
 
-  // TikTok requires Content-Range for the upload PUT request
+async function uploadTikTokVideo(uploadUrl: string, videoBuffer: Buffer) {
   const totalBytes = videoBuffer.length;
   const contentRange = `bytes 0-${totalBytes - 1}/${totalBytes}`;
 
-  // Upload video
   const uploadResponse = await fetch(uploadUrl, {
     method: 'PUT',
     headers: {
@@ -340,13 +500,10 @@ async function postToTikTok(userId: string, videoUrl: string, supabase: any, sch
     throw new Error(`TikTok upload failed: ${message}`);
   }
 
-  console.log(`[TikTok] Upload successful: ${publishId}`);
-
-  return { publishId, success: true };
+  console.log('[TikTok] Upload successful');
 }
 
-async function postToInstagram(userId: string, videoUrl: string, supabase: any, scheduledPost: any) {
-  // Get Instagram connection
+async function createInstagramContainer(userId: string, videoUrl: string, supabase: SupabaseAdmin, scheduledPost: ScheduledPostRow) {
   const { data: connection } = await supabase
     .from('social_media_connections')
     .select('*')
@@ -366,14 +523,11 @@ async function postToInstagram(userId: string, videoUrl: string, supabase: any, 
 
   console.log(`[Instagram] Creating media container for account: ${accountId}`);
 
-  // Format caption with hashtags (Instagram uses caption, not title)
   const hashtagString = scheduledPost?.hashtags?.map((tag: string) => `#${tag}`).join(' ') || '';
-  const caption = scheduledPost?.description 
+  const caption = scheduledPost?.description
     ? `${scheduledPost.description}\n\n${hashtagString}`
     : hashtagString;
 
-  // Instagram requires publicly accessible URL
-  // Create media container
   const containerResponse = await fetch(
     `https://graph.instagram.com/v21.0/${accountId}/media`,
     {
@@ -396,45 +550,45 @@ async function postToInstagram(userId: string, videoUrl: string, supabase: any, 
   }
 
   const containerData = await containerResponse.json();
-  const containerId = containerData.id;
 
-  console.log(`[Instagram] Media container created: ${containerId}`);
+  console.log(`[Instagram] Media container created: ${containerData.id}`);
 
-  // Wait for Instagram to process the video by checking status
+  return { containerId: containerData.id as string, accountId: accountId as string, accessToken: connection.access_token as string };
+}
+
+async function waitForInstagramContainer(containerId: string, accessToken: string) {
   let statusCheckAttempts = 0;
   const maxStatusChecks = 30; // Max 5 minutes (30 * 10s)
-  let isReady = false;
 
-  while (statusCheckAttempts < maxStatusChecks && !isReady) {
+  while (statusCheckAttempts < maxStatusChecks) {
     await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds between checks
-    
+
     const statusResponse = await fetch(
-      `https://graph.instagram.com/v21.0/${containerId}?fields=status_code&access_token=${connection.access_token}`,
+      `https://graph.instagram.com/v21.0/${containerId}?fields=status_code&access_token=${accessToken}`,
       { method: 'GET' }
     );
 
     if (statusResponse.ok) {
       const statusData = await statusResponse.json();
       console.log(`[Instagram] Container status: ${statusData.status_code}`);
-      
+
       if (statusData.status_code === 'FINISHED') {
-        isReady = true;
+        return;
       } else if (statusData.status_code === 'ERROR') {
         throw new Error('Instagram video processing failed');
       }
       // PUBLISHED, IN_PROGRESS, EXPIRED - keep waiting
     }
-    
+
     statusCheckAttempts++;
   }
 
-  if (!isReady) {
-    throw new Error('Instagram video processing timeout - container not ready after 5 minutes');
-  }
+  throw new Error('Instagram video processing timeout - container not ready after 5 minutes');
+}
 
-  console.log(`[Instagram] Container ready, publishing...`);
+async function publishInstagramContainer(accountId: string, containerId: string, accessToken: string) {
+  console.log(`[Instagram] Publishing container ${containerId}...`);
 
-  // Publish media
   const publishResponse = await fetch(
     `https://graph.instagram.com/v21.0/${accountId}/media_publish`,
     {
@@ -444,7 +598,7 @@ async function postToInstagram(userId: string, videoUrl: string, supabase: any, 
       },
       body: JSON.stringify({
         creation_id: containerId,
-        access_token: connection.access_token,
+        access_token: accessToken,
       }),
     }
   );
@@ -458,5 +612,5 @@ async function postToInstagram(userId: string, videoUrl: string, supabase: any, 
 
   console.log(`[Instagram] Published: ${publishData.id}`);
 
-  return { mediaId: publishData.id, success: true };
+  return { mediaId: publishData.id as string };
 }

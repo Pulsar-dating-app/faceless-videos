@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const { audioUrl, subtitles, backgroundVideoUrl, scheduledTime, platforms, userId, metadata } = await req.json();
+  const { audioUrl, subtitles, backgroundVideoUrl, scheduledTime, platforms, userId, metadata, occurrenceId } = await req.json();
 
   const videoUrl = backgroundVideoUrl || DEFAULT_BACKGROUND_VIDEO_URL;
 
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
   // Handle social media posting if video was generated successfully
   if (data.url && scheduledTime && platforms && platforms.length > 0 && userId) {
     try {
-      await handleSocialMediaPosting(userId, data.url, scheduledTime, platforms, metadata);
+      await handleSocialMediaPosting(userId, data.url, scheduledTime, platforms, metadata, occurrenceId);
     } catch (error) {
       console.error('Error in social media posting flow:', error);
       // Don't fail the whole request if posting setup fails
@@ -60,7 +60,8 @@ async function handleSocialMediaPosting(
   videoUrl: string,
   scheduledTime: string,
   platforms: string[],
-  metadata?: { title: string; description: string; hashtags: string[] }
+  metadata?: { title: string; description: string; hashtags: string[] },
+  occurrenceId?: string
 ) {
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -86,25 +87,54 @@ async function handleSocialMediaPosting(
   };
   const hasTikTokOrInstagram = platformsObj.tiktok || platformsObj.instagram;
 
-  // Insert into scheduled_posts
-  const { data: scheduledPost, error: dbError } = await supabaseAdmin
-    .from('scheduled_posts')
-    .insert({
-      user_uid: userId,
-      video_url: videoUrl,
-      scheduled_time: scheduledTime,
-      platforms: platformsObj,
-      status: 'pending',
-      title: metadata?.title || null,
-      description: metadata?.description || null,
-      hashtags: metadata?.hashtags || null,
-    })
-    .select()
-    .single();
+  const postFields = {
+    user_uid: userId,
+    video_url: videoUrl,
+    scheduled_time: scheduledTime,
+    platforms: platformsObj,
+    status: 'pending',
+    title: metadata?.title || null,
+    description: metadata?.description || null,
+    hashtags: metadata?.hashtags || null,
+    occurrence_id: occurrenceId || null,
+  };
 
-  if (dbError) {
-    console.error('Error saving to scheduled_posts:', dbError);
-    throw dbError;
+  let scheduledPost;
+
+  if (occurrenceId) {
+    // upsert + ignoreDuplicates leans on the DB's unique index on occurrence_id: if this
+    // occurrence was already processed by another invocation, the insert is skipped instead
+    // of creating a second scheduled_posts row (and a second YouTube upload below).
+    const { data: upserted, error: upsertError } = await supabaseAdmin
+      .from('scheduled_posts')
+      .upsert(postFields, { onConflict: 'occurrence_id', ignoreDuplicates: true })
+      .select()
+      .maybeSingle();
+
+    if (upsertError) {
+      console.error('Error saving to scheduled_posts:', upsertError);
+      throw upsertError;
+    }
+
+    if (!upserted) {
+      console.log(`Occurrence ${occurrenceId} already has a scheduled post, skipping duplicate posting flow`);
+      return;
+    }
+
+    scheduledPost = upserted;
+  } else {
+    const { data: inserted, error: insertError } = await supabaseAdmin
+      .from('scheduled_posts')
+      .insert(postFields)
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Error saving to scheduled_posts:', insertError);
+      throw insertError;
+    }
+
+    scheduledPost = inserted;
   }
 
   console.log(`✅ Saved scheduled post: ${scheduledPost.id}`);
