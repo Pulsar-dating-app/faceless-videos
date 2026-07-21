@@ -5,6 +5,8 @@ import { checkTikTokStatus, checkInstagramContainerStatus } from '@/lib/social-s
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const CRON_SECRET = process.env.CRON_SECRET;
+const TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY!;
+const TIKTOK_CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET!;
 
 // scheduled_posts has no retry_count/max_retries columns — each platform tracks its own
 // attempts independently via tiktok_retry_count / instagram_retry_count.
@@ -218,7 +220,7 @@ async function processTikTokPlatform(
   if (scheduledPost.tiktok_publish_id) {
     const { data: connection } = await supabase
       .from('social_media_connections')
-      .select('access_token')
+      .select('*')
       .eq('user_uid', payload.user_uid)
       .eq('platform', 'tiktok')
       .single();
@@ -228,7 +230,15 @@ async function processTikTokPlatform(
     }
 
     try {
-      const { status, failReason } = await checkTikTokStatus(scheduledPost.tiktok_publish_id, connection.access_token);
+      const publishId = scheduledPost.tiktok_publish_id;
+      const accessToken = await getValidTikTokAccessToken(supabase, payload.user_uid, connection);
+      const { status, failReason } = await withTikTokTokenRetry(
+        supabase,
+        payload.user_uid,
+        connection,
+        (token) => checkTikTokStatus(publishId, token),
+        accessToken
+      );
 
       if (status === 'PUBLISH_COMPLETE' || status === 'SEND_TO_USER_INBOX') {
         await supabase
@@ -411,6 +421,119 @@ async function processInstagramPlatform(
   }
 }
 
+interface TikTokConnection {
+  access_token: string;
+  refresh_token?: string | null;
+  expires_at?: string | null;
+}
+
+async function refreshTikTokToken(
+  refreshToken: string,
+  userId: string,
+  supabase: SupabaseAdmin
+): Promise<string> {
+  const tokenResponse = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Cache-Control': 'no-cache',
+    },
+    body: new URLSearchParams({
+      client_key: TIKTOK_CLIENT_KEY,
+      client_secret: TIKTOK_CLIENT_SECRET,
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    }),
+  });
+
+  if (!tokenResponse.ok) {
+    throw new Error(`Failed to refresh TikTok token: ${await tokenResponse.text()}`);
+  }
+
+  const tokenData = await tokenResponse.json();
+  const newAccessToken = tokenData.access_token;
+  const newRefreshToken = tokenData.refresh_token || refreshToken;
+  const expiresIn = tokenData.expires_in || 86400;
+  const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+  await supabase
+    .from('social_media_connections')
+    .update({
+      access_token: newAccessToken,
+      refresh_token: newRefreshToken,
+      expires_at: expiresAt,
+    })
+    .eq('user_uid', userId)
+    .eq('platform', 'tiktok');
+
+  console.log('[TikTok] Token refreshed');
+
+  return newAccessToken;
+}
+
+// Proactive refresh: if expires_at says we're close to expiry, refresh before using the token.
+async function getValidTikTokAccessToken(
+  supabase: SupabaseAdmin,
+  userId: string,
+  connection: TikTokConnection
+): Promise<string> {
+  if (connection.expires_at && connection.refresh_token) {
+    const expiresAt = new Date(connection.expires_at).getTime();
+    if (expiresAt - Date.now() < 5 * 60 * 1000) {
+      return refreshTikTokToken(connection.refresh_token, userId, supabase);
+    }
+  }
+  return connection.access_token;
+}
+
+// Reactive refresh: expires_at isn't always trustworthy (or may not be set at all by the
+// OAuth callback), so also retry once on an explicit access_token_invalid response.
+async function withTikTokTokenRetry<T>(
+  supabase: SupabaseAdmin,
+  userId: string,
+  connection: TikTokConnection,
+  run: (accessToken: string) => Promise<T>,
+  accessToken: string
+): Promise<T> {
+  try {
+    return await run(accessToken);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg.includes('access_token_invalid') && connection.refresh_token) {
+      console.log('[TikTok] Access token invalid, refreshing and retrying...');
+      const freshToken = await refreshTikTokToken(connection.refresh_token, userId, supabase);
+      return run(freshToken);
+    }
+    throw error;
+  }
+}
+
+async function tiktokInitRequest(accessToken: string, videoBuffer: Buffer, title: string) {
+  return fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      post_info: {
+        title,
+        privacy_level: 'PUBLIC_TO_EVERYONE',
+        disable_duet: false,
+        disable_comment: false,
+        disable_stitch: false,
+        video_cover_timestamp_ms: 1000,
+      },
+      source_info: {
+        source: 'FILE_UPLOAD',
+        video_size: videoBuffer.length,
+        chunk_size: videoBuffer.length,
+        total_chunk_count: 1,
+      },
+    }),
+  });
+}
+
 async function initTikTokUpload(userId: string, videoUrl: string, supabase: SupabaseAdmin, scheduledPost: ScheduledPostRow) {
   const { data: connection } = await supabase
     .from('social_media_connections')
@@ -422,6 +545,8 @@ async function initTikTokUpload(userId: string, videoUrl: string, supabase: Supa
   if (!connection) {
     throw new Error('TikTok not connected');
   }
+
+  let accessToken = await getValidTikTokAccessToken(supabase, userId, connection);
 
   const videoResponse = await fetch(videoUrl);
   if (!videoResponse.ok) {
@@ -437,35 +562,25 @@ async function initTikTokUpload(userId: string, videoUrl: string, supabase: Supa
   const fullDescription = scheduledPost?.description
     ? `${scheduledPost.description} ${hashtagString}`
     : hashtagString;
+  const title = fullDescription || scheduledPost?.title || 'Auto-generated video';
 
   // For unaudited apps, use inbox endpoint and SELF_ONLY privacy
-  const initResponse = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${connection.access_token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      post_info: {
-        title: fullDescription || scheduledPost?.title || 'Auto-generated video',
-        privacy_level: 'PUBLIC_TO_EVERYONE',
-        disable_duet: false,
-        disable_comment: false,
-        disable_stitch: false,
-        video_cover_timestamp_ms: 1000,
-      },
-      source_info: {
-        source: 'FILE_UPLOAD',
-        video_size: videoBuffer.length,
-        chunk_size: videoBuffer.length,
-        total_chunk_count: 1,
-      },
-    }),
-  });
+  let initResponse = await tiktokInitRequest(accessToken, videoBuffer, title);
 
   if (!initResponse.ok) {
     const errorText = await initResponse.text();
-    throw new Error(`TikTok init failed: ${errorText}`);
+
+    if (errorText.includes('access_token_invalid') && connection.refresh_token) {
+      console.log('[TikTok] Access token invalid during init, refreshing and retrying...');
+      accessToken = await refreshTikTokToken(connection.refresh_token, userId, supabase);
+      initResponse = await tiktokInitRequest(accessToken, videoBuffer, title);
+
+      if (!initResponse.ok) {
+        throw new Error(`TikTok init failed after refresh: ${await initResponse.text()}`);
+      }
+    } else {
+      throw new Error(`TikTok init failed: ${errorText}`);
+    }
   }
 
   const initData = await initResponse.json();
