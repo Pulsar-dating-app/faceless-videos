@@ -23,7 +23,7 @@ interface PostingQueueMessage {
   };
 }
 
-type PlatformResult = { terminal: boolean; success: boolean };
+type PlatformResult = { terminal: boolean; success: boolean; skipped?: boolean; reason?: string };
 type SupabaseAdmin = SupabaseClient;
 
 interface ScheduledPostRow {
@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    const cronStartedAt = Date.now();
     console.log('[publish-posts] Starting cronjob...');
 
     const { data: messages, error: readError } = await supabaseAdmin.rpc('pgmq_read_posting', {
@@ -90,7 +91,13 @@ export async function GET(request: NextRequest) {
       const payload = job.message as PostingQueueMessage;
 
       try {
-        console.log(`[publish-posts] Processing message ${msgId}`);
+        console.log(
+          `[publish-posts] Processing message ${msgId}`,
+          JSON.stringify({
+            scheduledPostId: payload.scheduled_post_id,
+            platforms: payload.platforms,
+          })
+        );
 
         const { data: scheduledPost, error: postError } = await supabaseAdmin
           .from('scheduled_posts')
@@ -102,13 +109,28 @@ export async function GET(request: NextRequest) {
           throw new Error('Scheduled post not found');
         }
 
+        console.log(
+          `[publish-posts] Current state for ${msgId}`,
+          JSON.stringify({
+            tiktok_status: scheduledPost.tiktok_status,
+            tiktok_retry_count: scheduledPost.tiktok_retry_count,
+            instagram_status: scheduledPost.instagram_status,
+            instagram_retry_count: scheduledPost.instagram_retry_count,
+          })
+        );
+
         const tiktokResult: PlatformResult = payload.platforms.tiktok
           ? await processTikTokPlatform(supabaseAdmin, scheduledPost, payload)
-          : { terminal: true, success: true };
+          : { terminal: true, success: true, skipped: true, reason: 'platform_not_requested' };
 
         const instagramResult: PlatformResult = payload.platforms.instagram
           ? await processInstagramPlatform(supabaseAdmin, scheduledPost, payload)
-          : { terminal: true, success: true };
+          : { terminal: true, success: true, skipped: true, reason: 'platform_not_requested' };
+
+        console.log(
+          `[publish-posts] Platform results for ${msgId}`,
+          JSON.stringify({ tiktok: tiktokResult, instagram: instagramResult })
+        );
 
         const bothTerminal = tiktokResult.terminal && instagramResult.terminal;
         const bothSuccess = tiktokResult.success && instagramResult.success;
@@ -130,26 +152,60 @@ export async function GET(request: NextRequest) {
             msg_id: msgId,
           });
 
+          console.log(`[publish-posts] Archived message ${msgId}, overall status: ${overallStatus}`);
+
+          const platformSummary = {
+            tiktok: payload.platforms.tiktok
+              ? { success: tiktokResult.success, skipped: !!tiktokResult.skipped, reason: tiktokResult.reason }
+              : undefined,
+            instagram: payload.platforms.instagram
+              ? { success: instagramResult.success, skipped: !!instagramResult.skipped, reason: instagramResult.reason }
+              : undefined,
+          };
+
           if (bothSuccess) {
-            console.log(`[publish-posts] All platforms successful for ${msgId}`);
-            results.push({ msgId, scheduledPostId: payload.scheduled_post_id, success: true });
+            const skippedNote = [
+              tiktokResult.skipped ? `tiktok: ${tiktokResult.reason}` : null,
+              instagramResult.skipped ? `instagram: ${instagramResult.reason}` : null,
+            ].filter(Boolean).join(', ');
+            console.log(
+              `[publish-posts] All platforms successful for ${msgId}${skippedNote ? ` (already handled — ${skippedNote})` : ''}`
+            );
+            results.push({
+              msgId,
+              scheduledPostId: payload.scheduled_post_id,
+              success: true,
+              platforms: platformSummary,
+            });
           } else {
             console.log(`[publish-posts] Terminal state (partial/failed) for ${msgId}`);
             errors.push({
               msgId,
               scheduledPostId: payload.scheduled_post_id,
               error: `tiktok=${tiktokResult.success ? 'ok' : 'failed'}, instagram=${instagramResult.success ? 'ok' : 'failed'}`,
+              platforms: platformSummary,
             });
           }
         } else {
-          console.log(`[publish-posts] Still processing ${msgId}, will recheck next run`);
+          console.log(
+            `[publish-posts] Still processing ${msgId}, will recheck next run`,
+            JSON.stringify({ tiktok: tiktokResult.reason, instagram: instagramResult.reason })
+          );
           await supabaseAdmin
             .from('scheduled_posts')
             .update({ status: 'processing' })
             .eq('id', payload.scheduled_post_id);
 
           // Message stays in the queue and reappears after the visibility timeout.
-          errors.push({ msgId, scheduledPostId: payload.scheduled_post_id, error: 'Still processing, will retry' });
+          errors.push({
+            msgId,
+            scheduledPostId: payload.scheduled_post_id,
+            error: 'Still processing, will retry',
+            platforms: {
+              tiktok: payload.platforms.tiktok ? { success: tiktokResult.success, reason: tiktokResult.reason } : undefined,
+              instagram: payload.platforms.instagram ? { success: instagramResult.success, reason: instagramResult.reason } : undefined,
+            },
+          });
         }
 
       } catch (error) {
@@ -159,12 +215,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log(`[publish-posts] Completed: ${results.length} success, ${errors.length} errors`);
+    const durationMs = Date.now() - cronStartedAt;
+    console.log(`[publish-posts] Completed: ${results.length} success, ${errors.length} errors (${durationMs}ms)`);
 
     return NextResponse.json({
       success: true,
       processed: results.length,
       total: messages.length,
+      durationMs,
       results,
       errors,
     });
@@ -184,6 +242,9 @@ async function recordTikTokFailure(
 ): Promise<PlatformResult> {
   const newRetryCount = currentRetryCount + 1;
   const nowFailed = newRetryCount >= MAX_RETRIES;
+  console.log(
+    `[publish-posts] [TikTok] Recording failure for ${postId}: attempt ${newRetryCount}/${MAX_RETRIES} — ${message}${nowFailed ? ' (max retries reached, marking as failed)' : ''}`
+  );
   await supabase
     .from('scheduled_posts')
     .update({
@@ -192,7 +253,7 @@ async function recordTikTokFailure(
       tiktok_status: nowFailed ? 'failed' : 'pending',
     })
     .eq('id', postId);
-  return { terminal: nowFailed, success: false };
+  return { terminal: nowFailed, success: false, reason: nowFailed ? 'max_retries_exceeded' : message };
 }
 
 async function processTikTokPlatform(
@@ -201,23 +262,28 @@ async function processTikTokPlatform(
   payload: PostingQueueMessage
 ): Promise<PlatformResult> {
   if (scheduledPost.tiktok_status === 'published') {
-    return { terminal: true, success: true };
+    console.log(`[publish-posts] [TikTok] Post ${scheduledPost.id} already published (tiktok_publish_id=${scheduledPost.tiktok_publish_id}), skipping — idempotency guard`);
+    return { terminal: true, success: true, skipped: true, reason: 'already_published' };
   }
   if (scheduledPost.tiktok_status === 'failed') {
-    return { terminal: true, success: false };
+    console.log(`[publish-posts] [TikTok] Post ${scheduledPost.id} already marked failed, skipping`);
+    return { terminal: true, success: false, skipped: true, reason: 'already_failed' };
   }
 
   const retryCount = scheduledPost.tiktok_retry_count || 0;
   if (retryCount >= MAX_RETRIES) {
+    console.log(`[publish-posts] [TikTok] Post ${scheduledPost.id} exceeded max retries (${retryCount}/${MAX_RETRIES}), marking failed`);
     await supabase
       .from('scheduled_posts')
       .update({ tiktok_status: 'failed', tiktok_last_error: 'Max retries exceeded' })
       .eq('id', scheduledPost.id);
-    return { terminal: true, success: false };
+    return { terminal: true, success: false, skipped: true, reason: 'max_retries_exceeded' };
   }
 
   // Already attempted before — ask TikTok what actually happened instead of trusting local state.
   if (scheduledPost.tiktok_publish_id) {
+    console.log(`[publish-posts] [TikTok] Post ${scheduledPost.id} has publish_id=${scheduledPost.tiktok_publish_id}, verifying real status with TikTok before deciding`);
+
     const { data: connection } = await supabase
       .from('social_media_connections')
       .select('*')
@@ -240,7 +306,10 @@ async function processTikTokPlatform(
         accessToken
       );
 
+      console.log(`[publish-posts] [TikTok] Status check for ${scheduledPost.id} (publish_id=${publishId}): ${status}`);
+
       if (status === 'PUBLISH_COMPLETE' || status === 'SEND_TO_USER_INBOX') {
+        console.log(`[publish-posts] [TikTok] Confirmed already published for ${scheduledPost.id} — not reposting`);
         await supabase
           .from('scheduled_posts')
           .update({
@@ -248,24 +317,27 @@ async function processTikTokPlatform(
             tiktok_posted_at: scheduledPost.tiktok_posted_at || new Date().toISOString(),
           })
           .eq('id', scheduledPost.id);
-        return { terminal: true, success: true };
+        return { terminal: true, success: true, skipped: true, reason: 'confirmed_already_published' };
       }
 
       if (status === 'FAILED') {
+        console.log(`[publish-posts] [TikTok] TikTok reports previous attempt failed for ${scheduledPost.id}: ${failReason}`);
         await supabase.from('scheduled_posts').update({ tiktok_publish_id: null }).eq('id', scheduledPost.id);
         return recordTikTokFailure(supabase, scheduledPost.id, retryCount, failReason || 'TikTok publish failed');
       }
 
       // PROCESSING_UPLOAD / PROCESSING_DOWNLOAD — still in flight, recheck next run
+      console.log(`[publish-posts] [TikTok] Still processing on TikTok's side for ${scheduledPost.id}, will recheck next run`);
       await supabase.from('scheduled_posts').update({ tiktok_status: 'processing' }).eq('id', scheduledPost.id);
-      return { terminal: false, success: false };
+      return { terminal: false, success: false, reason: `tiktok_status_${status}` };
     } catch (error) {
-      console.error('[publish-posts] TikTok status check failed:', error);
-      return { terminal: false, success: false };
+      console.error(`[publish-posts] [TikTok] Status check failed for ${scheduledPost.id}:`, error);
+      return { terminal: false, success: false, reason: 'status_check_error' };
     }
   }
 
   // Never attempted — post fresh
+  console.log(`[publish-posts] [TikTok] No previous attempt for ${scheduledPost.id}, posting fresh`);
   try {
     const { publishId, uploadUrl, videoBuffer } = await initTikTokUpload(
       payload.user_uid,
@@ -287,11 +359,11 @@ async function processTikTokPlatform(
       .update({ tiktok_status: 'published', tiktok_posted_at: new Date().toISOString() })
       .eq('id', scheduledPost.id);
 
-    console.log(`[publish-posts] ✅ TikTok post successful for ${scheduledPost.id}`);
-    return { terminal: true, success: true };
+    console.log(`[publish-posts] [TikTok] ✅ Post successful for ${scheduledPost.id} (publish_id=${publishId})`);
+    return { terminal: true, success: true, reason: 'posted_now' };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.error('[publish-posts] TikTok post failed:', error);
+    console.error(`[publish-posts] [TikTok] Post failed for ${scheduledPost.id}:`, error);
     return recordTikTokFailure(supabase, scheduledPost.id, retryCount, msg);
   }
 }
@@ -304,6 +376,9 @@ async function recordInstagramFailure(
 ): Promise<PlatformResult> {
   const newRetryCount = currentRetryCount + 1;
   const nowFailed = newRetryCount >= MAX_RETRIES;
+  console.log(
+    `[publish-posts] [Instagram] Recording failure for ${postId}: attempt ${newRetryCount}/${MAX_RETRIES} — ${message}${nowFailed ? ' (max retries reached, marking as failed)' : ''}`
+  );
   await supabase
     .from('scheduled_posts')
     .update({
@@ -312,7 +387,7 @@ async function recordInstagramFailure(
       instagram_status: nowFailed ? 'failed' : 'pending',
     })
     .eq('id', postId);
-  return { terminal: nowFailed, success: false };
+  return { terminal: nowFailed, success: false, reason: nowFailed ? 'max_retries_exceeded' : message };
 }
 
 async function processInstagramPlatform(
@@ -321,23 +396,28 @@ async function processInstagramPlatform(
   payload: PostingQueueMessage
 ): Promise<PlatformResult> {
   if (scheduledPost.instagram_status === 'published') {
-    return { terminal: true, success: true };
+    console.log(`[publish-posts] [Instagram] Post ${scheduledPost.id} already published (instagram_media_id=${scheduledPost.instagram_media_id}), skipping — idempotency guard`);
+    return { terminal: true, success: true, skipped: true, reason: 'already_published' };
   }
   if (scheduledPost.instagram_status === 'failed') {
-    return { terminal: true, success: false };
+    console.log(`[publish-posts] [Instagram] Post ${scheduledPost.id} already marked failed, skipping`);
+    return { terminal: true, success: false, skipped: true, reason: 'already_failed' };
   }
 
   const retryCount = scheduledPost.instagram_retry_count || 0;
   if (retryCount >= MAX_RETRIES) {
+    console.log(`[publish-posts] [Instagram] Post ${scheduledPost.id} exceeded max retries (${retryCount}/${MAX_RETRIES}), marking failed`);
     await supabase
       .from('scheduled_posts')
       .update({ instagram_status: 'failed', instagram_last_error: 'Max retries exceeded' })
       .eq('id', scheduledPost.id);
-    return { terminal: true, success: false };
+    return { terminal: true, success: false, skipped: true, reason: 'max_retries_exceeded' };
   }
 
   try {
     if (scheduledPost.instagram_container_id) {
+      console.log(`[publish-posts] [Instagram] Post ${scheduledPost.id} has container_id=${scheduledPost.instagram_container_id}, verifying real status with Instagram before deciding`);
+
       const { data: connection } = await supabase
         .from('social_media_connections')
         .select('*')
@@ -359,7 +439,10 @@ async function processInstagramPlatform(
         accessToken
       );
 
+      console.log(`[publish-posts] [Instagram] Container status for ${scheduledPost.id} (container_id=${containerId}): ${statusCode}`);
+
       if (statusCode === 'PUBLISHED') {
+        console.log(`[publish-posts] [Instagram] Confirmed already published for ${scheduledPost.id} — not reposting`);
         await supabase
           .from('scheduled_posts')
           .update({
@@ -367,10 +450,11 @@ async function processInstagramPlatform(
             instagram_posted_at: scheduledPost.instagram_posted_at || new Date().toISOString(),
           })
           .eq('id', scheduledPost.id);
-        return { terminal: true, success: true };
+        return { terminal: true, success: true, skipped: true, reason: 'confirmed_already_published' };
       }
 
       if (statusCode === 'FINISHED') {
+        console.log(`[publish-posts] [Instagram] Container ready but never published for ${scheduledPost.id}, publishing now`);
         const { mediaId } = await withInstagramTokenRetry(
           supabase,
           payload.user_uid,
@@ -385,20 +469,24 @@ async function processInstagramPlatform(
             instagram_posted_at: new Date().toISOString(),
           })
           .eq('id', scheduledPost.id);
-        return { terminal: true, success: true };
+        console.log(`[publish-posts] [Instagram] ✅ Published container for ${scheduledPost.id} (media_id=${mediaId})`);
+        return { terminal: true, success: true, reason: 'published_from_existing_container' };
       }
 
       if (statusCode === 'IN_PROGRESS') {
+        console.log(`[publish-posts] [Instagram] Still processing on Instagram's side for ${scheduledPost.id}, will recheck next run`);
         await supabase.from('scheduled_posts').update({ instagram_status: 'processing' }).eq('id', scheduledPost.id);
-        return { terminal: false, success: false };
+        return { terminal: false, success: false, reason: 'instagram_container_in_progress' };
       }
 
       // EXPIRED or ERROR — the container is unusable, clear it and try again from scratch
+      console.log(`[publish-posts] [Instagram] Container ${statusCode} for ${scheduledPost.id}, clearing and will retry from scratch`);
       await supabase.from('scheduled_posts').update({ instagram_container_id: null }).eq('id', scheduledPost.id);
       throw new Error(`Instagram container ${statusCode}`);
     }
 
     // Never attempted — create a fresh container
+    console.log(`[publish-posts] [Instagram] No previous attempt for ${scheduledPost.id}, posting fresh`);
     const { containerId, accountId, accessToken } = await createInstagramContainer(
       payload.user_uid,
       payload.video_url,
@@ -424,11 +512,11 @@ async function processInstagramPlatform(
       })
       .eq('id', scheduledPost.id);
 
-    console.log(`[publish-posts] ✅ Instagram post successful for ${scheduledPost.id}`);
-    return { terminal: true, success: true };
+    console.log(`[publish-posts] [Instagram] ✅ Post successful for ${scheduledPost.id} (media_id=${mediaId})`);
+    return { terminal: true, success: true, reason: 'posted_now' };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.error('[publish-posts] Instagram post failed:', error);
+    console.error(`[publish-posts] [Instagram] Post failed for ${scheduledPost.id}:`, error);
     return recordInstagramFailure(supabase, scheduledPost.id, retryCount, msg);
   }
 }
