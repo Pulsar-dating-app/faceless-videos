@@ -95,6 +95,77 @@ const CATEGORY_ICONS: { [key: string]: React.ReactNode } = {
   riddles: <HelpCircle className="w-5 h-5" />,
 };
 
+// automations.schedule_config stores UTC time(s)/weekdays (create-series/update-series convert
+// local -> UTC on write). These mirror that conversion in reverse, purely for display, so the UI
+// keeps showing the user's local time when viewing/editing a series.
+const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+
+function shiftWeekday(day: string, offset: number): string {
+  const idx = WEEKDAYS.indexOf(day);
+  if (idx === -1 || offset === 0) return day;
+  const shifted = ((idx + offset) % 7 + 7) % 7;
+  return WEEKDAYS[shifted];
+}
+
+function convertUtcTimeToLocal(
+  timeStr: string,
+  timezone: string,
+  referenceDate: Date
+): { time: string; dayOffset: number } {
+  const [hoursRaw, minutesRaw] = timeStr.split(":");
+  const hours = parseInt(hoursRaw, 10);
+  const minutes = parseInt(minutesRaw, 10);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return { time: timeStr, dayOffset: 0 };
+  }
+
+  const utcDate = new Date(
+    Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), referenceDate.getUTCDate(), hours, minutes, 0)
+  );
+
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(utcDate);
+    const get = (type: string) => parseInt(parts.find((p) => p.type === type)?.value ?? "0", 10);
+    const localHour = get("hour") % 24;
+    const localMinute = get("minute");
+
+    const refDayStart = Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), referenceDate.getUTCDate());
+    const localDayStart = Date.UTC(get("year"), get("month") - 1, get("day"));
+    const dayOffset = Math.round((localDayStart - refDayStart) / 86400000);
+
+    const time = `${String(localHour).padStart(2, "0")}:${String(localMinute).padStart(2, "0")}`;
+    return { time, dayOffset };
+  } catch {
+    return { time: timeStr, dayOffset: 0 };
+  }
+}
+
+// Converts a schedule_config (UTC) into its local-time equivalent for display/editing.
+function getLocalScheduleConfig(sc: any): { time?: string; times?: string[]; days?: string[] } {
+  if (!sc || typeof sc !== "object") return {};
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const referenceDate = new Date();
+
+  if (Array.isArray(sc.times) && sc.times.length > 0) {
+    const times = sc.times.map((t: string) => convertUtcTimeToLocal(t, timezone, referenceDate).time);
+    return { times };
+  }
+  if (typeof sc.time === "string") {
+    const { time, dayOffset } = convertUtcTimeToLocal(sc.time, timezone, referenceDate);
+    const days = Array.isArray(sc.days) ? sc.days.map((d: string) => shiftWeekday(d, dayOffset)) : undefined;
+    return { time, days };
+  }
+  return {};
+}
+
 // Duration options with monetization info
 const DURATION_OPTIONS = [
   { value: "30", label: "25-35s", monetizable: false },
@@ -2427,7 +2498,9 @@ export default function Dashboard() {
     };
 
     const formatScheduleLabel = (series: { schedule_config?: any; publish_time?: string }) => {
-      const sc = series.schedule_config;
+      const sc = series.schedule_config && typeof series.schedule_config === "object"
+        ? getLocalScheduleConfig(series.schedule_config)
+        : series.schedule_config;
       const weekdays = (t.dashboard as any).weekdays as Record<string, string> | undefined;
       const dayLabel = (dayKey: string) => weekdays?.[dayKey] ?? dayKey.charAt(0).toUpperCase() + dayKey.slice(1, 3);
       if (sc && typeof sc === "object") {
@@ -2500,7 +2573,15 @@ export default function Dashboard() {
                     </div>
                     <button
                       onClick={() => {
-                        setEditingSeries(series);
+                        // schedule_config is stored in UTC; convert to local so the edit form
+                        // shows/edits the same wall-clock time the user originally picked.
+                        setEditingSeries({
+                          ...series,
+                          schedule_config:
+                            series.schedule_config && typeof series.schedule_config === "object"
+                              ? getLocalScheduleConfig(series.schedule_config)
+                              : series.schedule_config,
+                        });
                         setIsEditModalOpen(true);
                       }}
                       className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
